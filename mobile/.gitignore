@@ -63,9 +63,14 @@ yarn-error.log
 # Testing
 coverage/
 
+# Expo
+.expo/
+.expo-shared/
+dist/
+web-build/
+
 # Misc
 *.log
 *.swp
 *.swo
 *~
-

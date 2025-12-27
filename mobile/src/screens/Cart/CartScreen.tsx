@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { ActivityIndicator, Button, Card } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import FastImage from 'react-native-fast-image';
+import { Image } from 'expo-image';
 import { cartService } from '../../services/cart.service';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectCartItems, selectCartTotal, setCart } from '../../store/slices/cartSlice';
@@ -109,10 +109,10 @@ const CartScreen: React.FC = () => {
       <Card style={styles.cartItem}>
         <View style={styles.itemContent}>
           {productImage ? (
-            <FastImage
+            <Image
               source={{ uri: productImage }}
               style={styles.itemImage}
-              resizeMode={FastImage.resizeMode.cover}
+              contentFit="cover"
             />
           ) : (
             <View style={[styles.itemImage, styles.placeholderImage]}>

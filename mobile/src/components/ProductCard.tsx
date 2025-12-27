@@ -6,7 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Button } from 'react-native-paper';
-import FastImage from 'react-native-fast-image';
+import { Image } from 'expo-image';
 import { Product } from '../types/product.types';
 
 interface ProductCardProps {
@@ -36,10 +36,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
     >
       <View style={styles.imageContainer}>
         {product.images && product.images.length > 0 ? (
-          <FastImage
+          <Image
             source={{ uri: product.images[0] }}
             style={styles.image}
-            resizeMode={FastImage.resizeMode.cover}
+            contentFit="cover"
           />
         ) : (
           <View style={[styles.image, styles.placeholderImage]}>

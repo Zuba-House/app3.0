@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { ActivityIndicator, Button } from 'react-native-paper';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import FastImage from 'react-native-fast-image';
+import { Image } from 'expo-image';
 import { productService } from '../../services/product.service';
 import { cartService } from '../../services/cart.service';
 import { Product } from '../../types/product.types';
@@ -123,10 +123,10 @@ const ProductDetailScreen: React.FC = () => {
     <ScrollView style={styles.container}>
       <View style={styles.imageContainer}>
         {product.images && product.images.length > 0 ? (
-          <FastImage
+          <Image
             source={{ uri: product.images[selectedImageIndex] }}
             style={styles.mainImage}
-            resizeMode={FastImage.resizeMode.contain}
+            contentFit="contain"
           />
         ) : (
           <View style={[styles.mainImage, styles.placeholderImage]}>
@@ -149,10 +149,10 @@ const ProductDetailScreen: React.FC = () => {
                   selectedImageIndex === index && styles.selectedThumbnail,
                 ]}
               >
-                <FastImage
+                <Image
                   source={{ uri: image }}
                   style={styles.thumbnailImage}
-                  resizeMode={FastImage.resizeMode.cover}
+                  contentFit="cover"
                 />
               </TouchableOpacity>
             ))}
