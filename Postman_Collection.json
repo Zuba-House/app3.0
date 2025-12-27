@@ -1,0 +1,411 @@
+{
+  "info": {
+    "name": "Zuba Product Variations API",
+    "description": "WooCommerce/Shopify-style product variation system for Zuba House",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Attributes Management",
+      "item": [
+        {
+          "name": "Create Attribute",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Color\",\n  \"type\": \"color_swatch\",\n  \"description\": \"Product colors\",\n  \"visibility\": \"both\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/attributes",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attributes"]
+            }
+          }
+        },
+        {
+          "name": "Get All Attributes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/attributes",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attributes"]
+            }
+          }
+        },
+        {
+          "name": "Get Attribute by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/attributes/{{attr_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attributes", "{{attr_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Attribute",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/attributes/{{attr_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attributes", "{{attr_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Attribute",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/attributes/{{attr_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attributes", "{{attr_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Attribute Values",
+      "item": [
+        {
+          "name": "Create Attribute Value",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Red\",\n  \"value\": \"red\",\n  \"meta\": {\n    \"colorCode\": \"#FF0000\",\n    \"sortOrder\": 1\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/attributes/{{attr_id}}/values",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attributes", "{{attr_id}}", "values"]
+            }
+          }
+        },
+        {
+          "name": "Get Attribute Values",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/attributes/{{attr_id}}/values",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attributes", "{{attr_id}}", "values"]
+            }
+          }
+        },
+        {
+          "name": "Update Attribute Value",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Dark Red\",\n  \"meta\": {\n    \"colorCode\": \"#CC0000\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/attributes/{{attr_id}}/values/{{value_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attributes", "{{attr_id}}", "values", "{{value_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Attribute Value",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/attributes/{{attr_id}}/values/{{value_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attributes", "{{attr_id}}", "values", "{{value_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Product Variations",
+      "item": [
+        {
+          "name": "Get Product Variations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}/variations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}", "variations"]
+            }
+          }
+        },
+        {
+          "name": "Create Single Variation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"attributes\": [\n    {\n      \"attributeId\": \"{{attr_id}}\",\n      \"valueId\": \"{{value_id}}\",\n      \"label\": \"Color: Red\"\n    }\n  ],\n  \"sku\": \"TSH-RED-L\",\n  \"price\": 35,\n  \"salePrice\": 30,\n  \"stock\": 15,\n  \"isDefault\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}/variations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}", "variations"]
+            }
+          }
+        },
+        {
+          "name": "Auto-Generate Variations",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"attributes\": [\n    {\n      \"attributeId\": \"{{color_attr_id}}\",\n      \"valueIds\": [\"{{red_value_id}}\", \"{{blue_value_id}}\"]\n    },\n    {\n      \"attributeId\": \"{{size_attr_id}}\",\n      \"valueIds\": [\"{{s_value_id}}\", \"{{m_value_id}}\", \"{{l_value_id}}\"]\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}/variations/generate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}", "variations", "generate"]
+            }
+          }
+        },
+        {
+          "name": "Find Variation by Attributes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}/variations/find?color=red&size=l",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}", "variations", "find"],
+              "query": [
+                {
+                  "key": "color",
+                  "value": "red"
+                },
+                {
+                  "key": "size",
+                  "value": "l"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Single Variation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}/variations/{{variation_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}", "variations", "{{variation_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Variation",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 40,\n  \"salePrice\": 35,\n  \"stock\": 20,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}/variations/{{variation_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}", "variations", "{{variation_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Update Variations",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variations\": [\n    {\n      \"_id\": \"{{variation_id_1}}\",\n      \"price\": 40,\n      \"stock\": 20\n    },\n    {\n      \"_id\": \"{{variation_id_2}}\",\n      \"price\": 45,\n      \"stock\": 25\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}/variations/bulk-update",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}", "variations", "bulk-update"]
+            }
+          }
+        },
+        {
+          "name": "Delete Variation",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}/variations/{{variation_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}", "variations", "{{variation_id}}"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "admin_token",
+      "value": ""
+    },
+    {
+      "key": "attr_id",
+      "value": ""
+    },
+    {
+      "key": "value_id",
+      "value": ""
+    },
+    {
+      "key": "product_id",
+      "value": ""
+    },
+    {
+      "key": "variation_id",
+      "value": ""
+    },
+    {
+      "key": "color_attr_id",
+      "value": ""
+    },
+    {
+      "key": "size_attr_id",
+      "value": ""
+    },
+    {
+      "key": "red_value_id",
+      "value": ""
+    },
+    {
+      "key": "blue_value_id",
+      "value": ""
+    },
+    {
+      "key": "s_value_id",
+      "value": ""
+    },
+    {
+      "key": "m_value_id",
+      "value": ""
+    },
+    {
+      "key": "l_value_id",
+      "value": ""
+    }
+  ]
+}

@@ -1,0 +1,201 @@
+.shipping-rates-container {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  margin: 20px 0;
+}
+
+.shipping-rates-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fallback-badge {
+  font-size: 12px;
+  background: #f39c12;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.shipping-rates-loading {
+  text-align: center;
+  padding: 30px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.shipping-rates-error {
+  text-align: center;
+  padding: 20px;
+  color: #e74c3c;
+}
+
+.retry-btn {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.shipping-rates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shipping-rate-card {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #fff;
+}
+
+.shipping-rate-card:hover {
+  border-color: #3498db;
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+}
+
+.shipping-rate-card.selected {
+  border-color: #3498db;
+  background: #f0f8ff;
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
+}
+
+.shipping-rate-card.cheapest {
+  border-color: #27ae60;
+}
+
+.rate-radio input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.rate-details {
+  flex: 1;
+}
+
+.rate-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+
+.rate-carrier {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 16px;
+}
+
+.cheapest-badge {
+  background: #27ae60;
+  color: white;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.rate-service {
+  color: #7f8c8d;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.rate-delivery,
+.rate-delivery-date {
+  font-size: 13px;
+  color: #95a5a6;
+  margin-top: 4px;
+}
+
+.rate-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.rate-cost {
+  font-size: 24px;
+  font-weight: 700;
+  color: #27ae60;
+}
+
+.rate-currency {
+  font-size: 12px;
+  color: #7f8c8d;
+}
+
+.rate-source-info {
+  margin-top: 15px;
+  font-size: 13px;
+  color: #7f8c8d;
+  text-align: center;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.shipping-rates-placeholder {
+  text-align: center;
+  padding: 30px;
+  color: #7f8c8d;
+  background: #f8f9fa;
+  border-radius: 10px;
+}
+
+.no-rates {
+  text-align: center;
+  padding: 20px;
+  color: #7f8c8d;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .shipping-rate-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .rate-price {
+    align-items: flex-start;
+  }
+
+  .rate-cost {
+    font-size: 20px;
+  }
+}
+
