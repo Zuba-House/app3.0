@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Button } from 'react-native-paper';
 import { Image } from 'expo-image';
 import { Product } from '../types/product.types';
@@ -158,4 +158,3 @@ const styles = StyleSheet.create({
 });
 
 export default React.memo(ProductCard);
-

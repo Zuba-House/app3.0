@@ -9,7 +9,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Image,
   TouchableOpacity,
   Alert,
 } from 'react-native';
@@ -367,4 +366,3 @@ const styles = StyleSheet.create({
 });
 
 export default ProductDetailScreen;
-
