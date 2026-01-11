@@ -177,13 +177,11 @@ class ZubaAPITester:
         print("🔐 TESTING AUTH ENDPOINTS")
         print("="*50)
         
-        # Test login endpoint structure (should return error for missing credentials)
-        self.run_test("Login Endpoint Structure", "POST", "/api/auth/login", 
-                     expected_status=400, data={})
+        # Test user endpoints (based on available routes)
+        self.run_test("User Details (No Auth)", "GET", "/api/user/user-details", expected_status=401)
         
-        # Test register endpoint structure (should return error for missing data)
-        self.run_test("Register Endpoint Structure", "POST", "/api/auth/register", 
-                     expected_status=400, data={})
+        # Test if there are any auth-related endpoints
+        self.run_test("User Profile (No Auth)", "GET", "/api/user/profile", expected_status=401)
 
     def test_cart_endpoints(self):
         """Test cart endpoints (without authentication)"""
