@@ -1,0 +1,634 @@
+.flash-deals-section {
+  background: linear-gradient(135deg, #FF4757 0%, #FF6B81 50%, #FF8A9B 100%);
+  border-radius: 20px;
+  padding: 25px;
+  margin: 20px 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Lightning Background */
+.lightning-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.lightning-bolt {
+  position: absolute;
+  font-size: 80px;
+  opacity: 0.1;
+  animation: lightningFlash 3s ease-in-out infinite;
+}
+
+.lightning-bolt:nth-child(1) {
+  top: 10%;
+  left: 5%;
+  animation-delay: 0s;
+}
+
+.lightning-bolt:nth-child(2) {
+  top: 50%;
+  right: 10%;
+  animation-delay: 1s;
+}
+
+.lightning-bolt:nth-child(3) {
+  bottom: 10%;
+  left: 50%;
+  animation-delay: 2s;
+}
+
+@keyframes lightningFlash {
+  0%, 90%, 100% { opacity: 0.05; transform: scale(1); }
+  95% { opacity: 0.2; transform: scale(1.2); }
+}
+
+/* Header */
+.flash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+  position: relative;
+  z-index: 2;
+}
+
+.flash-title-area {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.flash-icon-animated {
+  position: relative;
+  width: 55px;
+  height: 55px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bolt-icon {
+  color: #FFD700;
+  font-size: 28px;
+  z-index: 2;
+  animation: boltFlash 0.5s ease-in-out infinite;
+  filter: drop-shadow(0 0 10px #FFD700);
+}
+
+@keyframes boltFlash {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+}
+
+.flash-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 3px solid rgba(255, 215, 0, 0.5);
+  border-radius: 50%;
+  animation: ringExpand 1.5s ease-out infinite;
+}
+
+@keyframes ringExpand {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.flash-title-text h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 26px;
+  font-weight: 800;
+  color: white;
+  margin: 0;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.title-bolt {
+  color: #FFD700;
+  animation: boltFlash 0.5s ease-in-out infinite;
+}
+
+.fire-icon {
+  color: #FFA500;
+  animation: fireBurn 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes fireBurn {
+  from { transform: scale(1) rotate(-5deg); }
+  to { transform: scale(1.1) rotate(5deg); }
+}
+
+.flash-subtitle {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  margin: 5px 0 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Countdown Timer */
+.flash-countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.countdown-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.alarm-icon {
+  animation: alarmRing 0.5s ease-in-out infinite;
+}
+
+@keyframes alarmRing {
+  0%, 100% { transform: rotate(-10deg); }
+  50% { transform: rotate(10deg); }
+}
+
+.countdown-timer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.time-box {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 50px;
+}
+
+.time-box.pulse {
+  animation: timePulse 1s ease-in-out infinite;
+}
+
+@keyframes timePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.time-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: white;
+  font-family: 'Courier New', monospace;
+}
+
+.time-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+
+.time-separator {
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  animation: separatorBlink 1s ease-in-out infinite;
+}
+
+@keyframes separatorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.view-all-flash-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: white;
+  color: #FF4757;
+  border-radius: 25px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.view-all-flash-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Lucky Spin Banner */
+.lucky-spin-banner {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%);
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 15px;
+  padding: 15px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.lucky-content {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.lucky-icon {
+  width: 50px;
+  height: 50px;
+  background: rgba(255, 215, 0, 0.2);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dice-icon {
+  font-size: 28px;
+  color: #FFD700;
+  transition: transform 0.1s ease;
+}
+
+.dice-icon.spinning {
+  animation: diceRoll 0.1s linear infinite;
+}
+
+@keyframes diceRoll {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.lucky-text h3 {
+  color: white;
+  font-size: 16px;
+  margin: 0;
+}
+
+.lucky-text p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  margin: 3px 0 0 0;
+}
+
+.spin-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 25px;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  color: #333;
+  border: none;
+  border-radius: 25px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+}
+
+.spin-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
+}
+
+.spin-btn:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+.spin-btn.spinning {
+  animation: buttonShake 0.1s linear infinite;
+}
+
+@keyframes buttonShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+.spinning-dice {
+  animation: diceRoll 0.1s linear infinite;
+}
+
+.lucky-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: resultPop 0.5s ease-out;
+}
+
+@keyframes resultPop {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.confetti {
+  font-size: 24px;
+  animation: confettiDance 0.5s ease-in-out infinite alternate;
+}
+
+.discount-won {
+  font-size: 20px;
+  font-weight: 800;
+  color: #FFD700;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes confettiDance {
+  from { transform: rotate(-10deg) scale(1); }
+  to { transform: rotate(10deg) scale(1.1); }
+}
+
+/* Products Container */
+.flash-products-container {
+  position: relative;
+  z-index: 2;
+}
+
+/* Loading */
+.flash-loading {
+  display: flex;
+  gap: 15px;
+  overflow: hidden;
+}
+
+.flash-skeleton {
+  min-width: 180px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 15px;
+}
+
+.skeleton-badge {
+  width: 80px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  animation: skeletonPulse 1.5s infinite;
+}
+
+.skeleton-image {
+  width: 100%;
+  height: 150px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  animation: skeletonPulse 1.5s infinite;
+}
+
+.skeleton-progress {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  animation: skeletonPulse 1.5s infinite;
+}
+
+.skeleton-text {
+  width: 60%;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  animation: skeletonPulse 1.5s infinite;
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Product Cards */
+.flash-product-card {
+  position: relative;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform 0.3s ease;
+}
+
+.flash-product-card:hover {
+  transform: translateY(-5px);
+}
+
+.flash-badge {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  z-index: 10;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  color: #333;
+  padding: 6px 12px 6px 8px;
+  border-radius: 0 20px 20px 0;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+  animation: badgeGlow 1.5s ease-in-out infinite;
+}
+
+@keyframes badgeGlow {
+  0%, 100% { box-shadow: 2px 2px 10px rgba(255, 215, 0, 0.3); }
+  50% { box-shadow: 2px 2px 20px rgba(255, 215, 0, 0.6); }
+}
+
+.stock-warning {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10;
+  background: #FF4757;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  animation: warningPulse 1s ease-in-out infinite;
+}
+
+@keyframes warningPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* Claimed Progress Bar */
+.claimed-progress {
+  padding: 10px 12px;
+  background: #f9f9f9;
+}
+
+.progress-bar {
+  position: relative;
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: visible;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FF4757 0%, #FF6B81 100%);
+  border-radius: 4px;
+  transition: width 1s ease;
+  position: relative;
+}
+
+.progress-fire {
+  position: absolute;
+  right: -10px;
+  top: -8px;
+  font-size: 16px;
+  animation: fireMove 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes fireMove {
+  from { transform: translateY(0) scale(1); }
+  to { transform: translateY(-2px) scale(1.1); }
+}
+
+.claimed-text {
+  display: block;
+  font-size: 11px;
+  color: #FF4757;
+  font-weight: 600;
+  margin-top: 5px;
+}
+
+/* Swiper */
+.flash-swiper {
+  padding: 10px 5px 15px;
+}
+
+.flash-swiper .swiper-button-next,
+.flash-swiper .swiper-button-prev {
+  background: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.flash-swiper .swiper-button-next::after,
+.flash-swiper .swiper-button-prev::after {
+  font-size: 16px;
+  color: #FF4757;
+  font-weight: bold;
+}
+
+/* Urgency Banner */
+.urgency-banner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.urgency-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.urgency-icon {
+  color: #FFD700;
+}
+
+.urgency-divider {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+  .flash-header {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .flash-title-area {
+    flex-direction: column;
+  }
+  
+  .lucky-spin-banner {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .lucky-content {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 576px) {
+  .flash-deals-section {
+    padding: 15px;
+    border-radius: 15px;
+    margin: 10px 0;
+  }
+  
+  .flash-title-text h2 {
+    font-size: 20px;
+  }
+  
+  .countdown-timer {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .time-box {
+    min-width: 45px;
+    padding: 6px 10px;
+  }
+  
+  .time-value {
+    font-size: 18px;
+  }
+  
+  .urgency-banner {
+    gap: 10px;
+  }
+  
+  .urgency-divider {
+    display: none;
+  }
+  
+  .urgency-item {
+    font-size: 12px;
+  }
+}
+
