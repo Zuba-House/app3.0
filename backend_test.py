@@ -205,8 +205,8 @@ class ZubaAPITester:
         # Test 404 for non-existent endpoint
         self.run_test("Non-existent Endpoint", "GET", "/api/nonexistent", expected_status=404)
         
-        # Test invalid product ID
-        self.run_test("Invalid Product ID", "GET", "/api/products/invalid-id", expected_status=404)
+        # Test invalid product ID (correct endpoint)
+        self.run_test("Invalid Product ID", "GET", "/api/product/invalid-id", expected_status=404)
 
     def run_all_tests(self):
         """Run all test suites"""
