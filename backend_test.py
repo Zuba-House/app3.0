@@ -120,8 +120,8 @@ class ZubaAPITester:
         print("🛍️ TESTING PRODUCT ENDPOINTS")
         print("="*50)
         
-        # Test products list
-        success, response = self.run_test("Get Products", "GET", "/api/products")
+        # Test products list (correct endpoint is /api/product)
+        success, response = self.run_test("Get Products", "GET", "/api/product")
         
         if success and response:
             try:
@@ -138,19 +138,19 @@ class ZubaAPITester:
                     # Test first product details if available
                     first_product = products[0]
                     if '_id' in first_product:
-                        self.run_test("Get Product Details", "GET", f"/api/products/{first_product['_id']}")
+                        self.run_test("Get Product Details", "GET", f"/api/product/{first_product['_id']}")
                     elif 'id' in first_product:
-                        self.run_test("Get Product Details", "GET", f"/api/products/{first_product['id']}")
+                        self.run_test("Get Product Details", "GET", f"/api/product/{first_product['id']}")
                 else:
                     print("   No products found in response")
             except Exception as e:
                 print(f"   Could not parse products response: {e}")
         
         # Test product search
-        self.run_test("Search Products", "GET", "/api/products?search=shirt")
+        self.run_test("Search Products", "GET", "/api/product?search=shirt")
         
         # Test products with pagination
-        self.run_test("Products with Pagination", "GET", "/api/products?page=1&limit=10")
+        self.run_test("Products with Pagination", "GET", "/api/product?page=1&limit=10")
 
     def test_brand_endpoints(self):
         """Test brand-related endpoints"""
