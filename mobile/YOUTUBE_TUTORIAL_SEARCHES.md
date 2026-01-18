@@ -35,7 +35,7 @@
 "how to use expo go scan qr code"
 "expo go android setup guide"
 "expo development client tutorial"
-```
+``` 
 
 ---
 
