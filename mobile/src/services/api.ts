@@ -1,21 +1,12 @@
 /**
  * API Client
  * Handles all HTTP requests with automatic token management
+ * Uses fetch API (React Native compatible) instead of axios
  */
 
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL, STORAGE_KEYS } from '../constants/config';
 import { ApiResponse, ApiError } from '../types/api.types';
-
-// Create axios instance
-const apiClient = axios.create({
-  baseURL: API_URL,
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
 
 // Request queue for token refresh
 let isRefreshing = false;
@@ -35,51 +26,49 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Request Interceptor: Add JWT token
-apiClient.interceptors.request.use(
-  async (config: InternalAxiosRequestConfig) => {
-    try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      if (token && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } catch (error) {
-      console.error('Error getting token:', error);
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response Interceptor: Handle token refresh
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & {
-      _retry?: boolean;
+// Helper function to make API requests
+const makeRequest = async <T = any>(
+  url: string,
+  options: RequestInit = {}
+): Promise<ApiResponse<T>> => {
+  try {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
     };
 
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_URL}${url}`, {
+      ...options,
+      headers,
+    });
+
+    const data = await response.json();
+
     // Handle token expiration (401)
-    if (
-      error.response?.status === 401 &&
-      originalRequest &&
-      !originalRequest._retry
-    ) {
+    if (response.status === 401 && !options.headers?.['X-Retry']) {
       if (isRefreshing) {
         // Queue requests while refreshing
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
-          .then((token: string | null) => {
-            if (originalRequest.headers && token) {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
+          .then((newToken: string | null) => {
+            if (newToken) {
+              headers.Authorization = `Bearer ${newToken}`;
             }
-            return apiClient(originalRequest);
+            return makeRequest<T>(url, {
+              ...options,
+              headers: { ...headers, 'X-Retry': 'true' },
+            });
           })
           .catch((err) => Promise.reject(err));
       }
 
-      originalRequest._retry = true;
       isRefreshing = true;
 
       try {
@@ -95,41 +84,41 @@ apiClient.interceptors.response.use(
             STORAGE_KEYS.USER,
           ]);
           processQueue(new Error('No refresh token'), null);
-          return Promise.reject(error);
+          throw new Error('No refresh token');
         }
 
         // Call refresh token endpoint
-        const response = await axios.post(
+        const refreshResponse = await fetch(
           `${API_URL}/api/user/refresh-token`,
-          {},
           {
+            method: 'POST',
             headers: {
+              'Content-Type': 'application/json',
               Authorization: `Bearer ${refreshToken}`,
             },
           }
         );
 
-        const responseData = response.data as ApiResponse<{
+        const refreshData = (await refreshResponse.json()) as ApiResponse<{
           accessToken: string;
         }>;
 
-        if (responseData.success && responseData.data?.accessToken) {
-          const newAccessToken = responseData.data.accessToken;
+        if (refreshData.success && refreshData.data?.accessToken) {
+          const newAccessToken = refreshData.data.accessToken;
           await AsyncStorage.setItem(
             STORAGE_KEYS.ACCESS_TOKEN,
             newAccessToken
           );
 
-          // Update original request
-          if (originalRequest.headers) {
-            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-          }
-
           processQueue(null, newAccessToken);
           isRefreshing = false;
 
           // Retry original request
-          return apiClient(originalRequest);
+          headers.Authorization = `Bearer ${newAccessToken}`;
+          return makeRequest<T>(url, {
+            ...options,
+            headers: { ...headers, 'X-Retry': 'true' },
+          });
         } else {
           throw new Error('Failed to refresh token');
         }
@@ -142,98 +131,105 @@ apiClient.interceptors.response.use(
           STORAGE_KEYS.REFRESH_TOKEN,
           STORAGE_KEYS.USER,
         ]);
-        return Promise.reject(refreshError);
+        throw refreshError;
       }
     }
 
-    return Promise.reject(error);
+    if (!response.ok) {
+      return data as ApiResponse<T>;
+    }
+
+    return data as ApiResponse<T>;
+  } catch (error: any) {
+    // Handle network errors
+    if (error.message === 'Network request failed') {
+      throw {
+        success: false,
+        error: true,
+        message: 'Network error. Please check your internet connection.',
+      } as ApiResponse<T>;
+    }
+    throw error;
   }
-);
+};
 
 // Helper functions
 export const fetchDataFromApi = async <T = any>(
   url: string,
   params?: any
 ): Promise<ApiResponse<T>> => {
-  try {
-    const response = await apiClient.get<ApiResponse<T>>(url, { params });
-    return response.data;
-  } catch (error) {
-    const axiosError = error as AxiosError<ApiError>;
-    if (axiosError.response?.data) {
-      return axiosError.response.data as ApiResponse<T>;
-    }
-    throw error;
-  }
+  const queryString = params
+    ? '?' + new URLSearchParams(params).toString()
+    : '';
+  return makeRequest<T>(`${url}${queryString}`, {
+    method: 'GET',
+  });
 };
 
 export const postData = async <T = any>(
   url: string,
   data?: any
 ): Promise<ApiResponse<T>> => {
-  try {
-    const response = await apiClient.post<ApiResponse<T>>(url, data);
-    return response.data;
-  } catch (error) {
-    const axiosError = error as AxiosError<ApiError>;
-    if (axiosError.response?.data) {
-      return axiosError.response.data as ApiResponse<T>;
-    }
-    throw error;
-  }
+  return makeRequest<T>(url, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 };
 
 export const editData = async <T = any>(
   url: string,
   data?: any
 ): Promise<ApiResponse<T>> => {
-  try {
-    const response = await apiClient.put<ApiResponse<T>>(url, data);
-    return response.data;
-  } catch (error) {
-    const axiosError = error as AxiosError<ApiError>;
-    if (axiosError.response?.data) {
-      return axiosError.response.data as ApiResponse<T>;
-    }
-    throw error;
-  }
+  return makeRequest<T>(url, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
 };
 
 export const deleteData = async <T = any>(
   url: string
 ): Promise<ApiResponse<T>> => {
-  try {
-    const response = await apiClient.delete<ApiResponse<T>>(url);
-    return response.data;
-  } catch (error) {
-    const axiosError = error as AxiosError<ApiError>;
-    if (axiosError.response?.data) {
-      return axiosError.response.data as ApiResponse<T>;
-    }
-    throw error;
-  }
+  return makeRequest<T>(url, {
+    method: 'DELETE',
+  });
 };
 
 // File upload
 export const uploadImage = async (file: any): Promise<ApiResponse> => {
   try {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    
     const formData = new FormData();
     formData.append('image', file);
 
-    const response = await apiClient.post('/api/media/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
-  } catch (error) {
-    const axiosError = error as AxiosError<ApiError>;
-    if (axiosError.response?.data) {
-      return axiosError.response.data as ApiResponse;
+    const headers: HeadersInit = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
-    throw error;
+
+    const response = await fetch(`${API_URL}/api/media/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const data = await response.json();
+    return data as ApiResponse;
+  } catch (error: any) {
+    throw {
+      success: false,
+      error: true,
+      message: 'Failed to upload image',
+    } as ApiResponse;
   }
 };
 
-export default apiClient;
+// Export default for compatibility
+const apiClient = {
+  get: fetchDataFromApi,
+  post: postData,
+  put: editData,
+  delete: deleteData,
+};
 
+export default apiClient;
