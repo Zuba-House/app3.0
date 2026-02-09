@@ -383,7 +383,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
           },
         ]}
       >
-        <Text style={styles.appName}>Zuba</Text>
+        <Text style={styles.appName}>Zuba House</Text>
         <Text style={styles.tagline}>Shop the best deals</Text>
       </Animated.View>
 

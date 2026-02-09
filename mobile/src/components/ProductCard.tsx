@@ -213,9 +213,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
         {/* Price Container - Temu Style */}
         <View style={styles.priceRow}>
           <View style={styles.priceContainer}>
-            <Text style={styles.price}>CA${displayPrice.toFixed(2)}</Text>
+            <Text style={styles.price}>${displayPrice.toFixed(2)}</Text>
             {originalPrice && (
-              <Text style={styles.originalPrice}>CA${originalPrice.toFixed(2)}</Text>
+              <Text style={styles.originalPrice}>${originalPrice.toFixed(2)}</Text>
             )}
           </View>
           

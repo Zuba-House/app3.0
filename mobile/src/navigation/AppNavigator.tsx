@@ -29,6 +29,7 @@ import WishlistScreen from '../screens/Wishlist/WishlistScreen';
 import OrdersScreen from '../screens/Orders/OrdersScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
 import ProductDetailScreen from '../screens/Products/ProductDetailScreen';
+import BrandsScreen from '../screens/Brands/BrandsScreen';
 
 // Navigation Types
 export type RootStackParamList = {
@@ -55,6 +56,7 @@ export type MainTabParamList = {
 export type MainStackParamList = {
   MainTabs: undefined;
   ProductDetail: { productId: string };
+  Brands: { brandId?: string } | undefined;
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -194,6 +196,11 @@ const MainNavigator = () => {
         component={ProductDetailScreen}
         options={{ title: 'Product Details' }}
       />
+      <MainStack.Screen
+        name="Brands"
+        component={BrandsScreen}
+        options={{ title: 'All Brands', headerShown: false }}
+      />
     </MainStack.Navigator>
   );
 };
@@ -269,7 +276,7 @@ const AppNavigator: React.FC = () => {
     // Brief loading state after splash
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold', color: Colors.primary }}>Zuba</Text>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: Colors.primary }}>Zuba House</Text>
       </View>
     );
   }

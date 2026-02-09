@@ -96,6 +96,25 @@ const HomeScreen: React.FC = () => {
     featuredProducts: [],
     lastLoad: 0,
   });
+
+  // Track if filter was just set intentionally (to prevent useFocusEffect from resetting)
+  const filterJustSetRef = useRef<boolean>(false);
+
+  // Memoize sorted product arrays to avoid recalculating on every render
+  const topRatedProducts = useMemo(() => {
+    if (products.length === 0) return [];
+    return [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 8);
+  }, [products]);
+
+  const customerFavoritesProducts = useMemo(() => {
+    if (products.length === 0) return [];
+    return [...products].sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0)).slice(0, 8);
+  }, [products]);
+
+  const newArrivalsProducts = useMemo(() => {
+    if (products.length === 0) return [];
+    return [...products].slice(0, 4);
+  }, [products]);
   const [currentPromoIndex, setCurrentPromoIndex] = useState(0);
   const promoFlatListRef = useRef<FlatList>(null);
   const promoScrollX = useRef(new Animated.Value(0)).current;
@@ -164,21 +183,44 @@ const HomeScreen: React.FC = () => {
     loadData();
   }, []);
 
-  // Handle tab focus - scroll to top when Home tab is pressed
+  // Handle tab focus - reset filters and scroll to top when Home tab is pressed
   useFocusEffect(
     React.useCallback(() => {
       // Small delay to ensure ref is ready and component is mounted
       const timer = setTimeout(() => {
         try {
-          if (scrollViewRef.current) {
-            // Use requestAnimationFrame for smoother scroll
-            requestAnimationFrame(() => {
-              try {
-                scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-              } catch (scrollError) {
-                // Silently handle scroll errors
-              }
-            });
+          // Check if filter was just set intentionally (within last 500ms)
+          // If so, don't reset - user just clicked a brand/category
+          if (filterJustSetRef.current) {
+            filterJustSetRef.current = false; // Reset the flag
+            // Just scroll to top, don't reset filters
+            if (scrollViewRef.current) {
+              requestAnimationFrame(() => {
+                try {
+                  scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+                } catch (scrollError) {
+                  // Silently handle scroll errors
+                }
+              });
+            }
+            return;
+          }
+
+          // If filters are active, reset them when returning to Home from another tab
+          if (selectedCategory || selectedBrand || searchQuery) {
+            handleResetToHome();
+          } else {
+            // Just scroll to top if no filters
+            if (scrollViewRef.current) {
+              // Use requestAnimationFrame for smoother scroll
+              requestAnimationFrame(() => {
+                try {
+                  scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+                } catch (scrollError) {
+                  // Silently handle scroll errors
+                }
+              });
+            }
           }
         } catch (error) {
           // Silently handle any errors during focus
@@ -188,7 +230,7 @@ const HomeScreen: React.FC = () => {
       return () => {
         clearTimeout(timer);
       };
-    }, [])
+    }, [selectedCategory, selectedBrand, searchQuery, handleResetToHome])
   );
 
   // Auto-slide promotional banners
@@ -387,9 +429,16 @@ const HomeScreen: React.FC = () => {
   };
 
   const handleCategorySelect = useCallback((categoryId: string | null) => {
+    // Mark that filter was set intentionally
+    filterJustSetRef.current = true;
+    
     setSelectedCategory(categoryId);
     setSelectedBrand(null);
     setSearchQuery('');
+    
+    // Scroll to top to show filtered products
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    
     // Smooth transition
     InteractionManager.runAfterInteractions(() => {
       if (categoryId) {
@@ -398,6 +447,11 @@ const HomeScreen: React.FC = () => {
         loadProducts();
       }
     });
+    
+    // Reset the flag after a delay
+    setTimeout(() => {
+      filterJustSetRef.current = false;
+    }, 1000);
   }, []);
 
 
@@ -406,29 +460,53 @@ const HomeScreen: React.FC = () => {
   }, [navigation]);
 
   const handleCategoryPress = useCallback((category: Category) => {
+    // Mark that filter was set intentionally
+    filterJustSetRef.current = true;
+    
     setSelectedCategory(category._id);
     setSelectedBrand(null);
     setSearchQuery('');
     setSelectedTab(category.name);
+    
+    // Scroll to top to show filtered products
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    
     InteractionManager.runAfterInteractions(() => {
       loadProducts(category._id);
     });
+    
+    // Reset the flag after a delay
+    setTimeout(() => {
+      filterJustSetRef.current = false;
+    }, 1000);
   }, []);
 
   const handleBrandPress = (brandId: string) => {
+    // Mark that filter was set intentionally
+    filterJustSetRef.current = true;
+    
     setSelectedBrand(brandId);
     setSelectedCategory(null);
     setSearchQuery('');
     setSelectedTab(brandId);
+    
+    // Scroll to top to show filtered products
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    
     // Use InteractionManager for smoother transition
     InteractionManager.runAfterInteractions(() => {
       loadProducts(null, undefined, brandId);
     });
+    
+    // Reset the flag after a delay (in case useFocusEffect runs)
+    setTimeout(() => {
+      filterJustSetRef.current = false;
+    }, 1000);
   };
 
   const handleViewMoreBrands = () => {
-    // Navigate to search screen with brand filter option
-    navigation.navigate('Search', { showBrands: true });
+    // Navigate to brands screen
+    navigation.navigate('Brands');
   };
 
   // Quick reset to home - clear all filters
@@ -533,6 +611,18 @@ const HomeScreen: React.FC = () => {
     </View>
   );
 
+  // Memoized horizontal product item renderer
+  const renderHorizontalProductItem = useCallback(({ item }: { item: Product }) => (
+    <View style={styles.horizontalProductCard}>
+      <ProductCard
+        product={item}
+        onPress={() => handleProductPress(item)}
+        onAddToCart={() => handleProductPress(item)}
+        style={styles.horizontalProductCardInner}
+      />
+    </View>
+  ), [handleProductPress]);
+
   // Render horizontal product scroll section - optimized
   // Note: Cannot use hooks inside this function since it's called conditionally
   const renderHorizontalProductSection = (title: string, subtitle: string, products: Product[]) => {
@@ -546,16 +636,7 @@ const HomeScreen: React.FC = () => {
         {renderSectionHeader(title, subtitle)}
         <FlatList
           data={displayProducts}
-          renderItem={({ item }) => (
-            <View style={styles.horizontalProductCard}>
-              <ProductCard
-                product={item}
-                onPress={() => handleProductPress(item)}
-                onAddToCart={() => handleProductPress(item)}
-                style={styles.horizontalProductCardInner}
-              />
-            </View>
-          )}
+          renderItem={renderHorizontalProductItem}
           keyExtractor={(item) => item._id}
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -600,12 +681,9 @@ const HomeScreen: React.FC = () => {
                   source={brand.logo}
                   style={styles.brandLogo}
                   contentFit="contain"
+                  cachePolicy="memory-disk"
+                  transition={100}
                 />
-                {brand.verified && (
-                  <View style={styles.verifiedBadge}>
-                    <Ionicons name="checkmark-circle" size={18} color={Colors.secondary} />
-                  </View>
-                )}
               </View>
               <Text style={styles.brandName} numberOfLines={1}>
                 {brand.name}
@@ -763,18 +841,6 @@ const HomeScreen: React.FC = () => {
         onFocus={() => navigation.navigate('Search')}
       />
 
-      {/* Quick Reset Button - Show when filters are active */}
-      {(selectedCategory || selectedBrand || searchQuery) && (
-        <TouchableOpacity
-          style={styles.resetButton}
-          onPress={handleResetToHome}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="home" size={18} color={Colors.white} />
-          <Text style={styles.resetButtonText}>Back to Home</Text>
-        </TouchableOpacity>
-      )}
-
       {/* Category Tabs - Using Real Categories */}
       {categories.length > 0 && (
         <View style={styles.categoryTabsContainer}>
@@ -792,6 +858,7 @@ const HomeScreen: React.FC = () => {
         ref={scrollViewRef}
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
+        nestedScrollEnabled={true}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -815,18 +882,18 @@ const HomeScreen: React.FC = () => {
         )}
 
         {/* Top Rated Products - Horizontal Scroll */}
-        {!selectedCategory && !selectedBrand && products.length > 0 && renderHorizontalProductSection(
+        {!selectedCategory && !selectedBrand && topRatedProducts.length > 0 && renderHorizontalProductSection(
           'Top Rated Finds',
           '4+ star products',
-          [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 8)
+          topRatedProducts
         )}
 
         {/* New Arrivals Section */}
-        {!selectedCategory && !selectedBrand && products.length > 0 && (
+        {!selectedCategory && !selectedBrand && newArrivalsProducts.length > 0 && (
           <View style={styles.section}>
             {renderSectionHeader('Just In: New Arrivals', 'Fresh picks for you')}
             <FlatList
-              data={[...products].slice(0, 4)}
+              data={newArrivalsProducts}
               renderItem={renderProductItem}
               keyExtractor={(item) => item._id}
               numColumns={2}
@@ -839,10 +906,10 @@ const HomeScreen: React.FC = () => {
         )}
 
         {/* Customer Favorites - Horizontal Scroll */}
-        {!selectedCategory && !selectedBrand && products.length > 0 && renderHorizontalProductSection(
+        {!selectedCategory && !selectedBrand && customerFavoritesProducts.length > 0 && renderHorizontalProductSection(
           'Customer Favorites',
           'Most loved products',
-          [...products].sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0)).slice(0, 8)
+          customerFavoritesProducts
         )}
 
         {/* All Products Grid - Only show if category, brand selected or search active */}
@@ -1462,30 +1529,6 @@ const styles = StyleSheet.create({
     height: '85%',
     borderRadius: 40,
   },
-  verifiedBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: Colors.secondary,
-    ...Platform.select({
-      ios: {
-        shadowColor: Colors.shadow,
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
   brandName: {
     fontSize: 13,
     fontWeight: '600',
@@ -1498,35 +1541,6 @@ const styles = StyleSheet.create({
     color: Colors.secondary,
     fontWeight: '600',
     marginTop: 2,
-  },
-  resetButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.secondary,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
-    borderRadius: 25,
-    ...Platform.select({
-      ios: {
-        shadowColor: Colors.shadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  resetButtonText: {
-    color: Colors.white,
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 6,
   },
 });
 
