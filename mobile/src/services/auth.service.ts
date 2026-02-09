@@ -25,30 +25,67 @@ export const authService = {
   login: async (
     credentials: LoginCredentials
   ): Promise<AuthResponse> => {
-    const response = await postData<AuthResponse>(
+    const response = await postData<any>(
       API_ENDPOINTS.LOGIN,
       credentials
     );
 
-    if (response.success && response.data) {
-      const { accessToken, refreshToken, user } = response.data;
+    console.log('🔐 Login response:', JSON.stringify(response, null, 2));
 
-      // Validate tokens exist before storing
-      if (!accessToken || !user) {
-        throw new Error(response.message || 'Invalid login response');
+    // Backend returns: { success: true, error: false, message: "Login successfully", data: { accesstoken, refreshToken } }
+    // Note: backend uses "accesstoken" (lowercase) not "accessToken"
+    if (response.success && response.data) {
+      const data = response.data;
+      // Handle both accessToken and accesstoken (backend uses lowercase)
+      const accessToken = data.accessToken || data.accesstoken;
+      const refreshToken = data.refreshToken || data.refreshToken;
+
+      if (!accessToken) {
+        throw new Error(response.message || 'Invalid login response - no token');
       }
 
-      // Store tokens and user (only if values are defined)
+      // Store tokens first
       const itemsToStore: [string, string][] = [];
       if (accessToken) itemsToStore.push([STORAGE_KEYS.ACCESS_TOKEN, accessToken]);
       if (refreshToken) itemsToStore.push([STORAGE_KEYS.REFRESH_TOKEN, refreshToken]);
-      if (user) itemsToStore.push([STORAGE_KEYS.USER, JSON.stringify(user)]);
 
       if (itemsToStore.length > 0) {
         await AsyncStorage.multiSet(itemsToStore);
       }
 
-      return response.data;
+      // Fetch user details separately (backend doesn't return user in login response)
+      try {
+        console.log('🔍 Fetching user details with token:', accessToken.substring(0, 20) + '...');
+        const userResponse = await fetchDataFromApi<User>(API_ENDPOINTS.GET_CURRENT_USER);
+        console.log('👤 User details response:', JSON.stringify(userResponse, null, 2));
+        
+        if (userResponse.success && userResponse.data) {
+          await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userResponse.data));
+          return {
+            accessToken,
+            refreshToken: refreshToken || '',
+            user: userResponse.data,
+          };
+        } else {
+          console.warn('⚠️ User details response not successful:', userResponse);
+        }
+      } catch (userError: any) {
+        console.error('❌ Error fetching user after login:', userError);
+        console.error('❌ Error message:', userError.message);
+        // If we can't fetch user, still return tokens (user can be fetched later)
+      }
+
+      // Return with tokens even if user fetch failed
+      return {
+        accessToken,
+        refreshToken: refreshToken || '',
+        user: {} as User, // Will be fetched later
+      };
+    }
+
+    // Handle error response
+    if (response.error === true && response.message) {
+      throw new Error(response.message);
     }
 
     throw new Error(response.message || 'Login failed');
@@ -198,6 +235,101 @@ export const authService = {
       console.error('Error getting stored user:', error);
       return null;
     }
+  },
+
+  /**
+   * Google OAuth login/signup
+   */
+  loginWithGoogle: async (googleData: {
+    name: string;
+    email: string;
+    avatar?: string;
+    mobile?: string;
+  }): Promise<AuthResponse> => {
+    const response = await postData<any>(
+      API_ENDPOINTS.GOOGLE_AUTH,
+      {
+        name: googleData.name,
+        email: googleData.email,
+        avatar: googleData.avatar,
+        mobile: googleData.mobile,
+        password: '', // Not needed for Google auth
+        role: 'USER',
+      }
+    );
+
+    console.log('🔐 Google auth response:', JSON.stringify(response, null, 2));
+
+    if (response.success && response.data) {
+      const data = response.data;
+      const accessToken = data.accessToken || data.accesstoken;
+      const refreshToken = data.refreshToken || data.refreshToken;
+
+      if (!accessToken) {
+        throw new Error(response.message || 'Invalid Google auth response');
+      }
+
+      // Store tokens
+      const itemsToStore: [string, string][] = [];
+      if (accessToken) itemsToStore.push([STORAGE_KEYS.ACCESS_TOKEN, accessToken]);
+      if (refreshToken) itemsToStore.push([STORAGE_KEYS.REFRESH_TOKEN, refreshToken]);
+
+      if (itemsToStore.length > 0) {
+        await AsyncStorage.multiSet(itemsToStore);
+      }
+
+      // Fetch user details
+      try {
+        const userResponse = await fetchDataFromApi<User>(API_ENDPOINTS.GET_CURRENT_USER);
+        if (userResponse.success && userResponse.data) {
+          await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userResponse.data));
+          return {
+            accessToken,
+            refreshToken: refreshToken || '',
+            user: userResponse.data,
+          };
+        }
+      } catch (userError) {
+        console.error('Error fetching user after Google login:', userError);
+      }
+
+      return {
+        accessToken,
+        refreshToken: refreshToken || '',
+        user: {} as User,
+      };
+    }
+
+    throw new Error(response.message || 'Google authentication failed');
+  },
+
+  /**
+   * Request password reset OTP
+   */
+  forgotPassword: async (email: string): Promise<ApiResponse> => {
+    const response = await postData(API_ENDPOINTS.FORGOT_PASSWORD, { email });
+    return response;
+  },
+
+  /**
+   * Verify password reset OTP
+   */
+  verifyForgotPasswordOtp: async (email: string, otp: string): Promise<ApiResponse> => {
+    const response = await postData(API_ENDPOINTS.VERIFY_FORGOT_PASSWORD_OTP, { email, otp });
+    return response;
+  },
+
+  /**
+   * Reset password
+   */
+  resetPassword: async (email: string, newPassword: string, confirmPassword: string, oldPassword?: string): Promise<ApiResponse> => {
+    const response = await postData(API_ENDPOINTS.RESET_PASSWORD, {
+      email,
+      newPassword,
+      confirmPassword,
+      ...(oldPassword && { oldPassword }),
+    });
+    return response;
   },
 };
 

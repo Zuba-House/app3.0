@@ -8,12 +8,31 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#e5e2db"
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.zuba.mobile"
+      "bundleIdentifier": "com.zuba.mobile",
+      "splash": {
+        "image": "./assets/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#e5e2db"
+      }
     },
     "android": {
-      "package": "com.zuba.mobile"
+      "package": "com.zuba.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0b2735"
+      },
+      "splash": {
+        "image": "./assets/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#e5e2db"
+      }
     },
     "extra": {
       "apiUrl": "https://zuba-api.onrender.com"

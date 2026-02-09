@@ -81,20 +81,20 @@ const Login = () => {
   };
 
   return (
-    <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+    <div className="bg-white p-8 rounded-3xl shadow-large max-w-md w-full border border-[#e5e2db]">
       <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Vendor Login</h1>
-        <p className="text-gray-600 mt-2">Welcome back! Login to your dashboard.</p>
+        <h1 className="text-2xl font-bold text-[#0b2735]">Welcome Back</h1>
+        <p className="text-[#0b2735] text-opacity-70 mt-2">Login to your vendor dashboard</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block mb-2 text-gray-700 font-medium">Email Address</label>
+          <label className="block mb-2 text-[#0b2735] font-medium">Email Address</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] transition-colors"
+            className="w-full px-4 py-3 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] transition-all bg-white"
             placeholder="your@email.com"
             required
             autoComplete="email"
@@ -102,13 +102,13 @@ const Login = () => {
         </div>
 
         <div>
-          <label className="block mb-2 text-gray-700 font-medium">Password</label>
+          <label className="block mb-2 text-[#0b2735] font-medium">Password</label>
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] transition-colors pr-12"
+              className="w-full px-4 py-3 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] transition-all pr-12 bg-white"
               placeholder="••••••••"
               required
               autoComplete="current-password"
@@ -116,7 +116,7 @@ const Login = () => {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#0b2735] text-opacity-60 hover:text-[#0b2735] transition-colors"
             >
               {showPassword ? (
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -135,7 +135,7 @@ const Login = () => {
         <div className="flex items-center justify-end">
           <Link
             to="/forgot-password"
-            className="text-sm text-[#efb291] hover:text-[#e5a67d] transition-colors"
+            className="text-sm text-[#efb291] hover:text-[#0b2735] transition-colors font-medium"
           >
             Forgot Password?
           </Link>
@@ -144,7 +144,7 @@ const Login = () => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-[#efb291] text-white py-3 rounded-lg hover:bg-[#e5a67d] disabled:opacity-50 font-medium transition-colors"
+          className="w-full bg-[#0b2735] text-white py-3 rounded-xl hover:bg-[#0b2735] hover:bg-opacity-90 disabled:opacity-50 font-medium transition-all shadow-medium"
         >
           {loading ? (
             <span className="flex items-center justify-center">
@@ -160,11 +160,11 @@ const Login = () => {
         </button>
       </form>
       
-      <div className="mt-6 text-center border-t pt-6">
-        <p className="text-gray-600 mb-2">Don't have a vendor account?</p>
+      <div className="mt-6 text-center border-t border-[#e5e2db] pt-6">
+        <p className="text-[#0b2735] text-opacity-70 mb-2">Don't have a vendor account?</p>
         <Link
           to="/register"
-          className="text-[#efb291] hover:text-[#e5a67d] font-medium transition-colors"
+          className="text-[#efb291] hover:text-[#0b2735] font-semibold transition-colors"
         >
           Register as Vendor →
         </Link>

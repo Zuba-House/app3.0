@@ -3,7 +3,7 @@
  * Handles all product-related API calls
  */
 
-import { fetchDataFromApi } from './api';
+import { fetchDataFromApi, postData } from './api';
 import { API_ENDPOINTS, PAGINATION } from '../constants/config';
 import { Product, ProductFilters, Category } from '../types/product.types';
 import { ApiResponse, PaginatedResponse } from '../types/api.types';
@@ -45,13 +45,56 @@ export const productService = {
 
   /**
    * Search products
+   * Backend expects POST with { query } in body and returns { products } array
    */
   searchProducts: async (query: string): Promise<ApiResponse<Product[]>> => {
-    const response = await fetchDataFromApi<Product[]>(
-      API_ENDPOINTS.SEARCH_PRODUCTS,
-      { search: query }
-    );
-    return response;
+    try {
+      // Backend search endpoint expects POST with query in body
+      const response = await postData<any>(
+        '/api/product/search/get',
+        { query: query, page: 1, limit: 50 }
+      );
+      
+      console.log('🔍 Search response:', JSON.stringify(response, null, 2));
+      
+      // Backend returns { success: true, products: [...] }
+      if (response.success) {
+        // Handle different response formats
+        let products: Product[] = [];
+        
+        if (Array.isArray(response.data)) {
+          products = response.data;
+        } else if (response.data && Array.isArray(response.data.products)) {
+          products = response.data.products;
+        } else if ((response as any).products && Array.isArray((response as any).products)) {
+          products = (response as any).products;
+        } else if (response.data && typeof response.data === 'object' && (response.data as any).products) {
+          products = (response.data as any).products;
+        }
+        
+        return {
+          success: true,
+          error: false,
+          data: products,
+          message: response.message,
+        };
+      }
+      
+      return response;
+    } catch (error: any) {
+      console.error('Search error:', error);
+      // Fallback: try GET with query params
+      try {
+        const fallbackResponse = await fetchDataFromApi<Product[]>(
+          API_ENDPOINTS.GET_ALL_PRODUCTS,
+          { search: query, query: query, name: query, limit: 50 }
+        );
+        return fallbackResponse;
+      } catch (fallbackError) {
+        console.error('Fallback search also failed:', fallbackError);
+        throw error;
+      }
+    }
   },
 
   /**

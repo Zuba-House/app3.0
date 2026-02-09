@@ -26,7 +26,7 @@ const VendorDashboardLayout = ({ children }) => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#e5e2db]">
       <Sidebar 
         isOpen={isSidebarOpen} 
         setIsOpen={setIsSidebarOpen} 
@@ -43,7 +43,7 @@ const VendorDashboardLayout = ({ children }) => {
         }`}
         style={{ 
           marginTop: '56px', // h-14 on mobile
-          padding: isMobile ? '12px' : '20px',
+          padding: isMobile ? '12px' : '24px',
         }}
       >
         <div className="md:mt-2">

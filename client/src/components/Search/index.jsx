@@ -51,18 +51,18 @@ const Search = () => {
   }
 
   return (
-    <div className="searchBox w-[100%] h-[50px] bg-[#e5e5e5] rounded-[5px] relative p-2">
+    <div className="searchBox w-[100%] h-[50px] bg-white rounded-xl relative p-2 border border-[#e5e2db] shadow-sm">
       <input
         type="text"
-        placeholder="Search for products..."
-        className="w-full h-[35px] focus:outline-none bg-inherit p-2 text-[15px]"
+        placeholder="Search products..."
+        className="w-full h-[35px] focus:outline-none bg-inherit p-2 text-[15px] text-[#0b2735] placeholder:text-[#0b2735] placeholder:opacity-50"
         value={searchQuery}
         onChange={onChangeInput}
         onKeyPress={handleKeyPress}
       />
-      <Button className="!absolute top-[8px] right-[5px] z-50 !w-[37px] !min-w-[37px] h-[37px] !rounded-full !text-black search-icon-btn" onClick={search}>
+      <Button className="!absolute top-[8px] right-[5px] z-50 !w-[37px] !min-w-[37px] h-[37px] !rounded-full !text-[#0b2735] hover:!bg-[#efb291] hover:!text-[#0b2735] search-icon-btn transition-all" onClick={search}>
         {
-          isLoading === true ? <CircularProgress /> : <IoSearch className="text-[#4e4e4e] search-icon" />
+          isLoading === true ? <CircularProgress size={20} /> : <IoSearch className="text-[#0b2735] search-icon" />
         }
 
 

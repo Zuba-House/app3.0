@@ -20,8 +20,12 @@ export const API_ENDPOINTS = {
   REGISTER: '/api/user/register',
   REFRESH_TOKEN: '/api/user/refresh-token',
   LOGOUT: '/api/user/logout',
-  GET_CURRENT_USER: '/api/user/me',
+  GET_CURRENT_USER: '/api/user/user-details',
   UPDATE_PROFILE: '/api/user/me',
+  GOOGLE_AUTH: '/api/user/authWithGoogle',
+  FORGOT_PASSWORD: '/api/user/forgot-password',
+  VERIFY_FORGOT_PASSWORD_OTP: '/api/user/verify-forgot-password-otp',
+  RESET_PASSWORD: '/api/user/reset-password',
 
   // Products
   GET_ALL_PRODUCTS: '/api/product/getAllProducts',

@@ -216,7 +216,7 @@ const Home = () => {
         <FlashDeals />
       </section>
 
-      <section className="bg-white py-3 lg:py-8">
+      <section className="bg-white py-3 lg:py-8 rounded-2xl mx-2 lg:mx-0 shadow-sm">
         <div className="container">
           <div className="flex items-center justify-between flex-col lg:flex-row">
             <div className="leftSec w-full lg:w-[40%]">
@@ -288,7 +288,7 @@ const Home = () => {
 
       <section className="py-0 lg:py-4 pt-0 lg:pt-8 pb-0 bg-white">
         <div className="container">
-          <div className="freeShipping w-full md:w-[80%] m-auto py-4 p-4  border-2 border-[#eeb190] flex items-center justify-center lg:justify-between flex-col lg:flex-row rounded-md mb-7">
+          <div className="freeShipping w-full md:w-[80%] m-auto py-4 p-4  border-2 border-[#efb291] flex items-center justify-center lg:justify-between flex-col lg:flex-row rounded-2xl mb-7 bg-white shadow-sm">
             <div className="col1 flex items-center gap-4">
               <LiaShippingFastSolid className="text-[30px] lg:text-[50px]" />
               <span className="text-[16px] lg:text-[20px] font-[600] uppercase">

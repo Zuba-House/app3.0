@@ -237,9 +237,9 @@ const Register = () => {
   // Step 1: Email Verification
   if (step === 1) {
     return (
-      <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-        <h1 className="text-2xl font-bold mb-2 text-gray-800">Become a Vendor</h1>
-        <p className="text-gray-600 mb-6">First, let's verify your email address.</p>
+      <div className="bg-white p-8 rounded-3xl shadow-large max-w-md w-full border border-[#e5e2db]">
+        <h1 className="text-2xl font-bold mb-2 text-[#0b2735]">Become a Vendor</h1>
+        <p className="text-[#0b2735] text-opacity-70 mb-6">First, let's verify your email address.</p>
         
         {/* Progress Indicator */}
         <div className="flex items-center justify-center mb-6">
@@ -249,7 +249,7 @@ const Register = () => {
             }`}>
               {emailVerified ? '✓' : '1'}
             </div>
-            <div className={`w-16 h-1 ${emailVerified ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+            <div className={`w-16 h-1 ${emailVerified ? 'bg-green-500' : 'bg-[#e5e2db]'}`}></div>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
               emailVerified ? 'bg-[#efb291] text-white' : 'bg-gray-300 text-gray-500'
             }`}>
@@ -261,12 +261,12 @@ const Register = () => {
         <div className="space-y-4">
           {/* Email Input */}
           <div>
-            <label className="block mb-2 text-gray-700 font-medium">Email Address *</label>
+            <label className="block mb-2 text-[#0b2735] font-medium">Email Address *</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] disabled:bg-gray-100"
+              className="w-full px-4 py-3 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] disabled:bg-[#e5e2db] bg-white transition-all"
               placeholder="your@email.com"
               required
               disabled={emailVerified || otpSent}
@@ -279,7 +279,7 @@ const Register = () => {
               type="button"
               onClick={handleSendOTP}
               disabled={otpLoading || !email}
-              className="w-full bg-[#efb291] text-white py-3 rounded-lg hover:bg-[#e5a67d] disabled:opacity-50 font-medium transition-colors"
+              className="w-full bg-[#0b2735] text-white py-3 rounded-xl hover:bg-[#0b2735] hover:bg-opacity-90 disabled:opacity-50 font-medium transition-all shadow-medium"
             >
               {otpLoading ? (
                 <span className="flex items-center justify-center">
@@ -306,12 +306,12 @@ const Register = () => {
               </div>
 
               <div>
-                <label className="block mb-2 text-gray-700 font-medium">Enter Verification Code *</label>
+                <label className="block mb-2 text-[#0b2735] font-medium">Enter Verification Code *</label>
                 <input
                   type="text"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] text-center text-2xl tracking-[0.5em] font-mono"
+                  className="w-full px-4 py-3 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] text-center text-2xl tracking-[0.5em] font-mono bg-white transition-all"
                   placeholder="000000"
                   maxLength={6}
                   autoFocus
@@ -322,7 +322,7 @@ const Register = () => {
                 type="button"
                 onClick={handleVerifyOTP}
                 disabled={otpLoading || otp.length !== 6}
-                className="w-full bg-[#efb291] text-white py-3 rounded-lg hover:bg-[#e5a67d] disabled:opacity-50 font-medium transition-colors"
+                className="w-full bg-[#0b2735] text-white py-3 rounded-xl hover:bg-[#0b2735] hover:bg-opacity-90 disabled:opacity-50 font-medium transition-all shadow-medium"
               >
                 {otpLoading ? (
                   <span className="flex items-center justify-center">
@@ -342,7 +342,7 @@ const Register = () => {
                   type="button"
                   onClick={handleResendOTP}
                   disabled={otpLoading}
-                  className="text-sm text-gray-600 hover:text-[#efb291] disabled:opacity-50 transition-colors underline"
+                  className="text-sm text-[#0b2735] text-opacity-70 hover:text-[#efb291] disabled:opacity-50 transition-colors underline"
                 >
                   Didn't receive the code? Resend
                 </button>
@@ -354,7 +354,7 @@ const Register = () => {
                   setOtpSent(false);
                   setOtp('');
                 }}
-                className="w-full text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                className="w-full text-sm text-[#0b2735] text-opacity-60 hover:text-[#0b2735] transition-colors"
               >
                 ← Change email address
               </button>
@@ -375,11 +375,11 @@ const Register = () => {
           )}
         </div>
 
-        <div className="mt-6 text-center border-t pt-6">
-          <p className="text-gray-600">Already have a vendor account?</p>
+        <div className="mt-6 text-center border-t border-[#e5e2db] pt-6">
+          <p className="text-[#0b2735] text-opacity-70">Already have a vendor account?</p>
           <Link
             to="/login"
-            className="text-[#efb291] hover:text-[#e5a67d] font-medium transition-colors"
+            className="text-[#efb291] hover:text-[#0b2735] font-semibold transition-colors"
           >
             Login →
           </Link>
@@ -390,11 +390,11 @@ const Register = () => {
 
   // Step 2: Registration Form
   return (
-    <div className="bg-white p-8 rounded-lg shadow-md max-w-2xl w-full">
+    <div className="bg-white p-8 rounded-3xl shadow-large max-w-2xl w-full border border-[#e5e2db]">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Complete Your Registration</h1>
-          <p className="text-gray-600 mt-1">Fill out the form below to apply as a vendor.</p>
+          <h1 className="text-2xl font-bold text-[#0b2735]">Complete Your Registration</h1>
+          <p className="text-[#0b2735] text-opacity-70 mt-1">Fill out the form below to apply as a vendor.</p>
         </div>
         <div className="flex items-center text-green-600 bg-green-50 px-3 py-1 rounded-full">
           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -407,44 +407,44 @@ const Register = () => {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Personal Information */}
         <div className="border-b pb-6">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700 flex items-center">
+          <h2 className="text-lg font-semibold mb-4 text-[#0b2735] flex items-center">
             <span className="w-6 h-6 bg-[#efb291] text-white rounded-full text-sm flex items-center justify-center mr-2">1</span>
             Personal Information
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block mb-2 text-gray-700 font-medium">Full Name *</label>
+              <label className="block mb-2 text-[#0b2735] font-medium">Full Name *</label>
               <input
                 type="text"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] bg-white transition-all"
                 placeholder="John Doe"
                 required
               />
             </div>
             <div>
-              <label className="block mb-2 text-gray-700 font-medium">Password *</label>
+              <label className="block mb-2 text-[#0b2735] font-medium">Password *</label>
               <input
                 type="password"
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] bg-white transition-all"
                 placeholder="Min 6 characters"
                 required
                 minLength={6}
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block mb-2 text-gray-700 font-medium">Confirm Password *</label>
+              <label className="block mb-2 text-[#0b2735] font-medium">Confirm Password *</label>
               <input
                 type="password"
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] bg-white transition-all"
                 placeholder="Confirm your password"
                 required
               />
@@ -454,46 +454,46 @@ const Register = () => {
 
         {/* Store Information */}
         <div className="border-b pb-6">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700 flex items-center">
+          <h2 className="text-lg font-semibold mb-4 text-[#0b2735] flex items-center">
             <span className="w-6 h-6 bg-[#efb291] text-white rounded-full text-sm flex items-center justify-center mr-2">2</span>
             Store Information
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block mb-2 text-gray-700 font-medium">Store Name *</label>
+              <label className="block mb-2 text-[#0b2735] font-medium">Store Name *</label>
               <input
                 type="text"
                 name="storeName"
                 value={formData.storeName}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] bg-white transition-all"
                 placeholder="My Amazing Store"
                 required
               />
             </div>
             <div>
-              <label className="block mb-2 text-gray-700 font-medium">Store URL Slug *</label>
+              <label className="block mb-2 text-[#0b2735] font-medium">Store URL Slug *</label>
               <input
                 type="text"
                 name="storeSlug"
                 value={formData.storeSlug}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] bg-white transition-all"
                 placeholder="my-amazing-store"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-[#0b2735] text-opacity-60 mt-1">
                 Your store will be at: zubahouse.com/vendor/{formData.storeSlug || 'your-store'}
               </p>
             </div>
             <div className="md:col-span-2">
-              <label className="block mb-2 text-gray-700 font-medium">Store Description</label>
+              <label className="block mb-2 text-[#0b2735] font-medium">Store Description</label>
               <textarea
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
                 rows={3}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] bg-white transition-all"
                 placeholder="Tell customers about your store and products..."
               />
             </div>
@@ -502,30 +502,30 @@ const Register = () => {
 
         {/* Contact Information */}
         <div className="border-b pb-6">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700 flex items-center">
+          <h2 className="text-lg font-semibold mb-4 text-[#0b2735] flex items-center">
             <span className="w-6 h-6 bg-[#efb291] text-white rounded-full text-sm flex items-center justify-center mr-2">3</span>
             Contact Information
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block mb-2 text-gray-700 font-medium">Phone</label>
+              <label className="block mb-2 text-[#0b2735] font-medium">Phone</label>
               <input
                 type="tel"
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] bg-white transition-all"
                 placeholder="+1 234 567 8900"
               />
             </div>
             <div>
-              <label className="block mb-2 text-gray-700 font-medium">WhatsApp</label>
+              <label className="block mb-2 text-[#0b2735] font-medium">WhatsApp</label>
               <input
                 type="tel"
                 name="whatsapp"
                 value={formData.whatsapp}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] bg-white transition-all"
                 placeholder="+1 234 567 8900"
               />
             </div>
@@ -534,63 +534,63 @@ const Register = () => {
 
         {/* Address Information */}
         <div>
-          <h2 className="text-lg font-semibold mb-4 text-gray-700 flex items-center">
+          <h2 className="text-lg font-semibold mb-4 text-[#0b2735] flex items-center">
             <span className="w-6 h-6 bg-[#efb291] text-white rounded-full text-sm flex items-center justify-center mr-2">4</span>
             Address Information
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block mb-2 text-gray-700 font-medium">Country</label>
+              <label className="block mb-2 text-[#0b2735] font-medium">Country</label>
               <input
                 type="text"
                 name="country"
                 value={formData.country}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] bg-white transition-all"
                 placeholder="Canada"
               />
             </div>
             <div>
-              <label className="block mb-2 text-gray-700 font-medium">City</label>
+              <label className="block mb-2 text-[#0b2735] font-medium">City</label>
               <input
                 type="text"
                 name="city"
                 value={formData.city}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] bg-white transition-all"
                 placeholder="Ottawa"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block mb-2 text-gray-700 font-medium">Address Line 1</label>
+              <label className="block mb-2 text-[#0b2735] font-medium">Address Line 1</label>
               <input
                 type="text"
                 name="addressLine1"
                 value={formData.addressLine1}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] bg-white transition-all"
                 placeholder="123 Main Street"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block mb-2 text-gray-700 font-medium">Address Line 2</label>
+              <label className="block mb-2 text-[#0b2735] font-medium">Address Line 2</label>
               <input
                 type="text"
                 name="addressLine2"
                 value={formData.addressLine2}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] bg-white transition-all"
                 placeholder="Apt 4B"
               />
             </div>
             <div>
-              <label className="block mb-2 text-gray-700 font-medium">Postal Code</label>
+              <label className="block mb-2 text-[#0b2735] font-medium">Postal Code</label>
               <input
                 type="text"
                 name="postalCode"
                 value={formData.postalCode}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-[#e5e2db] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#efb291] focus:border-[#efb291] bg-white transition-all"
                 placeholder="K1A 0B1"
               />
             </div>
@@ -601,7 +601,7 @@ const Register = () => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-[#efb291] text-white py-3 rounded-lg hover:bg-[#e5a67d] disabled:opacity-50 font-medium transition-colors text-lg"
+          className="w-full bg-[#0b2735] text-white py-3 rounded-xl hover:bg-[#0b2735] hover:bg-opacity-90 disabled:opacity-50 font-medium transition-all text-lg shadow-medium"
         >
           {loading ? (
             <span className="flex items-center justify-center">
@@ -625,18 +625,18 @@ const Register = () => {
             setOtpSent(false);
             setOtp('');
           }}
-          className="w-full text-gray-500 hover:text-gray-700 text-sm transition-colors"
+          className="w-full text-[#0b2735] text-opacity-60 hover:text-[#0b2735] text-sm transition-colors"
         >
           ← Back to email verification
         </button>
       </form>
 
       <div className="mt-6 text-center border-t pt-6">
-        <p className="text-gray-600">Already have a vendor account?</p>
-        <Link
-          to="/login"
-          className="text-[#efb291] hover:text-[#e5a67d] font-medium transition-colors"
-        >
+        <p className="text-[#0b2735] text-opacity-70">Already have a vendor account?</p>
+          <Link
+            to="/login"
+            className="text-[#efb291] hover:text-[#0b2735] font-semibold transition-colors"
+          >
           Login →
         </Link>
       </div>

@@ -25,6 +25,9 @@ export interface ProductVariation {
   image?: string;
 }
 
+// Image can be a string (URL) or an object with url property (Cloudinary format)
+export type ProductImage = string | { url: string; alt?: string; title?: string; thumbnail?: string; position?: number; isFeatured?: boolean };
+
 export interface Product {
   _id: string;
   name: string;
@@ -32,7 +35,8 @@ export interface Product {
   shortDescription?: string;
   price: number;
   salePrice?: number;
-  images: string[];
+  images: ProductImage[]; // Can be string[] or object[] with url property
+  featuredImage?: string; // Cloudinary URL
   category: string | Category;
   categories?: string[];
   sku?: string;

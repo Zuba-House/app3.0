@@ -300,7 +300,7 @@ const ProductItem = (props) => {
   };
 
   return (
-    <div className="productItem shadow-lg rounded-md overflow-hidden border-1 border-[rgba(0,0,0,0.1)]">
+    <div className="productItem shadow-lg rounded-2xl overflow-hidden border border-[#e5e2db] bg-white">
       <div className="group imgWrapper w-[100%]  overflow-hidden  rounded-md rounded-bl-none rounded-br-none relative">
         {/* Out of Stock Badge */}
         {isOutOfStock() && (
@@ -475,24 +475,24 @@ const ProductItem = (props) => {
         <div className="actions absolute top-[-20px] right-[5px] z-50 flex items-center gap-2 flex-col w-[50px] transition-all duration-300 group-hover:top-[15px] opacity-0 group-hover:opacity-100">
 
           <Button 
-            className="!w-[44px] !h-[44px] lg:!w-[42px] lg:!h-[42px] !min-w-[44px] lg:!min-w-[42px] !rounded-full !bg-white shadow-lg text-black hover:!bg-primary hover:text-white group transition-all duration-200 hover:scale-110" 
+            className="!w-[44px] !h-[44px] lg:!w-[42px] lg:!h-[42px] !min-w-[44px] lg:!min-w-[42px] !rounded-full !bg-white shadow-lg text-[#0b2735] hover:!bg-[#efb291] hover:text-[#0b2735] group transition-all duration-200 hover:scale-110" 
             onClick={() => context.handleOpenProductDetailsModal(true, item)}
             title="Quick View"
             aria-label="Quick View Product"
           >
-            <MdZoomOutMap className="text-[20px] lg:text-[18px] !text-black group-hover:text-white hover:!text-white" />
+            <MdZoomOutMap className="text-[20px] lg:text-[18px] !text-[#0b2735] group-hover:text-[#0b2735]" />
           </Button>
 
 
           <Button 
-            className={`!w-[44px] !h-[44px] lg:!w-[42px] lg:!h-[42px] !min-w-[44px] lg:!min-w-[42px] !rounded-full !bg-white shadow-lg text-black hover:!bg-primary hover:text-white group transition-all duration-200 hover:scale-110`}
+            className={`!w-[44px] !h-[44px] lg:!w-[42px] lg:!h-[42px] !min-w-[44px] lg:!min-w-[42px] !rounded-full !bg-white shadow-lg text-[#0b2735] hover:!bg-[#efb291] hover:text-[#0b2735] group transition-all duration-200 hover:scale-110`}
             onClick={() => handleAddToMyList(item)}
             title={isAddedInMyList ? "Remove from Wishlist" : "Add to Wishlist"}
             aria-label={isAddedInMyList ? "Remove from Wishlist" : "Add to Wishlist"}
           >
             {
-              isAddedInMyList === true ? <IoMdHeart className="text-[20px] lg:text-[18px] !text-primary group-hover:text-white hover:!text-white" /> :
-                <FaRegHeart className="text-[20px] lg:text-[18px] !text-black group-hover:text-white hover:!text-white" />
+              isAddedInMyList === true ? <IoMdHeart className="text-[20px] lg:text-[18px] !text-[#efb291] group-hover:text-[#0b2735]" /> :
+                <FaRegHeart className="text-[20px] lg:text-[18px] !text-[#0b2735] group-hover:text-[#0b2735]" />
             }
           </Button>
         </div>
@@ -504,8 +504,8 @@ const ProductItem = (props) => {
             {item?.brand}
           </span>
         </h6>
-        <h3 className="text-[11px] lg:text-[13px] title mt-1 font-[500] mb-1 text-[#000]">
-          <Link to={`/product/${item?._id}`} className="link transition-all">
+        <h3 className="text-[11px] lg:text-[13px] title mt-1 font-[500] mb-1 text-[#0b2735]">
+          <Link to={`/product/${item?._id}`} className="link transition-all text-[#0b2735] hover:text-[#efb291]">
             {item?.name?.substring(0, 25) + (item?.name?.length > 25 ? '...' : '')}
           </Link>
         </h3>
@@ -520,19 +520,19 @@ const ProductItem = (props) => {
               if (priceRange && priceRange.min !== priceRange.max) {
                 return (
                   <div className="flex items-center gap-1 flex-wrap">
-                    <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
-                      {formatCurrency(priceRange.min)} - {formatCurrency(priceRange.max)}
-                    </span>
-                    <span className="text-[10px] lg:text-[11px] text-gray-600 font-[500]">USD</span>
+                <span className="price text-[#efb291] text-[12px] lg:text-[14px] font-[600]">
+                  {formatCurrency(priceRange.min)} - {formatCurrency(priceRange.max)}
+                </span>
+                <span className="text-[10px] lg:text-[11px] text-[#0b2735] text-opacity-60 font-[500]">USD</span>
                   </div>
                 );
               }
               return (
                 <div className="flex items-center gap-1">
-                  <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
+                  <span className="price text-[#efb291] text-[12px] lg:text-[14px] font-[600]">
                     {formatCurrency(item?.price || priceRange?.min)}
                   </span>
-                  <span className="text-[10px] lg:text-[11px] text-gray-600 font-[500]">USD</span>
+                  <span className="text-[10px] lg:text-[11px] text-[#0b2735] text-opacity-60 font-[500]">USD</span>
                 </div>
               );
             })()
@@ -541,17 +541,17 @@ const ProductItem = (props) => {
             <>
               {item?.isOnSale && item?.oldPrice > item?.price && (
                 <div className="flex items-center gap-1">
-                  <span className="oldPrice line-through text-gray-500 text-[12px] lg:text-[14px] font-[500]">
+                  <span className="oldPrice line-through text-[#0b2735] text-opacity-50 text-[12px] lg:text-[14px] font-[500]">
                     {formatCurrency(item?.oldPrice)}
                   </span>
-                  <span className="text-[10px] lg:text-[11px] text-gray-400 font-[400] line-through">USD</span>
+                  <span className="text-[10px] lg:text-[11px] text-[#0b2735] text-opacity-40 font-[400] line-through">USD</span>
                 </div>
               )}
               <div className="flex items-center gap-1">
-                <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
+                <span className="price text-[#efb291] text-[12px] lg:text-[14px] font-[600]">
                   {formatCurrency(item?.price)}
                 </span>
-                <span className="text-[10px] lg:text-[11px] text-gray-600 font-[500]">USD</span>
+                <span className="text-[10px] lg:text-[11px] text-[#0b2735] text-opacity-60 font-[500]">USD</span>
               </div>
             </>
           )}
@@ -564,7 +564,7 @@ const ProductItem = (props) => {
             isAdded === false ?
 
               <Button 
-                className="btn-org addToCartBtn btn-border flex w-full btn-sm gap-2" 
+                className="btn-org addToCartBtn btn-border flex w-full btn-sm gap-2 rounded-xl" 
                 size="small"
                 onClick={() => addToCart(item, context?.userData?._id, quantity)}
                 disabled={isOutOfStock()}
@@ -591,10 +591,10 @@ const ProductItem = (props) => {
                     :
 
 
-                    <div className="flex items-center justify-between overflow-hidden rounded-full border border-[rgba(0,0,0,0.1)]">
-                      <Button className="!min-w-[35px] !w-[35px] !h-[30px] !bg-[#f1f1f1]  !rounded-none" onClick={minusQty}><FaMinus className="text-[rgba(0,0,0,0.7)]" /></Button>
-                      <span>{quantity}</span>
-                      <Button className="!min-w-[35px] !w-[35px] !h-[30px] !bg-gray-800 !rounded-none"
+                    <div className="flex items-center justify-between overflow-hidden rounded-xl border border-[#e5e2db]">
+                      <Button className="!min-w-[35px] !w-[35px] !h-[30px] !bg-[#e5e2db] !rounded-none hover:!bg-[#efb291]" onClick={minusQty}><FaMinus className="text-[#0b2735]" /></Button>
+                      <span className="text-[#0b2735] font-medium">{quantity}</span>
+                      <Button className="!min-w-[35px] !w-[35px] !h-[30px] !bg-[#0b2735] !rounded-none hover:!bg-[#efb291]"
                         onClick={addQty}>
                         <FaPlus className="text-white" /></Button>
                     </div>

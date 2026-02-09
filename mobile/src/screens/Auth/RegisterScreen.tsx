@@ -20,6 +20,7 @@ import { authService } from '../../services/auth.service';
 import { RegisterData } from '../../types/user.types';
 import { AuthStackParamList } from '../../navigation/AppNavigator';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import Colors from '../../constants/colors';
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
 
@@ -140,6 +141,8 @@ const RegisterScreen: React.FC = () => {
             loading={loading}
             disabled={loading}
             style={styles.button}
+            buttonColor={Colors.primary}
+            textColor={Colors.white}
           >
             Sign Up
           </Button>
@@ -148,6 +151,7 @@ const RegisterScreen: React.FC = () => {
             mode="text"
             onPress={() => navigation.navigate('Login')}
             style={styles.linkButton}
+            textColor={Colors.primary}
           >
             Already have an account? Sign in
           </Button>
@@ -160,7 +164,7 @@ const RegisterScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -171,19 +175,28 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     alignSelf: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 8,
-    color: '#000',
+    color: Colors.primary,
   },
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 32,
-    color: '#666',
+    color: Colors.primary,
+    opacity: 0.7,
   },
   input: {
     marginBottom: 16,
@@ -196,13 +209,15 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   errorContainer: {
-    backgroundColor: '#ffebee',
+    backgroundColor: Colors.tertiary,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.primary,
   },
   errorText: {
-    color: '#c62828',
+    color: Colors.primary,
     textAlign: 'center',
   },
 });

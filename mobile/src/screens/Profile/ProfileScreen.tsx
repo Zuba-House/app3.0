@@ -10,6 +10,7 @@ import { Button } from 'react-native-paper';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectUser, selectIsAuthenticated, logout } from '../../store/slices/authSlice';
 import { authService } from '../../services/auth.service';
+import Colors from '../../constants/colors';
 
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -66,7 +67,7 @@ const ProfileScreen: React.FC = () => {
         mode="contained"
         onPress={handleLogout}
         style={styles.logoutButton}
-        buttonColor="#e53935"
+        buttonColor={Colors.primary}
       >
         Logout
       </Button>
@@ -80,12 +81,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.background,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 16,
+    color: Colors.primary,
   },
   userInfo: {
     marginBottom: 16,
@@ -95,14 +97,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     marginBottom: 4,
+    color: Colors.primary,
   },
   email: {
     fontSize: 16,
-    color: '#666',
+    color: Colors.primary,
+    opacity: 0.7,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: Colors.primary,
+    opacity: 0.7,
   },
   emptyIcon: {
     fontSize: 64,
@@ -112,11 +117,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 8,
-    color: '#333',
+    color: Colors.primary,
   },
   emptySubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: Colors.primary,
+    opacity: 0.7,
     marginBottom: 32,
     textAlign: 'center',
     paddingHorizontal: 20,

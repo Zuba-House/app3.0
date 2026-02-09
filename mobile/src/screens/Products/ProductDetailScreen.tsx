@@ -21,6 +21,72 @@ import { Product } from '../../types/product.types';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { setCart } from '../../store/slices/cartSlice';
+import Colors from '../../constants/colors';
+
+// Helper function to clean product data and remove problematic category properties
+const cleanProductData = (product: any): Product => {
+  try {
+    const cleaned: any = {
+      _id: product._id,
+      name: product.name || '',
+      description: product.description || '',
+      price: product.price || 0,
+      salePrice: product.salePrice,
+      images: product.images || [],
+      stock: product.stock || 0,
+      stockStatus: product.stockStatus || 'in_stock',
+      status: product.status || 'published',
+      productType: product.productType || 'simple',
+    };
+    
+    // Safely handle category - convert to string ID if it's an object
+    if (product.category) {
+      if (typeof product.category === 'object' && product.category !== null) {
+        // If category has _id, use it; otherwise try to extract safe properties
+        if (product.category._id) {
+          cleaned.category = product.category._id;
+        } else {
+          cleaned.category = null;
+        }
+      } else if (typeof product.category === 'string') {
+        cleaned.category = product.category;
+      }
+    }
+    
+    // Copy other optional fields safely
+    if (product.shortDescription) cleaned.shortDescription = product.shortDescription;
+    if (product.sku) cleaned.sku = product.sku;
+    if (product.featuredImage) cleaned.featuredImage = product.featuredImage;
+    if (product.categories) cleaned.categories = product.categories;
+    if (product.attributes) cleaned.attributes = product.attributes;
+    if (product.variations) cleaned.variations = product.variations;
+    if (product.featured !== undefined) cleaned.featured = product.featured;
+    if (product.rating !== undefined) cleaned.rating = product.rating;
+    if (product.reviewCount !== undefined) cleaned.reviewCount = product.reviewCount;
+    if (product.brand) cleaned.brand = product.brand;
+    if (product.weight) cleaned.weight = product.weight;
+    if (product.dimensions) cleaned.dimensions = product.dimensions;
+    if (product.createdAt) cleaned.createdAt = product.createdAt;
+    if (product.updatedAt) cleaned.updatedAt = product.updatedAt;
+    
+    return cleaned as Product;
+  } catch (error) {
+    console.warn('Error cleaning product data:', error);
+    // Return a minimal safe product
+    return {
+      _id: product._id || '',
+      name: product.name || 'Unknown Product',
+      description: product.description || '',
+      price: product.price || 0,
+      images: product.images || [],
+      stock: product.stock || 0,
+      stockStatus: 'in_stock',
+      status: 'published',
+      productType: 'simple',
+      category: typeof product.category === 'string' ? product.category : (product.category?._id || ''),
+    } as Product;
+  }
+};
 
 const ProductDetailScreen: React.FC = () => {
   const route = useRoute<any>();
@@ -42,15 +108,51 @@ const ProductDetailScreen: React.FC = () => {
   const loadProduct = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Loading product detail for ID:', productId);
       const response = await productService.getProductById(productId);
-      if (response.success && response.data) {
-        setProduct(response.data as Product);
+      
+      console.log('📦 Product detail response:', JSON.stringify(response, null, 2));
+      console.log('✅ Response success:', response.success);
+      console.log('📊 Response data:', response.data);
+      console.log('📊 Response product:', (response as any).product);
+      
+      // Backend returns product in "product" field, not "data"
+      let productData: Product | null = null;
+      
+      if (response.success) {
+        // Try different response formats
+        if (response.data) {
+          productData = response.data as Product;
+        } else if ((response as any).product) {
+          productData = (response as any).product as Product;
+        } else if ((response as any).data?.product) {
+          productData = (response as any).data.product as Product;
+        }
       }
-    } catch (error) {
-      console.error('Error loading product:', error);
-      Alert.alert('Error', 'Failed to load product');
+      
+      if (productData) {
+        // Clean product data to remove problematic category properties
+        const cleanedProduct = cleanProductData(productData);
+        console.log('✅ Product loaded:', cleanedProduct.name);
+        console.log('🖼️ Product images:', cleanedProduct.images);
+        setProduct(cleanedProduct);
+      } else {
+        console.warn('⚠️ Product not found or response not successful:', {
+          success: response.success,
+          hasData: !!response.data,
+          hasProduct: !!(response as any).product,
+          message: (response as any).message,
+          responseKeys: Object.keys(response || {}),
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Error loading product:', error);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      Alert.alert('Error', error.message || 'Failed to load product');
     } finally {
       setLoading(false);
+      console.log('✅ Loading complete');
     }
   };
 
@@ -121,42 +223,79 @@ const ProductDetailScreen: React.FC = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.imageContainer}>
-        {product.images && product.images.length > 0 ? (
-          <Image
-            source={{ uri: product.images[selectedImageIndex] }}
-            style={styles.mainImage}
-            contentFit="contain"
-          />
-        ) : (
-          <View style={[styles.mainImage, styles.placeholderImage]}>
-            <Text>No Image</Text>
-          </View>
-        )}
+        {(() => {
+          // Helper to get image URL - handle both string[] and object[] formats
+          const getImageUrl = (image: any): string | null => {
+            if (!image) return null;
+            // Handle object format: { url: string, alt?: string, ... }
+            if (typeof image === 'object' && image.url) {
+              return image.url;
+            }
+            // Handle string format
+            if (typeof image === 'string') {
+              return image;
+            }
+            return null;
+          };
 
-        {product.images && product.images.length > 1 && (
-          <ScrollView
-            horizontal
-            style={styles.thumbnailContainer}
-            showsHorizontalScrollIndicator={false}
-          >
-            {product.images.map((image, index) => (
-              <TouchableOpacity
-                key={index}
-                onPress={() => setSelectedImageIndex(index)}
-                style={[
-                  styles.thumbnail,
-                  selectedImageIndex === index && styles.selectedThumbnail,
-                ]}
-              >
+          // Get all image URLs
+          const imageUrls = product.images
+            ? product.images.map(getImageUrl).filter((url): url is string => url !== null)
+            : [];
+
+          // Try featuredImage if no images
+          if (imageUrls.length === 0 && (product as any).featuredImage) {
+            imageUrls.push((product as any).featuredImage);
+          }
+
+          if (imageUrls.length > 0) {
+            return (
+              <>
                 <Image
-                  source={{ uri: image }}
-                  style={styles.thumbnailImage}
-                  contentFit="cover"
+                  source={{ uri: imageUrls[selectedImageIndex] || imageUrls[0] }}
+                  style={styles.mainImage}
+                  contentFit="contain"
+                  placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+                  transition={200}
+                  onError={(error) => {
+                    console.error('❌ Image load error:', imageUrls[selectedImageIndex], error);
+                  }}
                 />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
+                {imageUrls.length > 1 && (
+                  <ScrollView
+                    horizontal
+                    style={styles.thumbnailContainer}
+                    showsHorizontalScrollIndicator={false}
+                  >
+                    {imageUrls.map((imageUrl, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        onPress={() => setSelectedImageIndex(index)}
+                        style={[
+                          styles.thumbnail,
+                          selectedImageIndex === index && styles.selectedThumbnail,
+                        ]}
+                      >
+                        <Image
+                          source={{ uri: imageUrl }}
+                          style={styles.thumbnailImage}
+                          contentFit="cover"
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </>
+            );
+          }
+
+          return (
+            <View style={[styles.mainImage, styles.placeholderImage]}>
+              <Text style={styles.placeholderText}>📦</Text>
+              <Text style={styles.placeholderText}>No Image</Text>
+            </View>
+          );
+        })()}
       </View>
 
       <View style={styles.content}>
@@ -220,6 +359,8 @@ const ProductDetailScreen: React.FC = () => {
           loading={addingToCart}
           disabled={product.stock === 0 || addingToCart}
           style={styles.addButton}
+          buttonColor={Colors.primary}
+          textColor={Colors.white}
         >
           {product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
         </Button>
@@ -231,50 +372,60 @@ const ProductDetailScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: Colors.white,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: Colors.background,
   },
   errorText: {
     fontSize: 16,
-    color: '#999',
+    color: Colors.primary,
+    opacity: 0.7,
     marginBottom: 20,
   },
   imageContainer: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.tertiary,
   },
   mainImage: {
     width: '100%',
     height: 400,
   },
   placeholderImage: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: Colors.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  placeholderText: {
+    fontSize: 48,
+    marginBottom: 8,
+    color: Colors.primary,
+    opacity: 0.5,
   },
   thumbnailContainer: {
     flexDirection: 'row',
     padding: 8,
+    backgroundColor: Colors.white,
   },
   thumbnail: {
     width: 60,
     height: 60,
     marginRight: 8,
-    borderRadius: 4,
+    borderRadius: 8,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: Colors.border,
   },
   selectedThumbnail: {
-    borderColor: '#007AFF',
+    borderColor: Colors.secondary,
   },
   thumbnailImage: {
     width: '100%',
@@ -283,12 +434,13 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    backgroundColor: Colors.white,
   },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 12,
-    color: '#333',
+    color: Colors.primary,
   },
   priceContainer: {
     flexDirection: 'row',
@@ -298,23 +450,24 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#2e7d32',
+    color: Colors.secondary,
     marginRight: 12,
   },
   originalPrice: {
     fontSize: 18,
-    color: '#999',
+    color: Colors.primary,
+    opacity: 0.5,
     textDecorationLine: 'line-through',
     marginRight: 12,
   },
   discountBadge: {
-    backgroundColor: '#e53935',
+    backgroundColor: Colors.secondary,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 8,
   },
   discountText: {
-    color: '#fff',
+    color: Colors.primary,
     fontSize: 12,
     fontWeight: 'bold',
   },
@@ -325,11 +478,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 8,
-    color: '#333',
+    color: Colors.primary,
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: Colors.primary,
+    opacity: 0.8,
     lineHeight: 20,
   },
   quantityContainer: {
@@ -340,7 +494,7 @@ const styles = StyleSheet.create({
   quantityLabel: {
     fontSize: 16,
     marginRight: 16,
-    color: '#333',
+    color: Colors.primary,
   },
   quantityControls: {
     flexDirection: 'row',
@@ -358,7 +512,8 @@ const styles = StyleSheet.create({
   },
   stockText: {
     fontSize: 14,
-    color: '#666',
+    color: Colors.primary,
+    opacity: 0.8,
   },
   addButton: {
     paddingVertical: 8,

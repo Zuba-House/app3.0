@@ -43,15 +43,32 @@ const makeRequest = async <T = any>(
       headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_URL}${url}`, {
+    const fullUrl = `${API_URL}${url}`;
+    console.log('🌐 Making API request:', fullUrl);
+    console.log('📤 Request headers:', JSON.stringify(headers, null, 2));
+    console.log('📤 Request options:', JSON.stringify(options, null, 2));
+
+    const response = await fetch(fullUrl, {
       ...options,
       headers,
     });
 
-    const data = await response.json();
+    console.log('📥 Response status:', response.status);
+    console.log('📥 Response ok:', response.ok);
+    console.log('📥 Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
+
+    let data: any;
+    try {
+      data = await response.json();
+      console.log('📥 Response data:', JSON.stringify(data, null, 2));
+    } catch (parseError) {
+      console.error('❌ JSON parse error:', parseError);
+      throw new Error('Invalid response from server');
+    }
 
     // Check for error response BEFORE handling 401
-    if (data && data.error === true) {
+    // Only throw if error is explicitly true AND success is false
+    if (data && data.error === true && data.success === false) {
       // This is an error response (e.g., email already exists)
       throw new Error(data.message || 'Request failed');
     }
@@ -142,16 +159,165 @@ const makeRequest = async <T = any>(
     }
 
     // Check if response indicates error
-    if (!response.ok || (data && data.error === true)) {
-      // Return error response
-      const errorResponse = data as ApiResponse<T>;
-      if (errorResponse.message) {
-        throw new Error(errorResponse.message);
-      }
-      throw new Error('Request failed');
+    // Only treat as error if error is true AND success is false
+    if (data && data.error === true && data.success === false) {
+      // This is an error response
+      throw new Error(data.message || 'Request failed');
+    }
+    
+    // Also check HTTP status codes
+    if (!response.ok && response.status >= 400) {
+      // HTTP error status
+      const errorMessage = data?.message || `Request failed with status ${response.status}`;
+      throw new Error(errorMessage);
     }
 
-    return data as ApiResponse<T>;
+    // Normalize response format - some endpoints return data in different fields
+    // Backend sometimes returns { success: true, product: {...} } instead of { success: true, data: {...} }
+    // Also handle case where data is nested or at root level
+    let responseData: any = null;
+    
+    if (data.data !== undefined) {
+      responseData = data.data;
+    } else if (data.product !== undefined) {
+      responseData = data.product;
+    } else if (data.products !== undefined) {
+      // Backend search returns products array directly
+      responseData = data.products;
+    } else if (data.result !== undefined) {
+      responseData = data.result;
+    } else if (data.user !== undefined) {
+      responseData = data.user;
+    } else if (!data.error && data.success !== false) {
+      // If no error and success, data might be at root (but exclude error/success/message fields)
+      const { error, success, message, total, page, totalPages, ...rest } = data;
+      if (Object.keys(rest).length > 0) {
+        responseData = rest;
+      }
+    }
+
+    // Safely handle nested category data to prevent level3 errors
+    const cleanCategoryData = (obj: any): any => {
+      if (!obj || typeof obj !== 'object') return obj;
+      
+      try {
+        const cleaned = Array.isArray(obj) ? [...obj] : { ...obj };
+        
+        if (Array.isArray(cleaned)) {
+          return cleaned.map((item: any) => {
+            if (!item || typeof item !== 'object') return item;
+            
+            try {
+              const itemCleaned: any = {};
+              
+              // Copy all properties except problematic ones
+              for (const key in item) {
+                if (item.hasOwnProperty(key)) {
+                  const value = item[key];
+                  
+                  // Handle category objects specially - ALWAYS convert to string ID
+                  if (key === 'category' && value && typeof value === 'object') {
+                    try {
+                      // Always convert category object to string ID to avoid level3 errors
+                      if ((value as any)._id) {
+                        itemCleaned[key] = (value as any)._id;
+                      } else {
+                        // If no _id, try to find it or set to null
+                        itemCleaned[key] = null;
+                      }
+                    } catch (e) {
+                      // If category processing fails, set to null
+                      itemCleaned[key] = null;
+                    }
+                  } else {
+                    // Recursively clean nested objects
+                    if (value && typeof value === 'object' && !Array.isArray(value)) {
+                      itemCleaned[key] = cleanCategoryData(value);
+                    } else {
+                      itemCleaned[key] = value;
+                    }
+                  }
+                }
+              }
+              
+              return itemCleaned;
+            } catch (e) {
+              console.warn('Error cleaning item:', e);
+              return item;
+            }
+          });
+        } else {
+          // Single object - clean it
+          const cleanedObj: any = {};
+          for (const key in cleaned) {
+            if (cleaned.hasOwnProperty(key)) {
+              const value = cleaned[key];
+              
+              if (key === 'category' && value && typeof value === 'object') {
+                try {
+                  // Always convert category object to string ID to avoid level3 errors
+                  cleanedObj[key] = (value as any)?._id || null;
+                } catch (e) {
+                  cleanedObj[key] = null;
+                }
+              } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+                cleanedObj[key] = cleanCategoryData(value);
+              } else {
+                cleanedObj[key] = value;
+              }
+            }
+          }
+          return cleanedObj;
+        }
+      } catch (e) {
+        console.warn('Error in cleanCategoryData:', e);
+        return obj;
+      }
+    };
+
+    // Clean category data with error handling
+    try {
+      responseData = cleanCategoryData(responseData);
+    } catch (cleanError) {
+      console.warn('⚠️ Error cleaning category data, using original:', cleanError);
+      // If cleaning fails, try to at least remove problematic properties
+      if (responseData && typeof responseData === 'object') {
+        try {
+          if (Array.isArray(responseData)) {
+            responseData = responseData.map((item: any) => {
+              // Safely convert category to string ID without accessing level3
+              if (item && item.category) {
+                const { category, ...rest } = item;
+                if (typeof category === 'object' && category !== null) {
+                  return { ...rest, category: category._id || null };
+                }
+                return { ...rest, category: category };
+              }
+              return item;
+            });
+          } else if (responseData.category) {
+            // Safely convert category to string ID
+            const { category, ...rest } = responseData;
+            if (typeof category === 'object' && category !== null) {
+              responseData = { ...rest, category: category._id || null };
+            } else {
+              responseData = { ...rest, category: category };
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ Secondary cleanup also failed:', e);
+        }
+      }
+    }
+
+    const normalizedResponse: ApiResponse<T> = {
+      success: data.success !== false, // Default to true if not explicitly false
+      error: data.error === true,
+      message: data.message,
+      data: responseData,
+    } as ApiResponse<T>;
+
+    return normalizedResponse;
   } catch (error: any) {
     // Handle network errors
     if (error.message === 'Network request failed') {

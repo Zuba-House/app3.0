@@ -21,6 +21,7 @@ import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectCartItems, selectCartTotal, setCart } from '../../store/slices/cartSlice';
 import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { CartItem } from '../../types/cart.types';
+import Colors from '../../constants/colors';
 
 const CartScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -254,24 +255,25 @@ const CartScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: Colors.white,
   },
   loadingText: {
     marginTop: 16,
-    color: '#666',
+    color: Colors.primary,
+    opacity: 0.7,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.white,
   },
   emptyIcon: {
     fontSize: 64,
@@ -281,11 +283,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 8,
-    color: '#333',
+    color: Colors.primary,
   },
   emptySubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: Colors.primary,
+    opacity: 0.7,
     marginBottom: 32,
     textAlign: 'center',
   },
@@ -297,25 +300,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: Colors.border,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: Colors.primary,
   },
   itemCount: {
     fontSize: 14,
-    color: '#666',
+    color: Colors.primary,
+    opacity: 0.7,
   },
   listContent: {
     padding: 16,
   },
   cartItem: {
     marginBottom: 12,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   itemContent: {
     flexDirection: 'row',
@@ -328,12 +335,13 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   placeholderImage: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: Colors.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   placeholderText: {
-    color: '#999',
+    color: Colors.primary,
+    opacity: 0.5,
     fontSize: 10,
   },
   itemDetails: {
@@ -343,12 +351,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
-    color: '#333',
+    color: Colors.primary,
   },
   itemPrice: {
     fontSize: 14,
-    color: '#666',
+    color: Colors.secondary,
     marginBottom: 8,
+    fontWeight: '600',
   },
   quantityContainer: {
     flexDirection: 'row',
@@ -360,13 +369,13 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 4,
+    backgroundColor: Colors.tertiary,
+    borderRadius: 8,
   },
   quantityButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: Colors.primary,
   },
   quantity: {
     marginHorizontal: 16,
@@ -382,21 +391,22 @@ const styles = StyleSheet.create({
   subtotal: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2e7d32',
+    color: Colors.secondary,
     marginBottom: 8,
   },
   removeButton: {
     padding: 4,
   },
   removeButtonText: {
-    color: '#e53935',
+    color: Colors.primary,
     fontSize: 12,
+    opacity: 0.7,
   },
   footer: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.white,
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: Colors.border,
   },
   totalContainer: {
     flexDirection: 'row',
@@ -407,12 +417,12 @@ const styles = StyleSheet.create({
   totalLabel: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: Colors.primary,
   },
   totalAmount: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2e7d32',
+    color: Colors.secondary,
   },
   checkoutButton: {
     paddingVertical: 8,

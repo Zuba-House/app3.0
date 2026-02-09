@@ -9,16 +9,24 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import { STORAGE_KEYS } from '../constants/config';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setCredentials } from '../store/slices/authSlice';
 import { User } from '../types/user.types';
+import Colors from '../constants/colors';
+import SplashScreen from '../components/SplashScreen';
 
 // Screens
 import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
+import ForgotPasswordScreen from '../screens/Auth/ForgotPasswordScreen';
+import VerifyOtpScreen from '../screens/Auth/VerifyOtpScreen';
+import ResetPasswordScreen from '../screens/Auth/ResetPasswordScreen';
 import HomeScreen from '../screens/Home/HomeScreen';
-import CartScreen from '../screens/Cart/CartScreen';
+import SearchScreen from '../screens/Search/SearchScreen';
+import WishlistScreen from '../screens/Wishlist/WishlistScreen';
+import OrdersScreen from '../screens/Orders/OrdersScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
 import ProductDetailScreen from '../screens/Products/ProductDetailScreen';
 
@@ -26,24 +34,33 @@ import ProductDetailScreen from '../screens/Products/ProductDetailScreen';
 export type RootStackParamList = {
   Auth: { screen?: 'Login' | 'Register' } | undefined;
   Main: undefined;
-  ProductDetail: { productId: string };
 };
 
 export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
+  ForgotPassword: undefined;
+  VerifyOtp: { email: string };
+  ResetPassword: { email: string };
 };
 
 export type MainTabParamList = {
   Home: undefined;
-  Cart: undefined;
-  Profile: undefined;
+  Search: undefined;
+  Wishlist: undefined;
+  Orders: undefined;
+  Account: undefined;
+};
+
+export type MainStackParamList = {
+  MainTabs: undefined;
+  ProductDetail: { productId: string };
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
-const MainStack = createNativeStackNavigator();
+const MainStack = createNativeStackNavigator<MainStackParamList>();
 
 // Auth Navigator
 const AuthNavigator = () => {
@@ -55,6 +72,9 @@ const AuthNavigator = () => {
     >
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
+      <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <AuthStack.Screen name="VerifyOtp" component={VerifyOtpScreen} />
+      <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     </AuthStack.Navigator>
   );
 };
@@ -65,13 +85,96 @@ const TabNavigator = () => {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
+        tabBarActiveTintColor: Colors.secondary,
+        tabBarInactiveTintColor: Colors.primary,
+        tabBarStyle: {
+          backgroundColor: Colors.white,
+          borderTopWidth: 1,
+          borderTopColor: Colors.border,
+          height: 65,
+          paddingBottom: 10,
+          paddingTop: 8,
+          elevation: 8,
+          shadowColor: Colors.shadow,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+          marginTop: 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 4,
+        },
       }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Cart" component={CartScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen 
+        name="Home" 
+        component={HomeScreen}
+        options={{
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'home' : 'home-outline'} 
+              size={24} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Search" 
+        component={SearchScreen}
+        options={{
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'search' : 'search-outline'} 
+              size={24} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Wishlist" 
+        component={WishlistScreen}
+        options={{
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'heart' : 'heart-outline'} 
+              size={24} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Orders" 
+        component={OrdersScreen}
+        options={{
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'bag' : 'bag-outline'} 
+              size={24} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Account" 
+        component={ProfileScreen}
+        options={{
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'person' : 'person-outline'} 
+              size={24} 
+              color={color} 
+            />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 };
@@ -97,6 +200,7 @@ const MainNavigator = () => {
 // Root Navigator
 const AppNavigator: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const dispatch = useAppDispatch();
 
@@ -150,11 +254,21 @@ const AppNavigator: React.FC = () => {
     checkAuth();
   }, [dispatch]);
 
-  if (isLoading) {
-    // Show splash screen or loading indicator
+  // Show beautiful animated splash screen
+  if (showSplash) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#007AFF' }}>Zuba</Text>
+      <SplashScreen
+        onFinish={() => setShowSplash(false)}
+        duration={2500}
+      />
+    );
+  }
+
+  if (isLoading) {
+    // Brief loading state after splash
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: Colors.primary }}>Zuba</Text>
       </View>
     );
   }
