@@ -19,19 +19,25 @@ import { Image } from 'expo-image';
 import { cartService } from '../../services/cart.service';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectCartItems, selectCartTotal, setCart } from '../../store/slices/cartSlice';
+import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { CartItem } from '../../types/cart.types';
 
 const CartScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const cartItems = useAppSelector(selectCartItems);
   const total = useAppSelector(selectCartTotal);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadCart();
-  }, []);
+    if (isAuthenticated) {
+      loadCart();
+    } else {
+      setLoading(false);
+    }
+  }, [isAuthenticated]);
 
   const loadCart = async () => {
     try {
@@ -162,6 +168,32 @@ const CartScreen: React.FC = () => {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
         <Text style={styles.loadingText}>Loading cart...</Text>
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyIcon}>🔐</Text>
+        <Text style={styles.emptyTitle}>Please Login</Text>
+        <Text style={styles.emptySubtitle}>
+          You need to be logged in to view your cart
+        </Text>
+        <Button
+          mode="contained"
+          onPress={() => navigation.navigate('Auth', { screen: 'Login' })}
+          style={styles.shopButton}
+        >
+          Login
+        </Button>
+        <Button
+          mode="outlined"
+          onPress={() => navigation.navigate('Home')}
+          style={styles.shopButton}
+        >
+          Continue Shopping
+        </Button>
       </View>
     );
   }

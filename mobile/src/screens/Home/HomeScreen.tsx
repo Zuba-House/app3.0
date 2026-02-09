@@ -1,6 +1,6 @@
 /**
  * Home Screen
- * Main product browsing screen
+ * Beautiful main product browsing screen
  */
 
 import React, { useEffect, useState } from 'react';
@@ -11,14 +11,18 @@ import {
   FlatList,
   RefreshControl,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
-import { ActivityIndicator, Searchbar } from 'react-native-paper';
+import { ActivityIndicator, Searchbar, IconButton } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { productService } from '../../services/product.service';
 import { Product } from '../../types/product.types';
 import ProductCard from '../../components/ProductCard';
 import { useAppSelector } from '../../store/hooks';
 import { selectIsAuthenticated } from '../../store/slices/authSlice';
+import { Image } from 'expo-image';
+
+const { width } = Dimensions.get('window');
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -75,24 +79,22 @@ const HomeScreen: React.FC = () => {
   };
 
   const handleProductPress = (product: Product) => {
-    // Navigate to ProductDetail - it's in the same MainStack
-    (navigation as any).navigate('ProductDetail', { productId: product._id });
+    navigation.navigate('ProductDetail', { productId: product._id });
   };
 
   const handleAddToCart = async (product: Product) => {
     if (!isAuthenticated) {
-      // This will be handled by root navigator
+      // Show login screen if not authenticated
+      navigation.navigate('Auth', { screen: 'Login' });
       return;
     }
-
-    // Navigate to product detail to add to cart
     handleProductPress(product);
   };
 
   if (loading && products.length === 0) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#007AFF" />
         <Text style={styles.loadingText}>Loading products...</Text>
       </View>
     );
@@ -100,24 +102,55 @@ const HomeScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      {/* Beautiful Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Zuba</Text>
-        <TouchableOpacity
-          onPress={() => (navigation as any).navigate('Cart')}
-          style={styles.cartButton}
-        >
-          <Text style={styles.cartIcon}>🛒</Text>
-        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerTitle}>Zuba</Text>
+            <Text style={styles.headerSubtitle}>Shop the best deals</Text>
+          </View>
+          <View style={styles.headerActions}>
+            {!isAuthenticated && (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Auth', { screen: 'Login' })}
+                style={styles.loginButton}
+              >
+                <Text style={styles.loginButtonText}>Login</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={() => {
+                if (isAuthenticated) {
+                  navigation.navigate('Cart');
+                } else {
+                  navigation.navigate('Auth', { screen: 'Login' });
+                }
+              }}
+              style={styles.cartButton}
+            >
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartIcon}>🛒</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
-      <Searchbar
-        placeholder="Search products..."
-        onChangeText={setSearchQuery}
-        value={searchQuery}
-        onSubmitEditing={handleSearch}
-        style={styles.searchbar}
-      />
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Searchbar
+          placeholder="Search products..."
+          onChangeText={setSearchQuery}
+          value={searchQuery}
+          onSubmitEditing={handleSearch}
+          style={styles.searchbar}
+          iconColor="#007AFF"
+          inputStyle={styles.searchInput}
+          placeholderTextColor="#999"
+        />
+      </View>
 
+      {/* Products Grid */}
       <FlatList
         data={products}
         renderItem={({ item }) => (
@@ -132,13 +165,23 @@ const HomeScreen: React.FC = () => {
         numColumns={2}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={['#007AFF']}
+            tintColor="#007AFF"
+          />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>📦</Text>
             <Text style={styles.emptyText}>No products found</Text>
+            <Text style={styles.emptySubtext}>
+              Try adjusting your search or check back later
+            </Text>
           </View>
         }
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
@@ -147,7 +190,7 @@ const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
   loadingContainer: {
     flex: 1,
@@ -158,47 +201,113 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     color: '#666',
+    fontSize: 16,
   },
   header: {
+    backgroundColor: '#fff',
+    paddingTop: 50,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8e8e8',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  loginButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#007AFF',
+    borderRadius: 20,
+  },
+  loginButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#007AFF',
+    letterSpacing: -0.5,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
   },
   cartButton: {
     padding: 8,
   },
+  cartBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   cartIcon: {
     fontSize: 24,
   },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8e8e8',
+  },
   searchbar: {
-    margin: 16,
-    marginBottom: 8,
+    backgroundColor: '#f5f5f5',
+    elevation: 0,
+    borderRadius: 12,
+  },
+  searchInput: {
+    fontSize: 16,
+    color: '#333',
   },
   listContent: {
     padding: 8,
+    paddingBottom: 20,
   },
   productCard: {
     flex: 1,
-    maxWidth: '48%',
+    maxWidth: (width - 32) / 2,
+    margin: 8,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: 60,
+    minHeight: 400,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
     color: '#999',
+    textAlign: 'center',
   },
 });
 

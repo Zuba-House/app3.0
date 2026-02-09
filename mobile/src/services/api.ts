@@ -50,6 +50,12 @@ const makeRequest = async <T = any>(
 
     const data = await response.json();
 
+    // Check for error response BEFORE handling 401
+    if (data && data.error === true) {
+      // This is an error response (e.g., email already exists)
+      throw new Error(data.message || 'Request failed');
+    }
+
     // Handle token expiration (401)
     if (response.status === 401 && !options.headers?.['X-Retry']) {
       if (isRefreshing) {
@@ -135,8 +141,14 @@ const makeRequest = async <T = any>(
       }
     }
 
-    if (!response.ok) {
-      return data as ApiResponse<T>;
+    // Check if response indicates error
+    if (!response.ok || (data && data.error === true)) {
+      // Return error response
+      const errorResponse = data as ApiResponse<T>;
+      if (errorResponse.message) {
+        throw new Error(errorResponse.message);
+      }
+      throw new Error('Request failed');
     }
 
     return data as ApiResponse<T>;

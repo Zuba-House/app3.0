@@ -1,0 +1,80 @@
+.shipping-address-input {
+  margin: 15px 0;
+}
+
+.shipping-address-input .form-group {
+  margin-bottom: 10px;
+}
+
+.shipping-address-input input[type="text"],
+.shipping-address-input select {
+  transition: border-color 0.3s ease;
+}
+
+.shipping-address-input input[type="text"]:focus,
+.shipping-address-input select:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+}
+
+.shipping-address-error {
+  padding: 15px;
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 6px;
+  color: #c33;
+  font-size: 14px;
+}
+
+.manual-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Phone Input Styling */
+.phone-input-wrapper {
+  width: 100%;
+}
+
+.phone-input-wrapper .PhoneInput {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+}
+
+.phone-input-wrapper .PhoneInput:focus-within {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+}
+
+.phone-input-wrapper.error .PhoneInput {
+  border-color: #ef4444;
+}
+
+.phone-input-wrapper .PhoneInputInput {
+  border: none;
+  outline: none;
+  width: 100%;
+  font-size: 14px;
+  padding: 0;
+}
+
+.phone-input-wrapper .PhoneInputCountryIcon {
+  width: 20px;
+  height: 15px;
+  margin-right: 8px;
+}
+
+.phone-input-wrapper .PhoneInputCountrySelect {
+  border: none;
+  outline: none;
+  font-size: 14px;
+  padding-right: 8px;
+}
+

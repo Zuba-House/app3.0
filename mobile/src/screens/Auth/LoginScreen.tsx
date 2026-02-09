@@ -13,13 +13,18 @@ import {
   ScrollView,
 } from 'react-native';
 import { TextInput, Button } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch } from '../../store/hooks';
 import { setCredentials } from '../../store/slices/authSlice';
 import { authService } from '../../services/auth.service';
 import { LoginCredentials } from '../../types/user.types';
+import { AuthStackParamList } from '../../navigation/AppNavigator';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-// TODO: Replace with actual navigation
+type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
+
 const LoginScreen: React.FC = () => {
+  const navigation = useNavigation<LoginScreenNavigationProp>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,20 +43,24 @@ const LoginScreen: React.FC = () => {
 
     try {
       const credentials: LoginCredentials = { email, password };
-      const authData = await authService.login(credentials);
+      const response = await authService.login(credentials);
 
-      dispatch(
-        setCredentials({
-          user: authData.user,
-          accessToken: authData.accessToken,
-          refreshToken: authData.refreshToken,
-        })
-      );
-
-      // Navigation will be handled by AppNavigator
-      // Navigate to home screen
+      if (response && response.user && response.accessToken) {
+        dispatch(
+          setCredentials({
+            user: response.user,
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken || '',
+          })
+        );
+        // Navigation will be handled by AppNavigator automatically
+      } else {
+        throw new Error('Invalid response from server');
+      }
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.');
+      console.error('Login error:', err);
+      const errorMessage = err.message || err.response?.data?.message || 'Login failed. Please try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -106,10 +115,7 @@ const LoginScreen: React.FC = () => {
 
           <Button
             mode="text"
-            onPress={() => {
-              // Navigate to Register screen
-              console.log('Navigate to Register');
-            }}
+            onPress={() => navigation.navigate('Register')}
             style={styles.linkButton}
           >
             Don't have an account? Sign up

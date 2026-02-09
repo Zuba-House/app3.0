@@ -13,13 +13,18 @@ import {
   ScrollView,
 } from 'react-native';
 import { TextInput, Button } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch } from '../../store/hooks';
 import { setCredentials } from '../../store/slices/authSlice';
 import { authService } from '../../services/auth.service';
 import { RegisterData } from '../../types/user.types';
+import { AuthStackParamList } from '../../navigation/AppNavigator';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-// TODO: Replace with actual navigation
+type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
+
 const RegisterScreen: React.FC = () => {
+  const navigation = useNavigation<RegisterScreenNavigationProp>();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -50,19 +55,24 @@ const RegisterScreen: React.FC = () => {
 
     try {
       const registerData: RegisterData = { name, email, password };
-      const authData = await authService.register(registerData);
+      const response = await authService.register(registerData);
 
-      dispatch(
-        setCredentials({
-          user: authData.user,
-          accessToken: authData.accessToken,
-          refreshToken: authData.refreshToken,
-        })
-      );
-
-      // Navigation will be handled by AppNavigator
+      if (response && response.user && response.accessToken) {
+        dispatch(
+          setCredentials({
+            user: response.user,
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken || '',
+          })
+        );
+        // Navigation will be handled by AppNavigator automatically
+      } else {
+        throw new Error('Invalid response from server');
+      }
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
+      console.error('Registration error:', err);
+      const errorMessage = err.message || err.response?.data?.message || 'Registration failed. Please try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -136,10 +146,7 @@ const RegisterScreen: React.FC = () => {
 
           <Button
             mode="text"
-            onPress={() => {
-              // Navigate to Login screen
-              console.log('Navigate to Login');
-            }}
+            onPress={() => navigation.navigate('Login')}
             style={styles.linkButton}
           >
             Already have an account? Sign in

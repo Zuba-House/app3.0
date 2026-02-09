@@ -33,12 +33,20 @@ export const authService = {
     if (response.success && response.data) {
       const { accessToken, refreshToken, user } = response.data;
 
-      // Store tokens and user
-      await AsyncStorage.multiSet([
-        [STORAGE_KEYS.ACCESS_TOKEN, accessToken],
-        [STORAGE_KEYS.REFRESH_TOKEN, refreshToken],
-        [STORAGE_KEYS.USER, JSON.stringify(user)],
-      ]);
+      // Validate tokens exist before storing
+      if (!accessToken || !user) {
+        throw new Error(response.message || 'Invalid login response');
+      }
+
+      // Store tokens and user (only if values are defined)
+      const itemsToStore: [string, string][] = [];
+      if (accessToken) itemsToStore.push([STORAGE_KEYS.ACCESS_TOKEN, accessToken]);
+      if (refreshToken) itemsToStore.push([STORAGE_KEYS.REFRESH_TOKEN, refreshToken]);
+      if (user) itemsToStore.push([STORAGE_KEYS.USER, JSON.stringify(user)]);
+
+      if (itemsToStore.length > 0) {
+        await AsyncStorage.multiSet(itemsToStore);
+      }
 
       return response.data;
     }
@@ -55,17 +63,51 @@ export const authService = {
       data
     );
 
+    // Handle different response structures
+    let authData: AuthResponse;
+    
     if (response.success && response.data) {
-      const { accessToken, refreshToken, user } = response.data;
+      // Check if data is directly AuthResponse or nested
+      if (response.data.accessToken && response.data.user) {
+        authData = response.data as AuthResponse;
+      } else if ((response.data as any).accessToken) {
+        authData = response.data as AuthResponse;
+      } else {
+        // Try to extract from nested structure
+        const nested = response.data as any;
+        authData = {
+          accessToken: nested.accessToken || nested.token || '',
+          refreshToken: nested.refreshToken || nested.refresh || '',
+          user: nested.user || nested.data || nested,
+        };
+      }
 
-      // Store tokens and user
-      await AsyncStorage.multiSet([
-        [STORAGE_KEYS.ACCESS_TOKEN, accessToken],
-        [STORAGE_KEYS.REFRESH_TOKEN, refreshToken],
-        [STORAGE_KEYS.USER, JSON.stringify(user)],
-      ]);
+      // Validate we have required fields
+      if (!authData.accessToken || !authData.user) {
+        throw new Error(response.message || 'Invalid registration response');
+      }
 
-      return response.data;
+      // Validate tokens exist before storing
+      if (!authData.accessToken || !authData.user) {
+        throw new Error(response.message || 'Invalid registration response');
+      }
+
+      // Store tokens and user (only if values are defined)
+      const itemsToStore: [string, string][] = [];
+      if (authData.accessToken) itemsToStore.push([STORAGE_KEYS.ACCESS_TOKEN, authData.accessToken]);
+      if (authData.refreshToken) itemsToStore.push([STORAGE_KEYS.REFRESH_TOKEN, authData.refreshToken]);
+      if (authData.user) itemsToStore.push([STORAGE_KEYS.USER, JSON.stringify(authData.user)]);
+
+      if (itemsToStore.length > 0) {
+        await AsyncStorage.multiSet(itemsToStore);
+      }
+
+      return authData;
+    }
+
+    // Handle error response from API
+    if (response.error === true && response.message) {
+      throw new Error(response.message);
     }
 
     throw new Error(response.message || 'Registration failed');
