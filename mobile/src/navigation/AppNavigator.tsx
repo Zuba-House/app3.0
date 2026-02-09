@@ -109,6 +109,7 @@ const TabNavigator = () => {
           marginTop: 4,
         },
       }}
+      backBehavior="firstRoute"
     >
       <Tab.Screen 
         name="Home" 

@@ -24,8 +24,44 @@ export const categoryService = {
    * Get all categories
    */
   getCategories: async (): Promise<ApiResponse<Category[]>> => {
-    const response = await fetchDataFromApi<Category[]>(API_ENDPOINTS.GET_CATEGORIES);
-    return response;
+    try {
+      const response = await fetchDataFromApi<Category[]>(API_ENDPOINTS.GET_CATEGORIES);
+      
+      // Additional cleaning of categories to ensure no level3 issues
+      if (response.success && response.data) {
+        const categories = Array.isArray(response.data) ? response.data : [];
+        const cleanedCategories = categories
+          .filter((cat: any) => cat && cat._id && cat.name)
+          .map((cat: any) => {
+            // Create a completely clean category object
+            const cleaned: Category = {
+              _id: String(cat._id),
+              name: String(cat.name),
+              slug: cat.slug ? String(cat.slug) : '',
+            };
+            if (cat.description) cleaned.description = String(cat.description);
+            if (cat.image) cleaned.image = String(cat.image);
+            if (cat.icon) cleaned.icon = String(cat.icon);
+            // Explicitly do NOT copy any other properties
+            return cleaned;
+          });
+        
+        return {
+          ...response,
+          data: cleanedCategories,
+        };
+      }
+      
+      return response;
+    } catch (error: any) {
+      console.error('Category service error:', error);
+      return {
+        success: false,
+        error: true,
+        message: error.message || 'Failed to load categories',
+        data: [],
+      };
+    }
   },
 
   /**

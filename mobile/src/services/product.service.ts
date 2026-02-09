@@ -124,6 +124,52 @@ export const productService = {
   },
 
   /**
+   * Get products by brand
+   */
+  getProductsByBrand: async (
+    brand: string,
+    page: number = 1,
+    limit: number = PAGINATION.DEFAULT_PAGE_SIZE
+  ): Promise<ApiResponse<Product[]>> => {
+    try {
+      // Use the filters endpoint similar to web client
+      const response = await postData<any>(
+        '/api/product/filters',
+        { brand: [brand], page, limit }
+      );
+      
+      if (response?.error === false && response?.products) {
+        return {
+          success: true,
+          error: false,
+          data: response.products,
+          message: response.message || 'Products fetched successfully',
+        };
+      }
+      
+      return {
+        success: false,
+        error: true,
+        data: [],
+        message: response?.message || 'Failed to fetch products',
+      };
+    } catch (error: any) {
+      console.error('Error fetching products by brand:', error);
+      // Fallback: try GET with brand query param
+      try {
+        const fallbackResponse = await fetchDataFromApi<Product[]>(
+          API_ENDPOINTS.GET_ALL_PRODUCTS,
+          { brand, page, limit }
+        );
+        return fallbackResponse;
+      } catch (fallbackError) {
+        console.error('Fallback brand filter also failed:', fallbackError);
+        throw error;
+      }
+    }
+  },
+
+  /**
    * Get all categories
    */
   getCategories: async (): Promise<ApiResponse<Category[]>> => {

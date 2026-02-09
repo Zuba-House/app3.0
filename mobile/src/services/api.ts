@@ -59,8 +59,94 @@ const makeRequest = async <T = any>(
 
     let data: any;
     try {
-      data = await response.json();
-      console.log('📥 Response data:', JSON.stringify(data, null, 2));
+      const rawData = await response.json();
+      
+      // IMMEDIATELY clean the data at the JSON level to prevent any level3 access
+      // This runs BEFORE any other processing to ensure level3 is never accessed
+      const cleanDataImmediately = (obj: any, depth: number = 0): any => {
+        // Prevent infinite recursion
+        if (depth > 10) return obj;
+        if (!obj || typeof obj !== 'object') return obj;
+        
+        try {
+          if (Array.isArray(obj)) {
+            return obj.map((item: any) => {
+              if (!item || typeof item !== 'object') return item;
+              try {
+                const cleaned: any = {};
+                for (const key in item) {
+                  if (item.hasOwnProperty(key)) {
+                    const value = item[key];
+                    
+                    // CRITICAL: Handle category immediately - convert to string ID
+                    // NEVER access level3 or any nested properties
+                    if (key === 'category') {
+                      if (value && typeof value === 'object' && value !== null) {
+                        // Extract _id only - NEVER access level3 or any other property
+                        cleaned[key] = (value as any)._id || null;
+                      } else {
+                        cleaned[key] = value;
+                      }
+                    } else if (key === 'categories' && Array.isArray(value)) {
+                      // Clean categories array - convert objects to IDs
+                      cleaned[key] = value.map((cat: any) => {
+                        if (cat && typeof cat === 'object' && (cat as any)._id) {
+                          return (cat as any)._id;
+                        }
+                        return cat;
+                      });
+                    } else if (value && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                      // Recursively clean nested objects (but skip category objects)
+                      cleaned[key] = cleanDataImmediately(value, depth + 1);
+                    } else {
+                      cleaned[key] = value;
+                    }
+                  }
+                }
+                return cleaned;
+              } catch (e) {
+                console.warn('Error cleaning array item:', e);
+                return item;
+              }
+            });
+          } else {
+            const cleaned: any = {};
+            for (const key in obj) {
+              if (obj.hasOwnProperty(key)) {
+                const value = obj[key];
+                
+                // CRITICAL: Handle category immediately - NEVER access level3
+                if (key === 'category') {
+                  if (value && typeof value === 'object' && value !== null) {
+                    // Extract _id only - NEVER access any other property
+                    cleaned[key] = (value as any)._id || null;
+                  } else {
+                    cleaned[key] = value;
+                  }
+                } else if (key === 'categories' && Array.isArray(value)) {
+                  cleaned[key] = value.map((cat: any) => {
+                    if (cat && typeof cat === 'object' && (cat as any)._id) {
+                      return (cat as any)._id;
+                    }
+                    return cat;
+                  });
+                } else if (value && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                  cleaned[key] = cleanDataImmediately(value, depth + 1);
+                } else {
+                  cleaned[key] = value;
+                }
+              }
+            }
+            return cleaned;
+          }
+        } catch (e) {
+          console.warn('Error in cleanDataImmediately:', e);
+          return obj;
+        }
+      };
+      
+      data = cleanDataImmediately(rawData);
+      console.log('📥 Response data (cleaned):', JSON.stringify(data, null, 2));
     } catch (parseError) {
       console.error('❌ JSON parse error:', parseError);
       throw new Error('Invalid response from server');

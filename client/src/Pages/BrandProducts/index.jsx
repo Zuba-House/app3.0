@@ -12,6 +12,7 @@ import Pagination from "@mui/material/Pagination";
 import ProductLoadingGrid from "../../components/ProductLoading/productLoadingGrid";
 import { postData } from "../../utils/api";
 import { MyContext } from "../../App";
+import VerifiedBadge from "../../components/VerifiedBadge";
 
 // Brand configuration - add new brands here
 // The key is case-insensitive URL slug, value contains display info
@@ -21,14 +22,16 @@ const BRAND_CONFIG = {
     brandQuery: "NGOMA", // The exact brand name in the database
     description: "Discover our exclusive collection of NGOMA products. Premium quality, authentic designs.",
     headerColor: "#0b2735",
-    accentColor: "#eeb190"
+    accentColor: "#eeb190",
+    verified: true
   },
   kanyanaworld: {
     displayName: "Kanyana World",
     brandQuery: "KanyanaWorld", // The exact brand name in the database (can also match case-insensitively)
     description: "Explore the vibrant Kanyana World collection. Unique styles, exceptional quality.",
     headerColor: "#0b2735",
-    accentColor: "#eeb190"
+    accentColor: "#eeb190",
+    verified: true
   },
   // Add more brands as needed:
   // brandslug: {
@@ -36,7 +39,8 @@ const BRAND_CONFIG = {
   //   brandQuery: "ExactBrandNameInDB",
   //   description: "Brand description...",
   //   headerColor: "#0b2735",
-  //   accentColor: "#eeb190"
+  //   accentColor: "#eeb190",
+  //   verified: true
   // }
 };
 
@@ -64,7 +68,8 @@ const getBrandConfig = (brandSlug) => {
     brandQuery: brandSlug,
     description: `Browse our collection of ${brandSlug} products.`,
     headerColor: "#0b2735",
-    accentColor: "#eeb190"
+    accentColor: "#eeb190",
+    verified: false
   };
 };
 
@@ -193,12 +198,17 @@ const BrandProductsPage = () => {
 
           {/* Header Section */}
           <div className="mb-6">
-            <h1 
-              className="text-[28px] sm:text-[32px] md:text-[36px] lg:text-[40px] font-[700] mb-2"
-              style={{ color: brandConfig.headerColor }}
-            >
-              {brandConfig.displayName} Products
-            </h1>
+            <div className="flex items-center gap-2 mb-2">
+              <h1 
+                className="text-[28px] sm:text-[32px] md:text-[36px] lg:text-[40px] font-[700]"
+                style={{ color: brandConfig.headerColor }}
+              >
+                {brandConfig.displayName} Products
+              </h1>
+              {brandConfig.verified && (
+                <VerifiedBadge size={28} className="mt-1" />
+              )}
+            </div>
             <p className="text-[14px] sm:text-[16px] text-gray-600">
               {brandConfig.description}
             </p>

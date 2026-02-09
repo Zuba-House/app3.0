@@ -1,0 +1,101 @@
+/**
+ * Verified Badge Styles
+ * Creative blue verified badge with gradient and shadow effects
+ */
+
+.verified-badge {
+  position: relative;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.verified-badge__outer-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(29, 161, 242, 0.2);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.verified-badge__background {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1DA1F2 0%, #0D8BD9 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 
+    0 2px 8px rgba(29, 161, 242, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+    0 1px 0 rgba(255, 255, 255, 0.2) inset;
+  z-index: 1;
+}
+
+.verified-badge__inner-highlight {
+  position: absolute;
+  top: 15%;
+  left: 15%;
+  width: 70%;
+  height: 70%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.4), transparent 70%);
+  pointer-events: none;
+}
+
+.verified-badge__checkmark {
+  position: relative;
+  width: 50%;
+  height: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+.verified-badge__checkmark svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Pulse animation for outer glow */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.1);
+  }
+}
+
+/* Hover effect */
+.verified-badge:hover .verified-badge__background {
+  transform: scale(1.05);
+  box-shadow: 
+    0 4px 12px rgba(29, 161, 242, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.15) inset,
+    0 1px 0 rgba(255, 255, 255, 0.3) inset;
+  transition: all 0.3s ease;
+}
+
+.verified-badge:hover .verified-badge__outer-glow {
+  opacity: 0.3;
+  transform: scale(1.15);
+  transition: all 0.3s ease;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .verified-badge__outer-glow {
+    animation: none; /* Disable pulse on mobile for performance */
+  }
+}
