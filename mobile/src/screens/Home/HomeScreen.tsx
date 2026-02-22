@@ -880,8 +880,30 @@ const HomeScreen: React.FC = () => {
         {/* Promotional Banner - Minimalist Design */}
         {!selectedCategory && renderPromoBanner()}
 
+        {/* Daily Check-In Banner - TEMU Style */}
+        {!selectedCategory && !selectedBrand && <DailyCheckIn />}
+
+        {/* Flash Sale - TEMU Style */}
+        {!selectedCategory && !selectedBrand && products.length > 0 && (
+          <FlashSale 
+            products={products.slice(0, 8)} 
+            title="Flash Sale"
+          />
+        )}
+
+        {/* Deal of the Day - TEMU Style */}
+        {!selectedCategory && !selectedBrand && featuredProducts.length > 0 && (
+          <DealOfTheDay product={featuredProducts[0]} />
+        )}
+
         {/* Brands Grid - 2x2 */}
         {!selectedCategory && !selectedBrand && renderBrandsGridSection()}
+
+        {/* Category Deals - TEMU Style */}
+        {!selectedCategory && !selectedBrand && <CategoryDeals />}
+
+        {/* Recently Viewed - TEMU Style */}
+        {!selectedCategory && !selectedBrand && <RecentlyViewed />}
 
         {/* Featured Deals - Horizontal Scroll */}
         {!selectedCategory && !selectedBrand && featuredProducts.length > 0 && renderHorizontalProductSection(
