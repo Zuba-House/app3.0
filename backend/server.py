@@ -24,7 +24,7 @@ app.add_middleware(
 )
 
 # Zuba API Base URL
-ZUBA_API_URL = "https://zuba-api.onrender.com"
+ZUBA_API_URL = os.getenv('ZUBA_API_URL', 'https://zuba-api.onrender.com')
 
 # Health check
 @app.get("/api/health")
