@@ -1,0 +1,154 @@
+{
+  "brand_identity": {
+    "name": "Zuba House",
+    "ethos": "Modern African aesthetics meets fast-fashion efficiency. Professional, minimalist, and culturally rich.",
+    "persona": "The Curator",
+    "tone": "Confident, Vibrant, Accessible",
+    "environment": "Mobile-First Web App (PWA) mimicking Native App behavior"
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "hex": "#0b2735",
+        "name": "Obsidian Teal",
+        "usage": "Headings, Primary Buttons, Active States, Bottom Nav Active"
+      },
+      "secondary": {
+        "hex": "#efb291",
+        "name": "Savanna Peach",
+        "usage": "Accents, Sale Badges, CTA Highlights, Urgency Banners"
+      },
+      "tertiary": {
+        "hex": "#e5e2db",
+        "name": "Bone Cream",
+        "usage": "App Background, Cards (Light Mode), Inputs"
+      },
+      "neutral": {
+        "white": "#FFFFFF",
+        "black": "#0A0A0A",
+        "gray_100": "#F3F4F6",
+        "gray_200": "#E5E7EB",
+        "gray_800": "#1F2937"
+      }
+    },
+    "rules": [
+      "Background is ALWAYS #e5e2db (Bone Cream) or #FFFFFF (White) for contrast areas.",
+      "Text is predominantly #0b2735 (Obsidian Teal). NEVER use pure black.",
+      "Primary Buttons: #0b2735 background with #FFFFFF text.",
+      "Secondary Buttons/Tags: #efb291 background with #0b2735 text.",
+      "Borders: 1px solid #0b2735 with 10% opacity."
+    ]
+  },
+  "typography": {
+    "font_family": {
+      "headings": "Outfit, sans-serif",
+      "body": "Plus Jakarta Sans, sans-serif"
+    },
+    "styles": {
+      "h1": "text-3xl font-bold tracking-tight text-[#0b2735]",
+      "h2": "text-2xl font-semibold tracking-tight text-[#0b2735]",
+      "h3": "text-xl font-medium text-[#0b2735]",
+      "body_lg": "text-lg font-normal text-[#0b2735]/80",
+      "body_base": "text-base font-normal text-[#0b2735]/80",
+      "caption": "text-xs font-medium text-[#0b2735]/60 uppercase tracking-wider"
+    },
+    "installation": "Import Google Fonts: Outfit (300, 400, 500, 700) and Plus Jakarta Sans (400, 500, 600)."
+  },
+  "layout_strategy": {
+    "mobile_first_principles": [
+      "Bottom Navigation Bar is MANDATORY (Fixed at bottom).",
+      "Top Bar with Sticky Search Input.",
+      "Horizontal Scrolling for Categories/Deals (hide scrollbar).",
+      "Grid Layout: 2-column masonry for products (gap-2 or gap-3).",
+      "Touch Targets: Minimum 44px height for all interactive elements."
+    ],
+    "spacing": {
+      "container_padding": "px-4",
+      "section_gap": "gap-6",
+      "card_padding": "p-3"
+    }
+  },
+  "components": {
+    "BottomNavigation": {
+      "items": ["Home", "Categories", "Cart", "Profile"],
+      "style": "Fixed bottom, bg-white/90 backdrop-blur-md, border-t border-[#0b2735]/10, active color #0b2735, inactive #0b2735/40"
+    },
+    "ProductCard": {
+      "style": "Vertical layout, aspect-[3/4] image, minimal details below. No borders, just whitespace.",
+      "elements": ["Image (rounded-md)", "Title (truncate-2-lines)", "Price (Bold)", "Add Button (Icon only on image bottom-right)"]
+    },
+    "CategorySidebar": {
+      "style": "Split View: Left 25% (List of Parents), Right 75% (Grid of Children).",
+      "behavior": "Left side fixed/sticky, Right side scrolls."
+    },
+    "UrgencyBanner": {
+      "style": "bg-[#efb291] text-[#0b2735] px-3 py-1 rounded-sm text-xs font-bold flex items-center gap-2",
+      "content": "Flash Sale Ends in [Timer]"
+    }
+  },
+  "image_urls": {
+    "hero_banners": [
+      {
+        "url": "https://images.unsplash.com/photo-1765146488707-28ca911a2953",
+        "alt": "Two stylish women walking, hero banner",
+        "category": "hero"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1676220849540-b7566a366321",
+        "alt": "Woman in pink coat, fashion statement",
+        "category": "hero"
+      }
+    ],
+    "categories": {
+      "men": "https://images.unsplash.com/photo-1658457907943-6665bfde11bf",
+      "women": "https://images.unsplash.com/flagged/photo-1598898471446-213b4abb132f",
+      "accessories": "https://images.unsplash.com/photo-1723361656062-ed14986c7f1a"
+    },
+    "products": [
+      {
+        "url": "https://images.unsplash.com/photo-1631233859262-0d7b12ea7d4c",
+        "name": "White Linen Dress",
+        "category": "Women"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1628375385879-b476587214ef",
+        "name": "Minimalist Crew Set",
+        "category": "Men"
+      },
+      {
+        "url": "https://images.pexels.com/photos/34372559/pexels-photo-34372559.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "name": "Gold Starburst Hoops",
+        "category": "Accessories"
+      },
+      {
+        "url": "https://images.pexels.com/photos/8605908/pexels-photo-8605908.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "name": "Gold Chain Necklace",
+        "category": "Accessories"
+      }
+    ]
+  },
+  "instructions_to_main_agent": {
+    "environment_override": "The user requested React Native Expo, but the environment is REACT WEB (Vite). YOU MUST BUILD A MOBILE-FIRST PWA (Web App) that mimics a native app.",
+    "layout_rules": [
+      "Do not use desktop-style headers. Use a Mobile Top Bar.",
+      "Hide scrollbars globally: .no-scrollbar::-webkit-scrollbar { display: none; }",
+      "Ensure all click targets are large enough for fingers.",
+      "Use 'react-router-dom' for navigation but style it like app transitions if possible."
+    ],
+    "styling_overrides": [
+      "Update tailwind.config.js to use the specific brand colors defined above.",
+      "Use 'sonner' for toasts (or react-hot-toast if sonner not available, but user pref sonner).",
+      "Use 'lucide-react' for icons (standard)."
+    ]
+  },
+  "universal_guidelines": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy",
+    "Use glass-morphism effects with backdrop filters (12-24px blur)",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Main agent relies on these image URLs. Missing categories = main agent will use placeholder text which is FORBIDDEN"
+  ]
+}
