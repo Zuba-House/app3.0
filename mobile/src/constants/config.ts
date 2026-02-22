@@ -36,13 +36,13 @@ export const API_ENDPOINTS = {
   GET_CATEGORIES: '/api/category',
 
   // Cart
-  GET_CART: '/api/cart',
+  GET_CART: '/api/cart/get',
   ADD_TO_CART: '/api/cart/add',
   UPDATE_CART_ITEM: '/api/cart',
   REMOVE_FROM_CART: '/api/cart',
 
   // Orders
-  GET_ORDERS: '/api/order',
+  GET_ORDERS: '/api/order/order-list',
   GET_ORDER: '/api/order',
   CREATE_ORDER: '/api/order/create',
 
