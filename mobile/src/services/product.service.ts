@@ -138,11 +138,11 @@ export const productService = {
         { brand: [brand], page, limit }
       );
       
-      if (response?.error === false && response?.products) {
+      if (response?.error === false && (response as any)?.products) {
         return {
           success: true,
           error: false,
-          data: response.products,
+          data: (response as any).products,
           message: response.message || 'Products fetched successfully',
         };
       }

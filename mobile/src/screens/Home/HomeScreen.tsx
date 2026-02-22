@@ -109,6 +109,20 @@ const HomeScreen: React.FC = () => {
   // Track if filter was just set intentionally (to prevent useFocusEffect from resetting)
   const filterJustSetRef = useRef<boolean>(false);
 
+  // Quick reset to home - clear all filters (defined early for useFocusEffect)
+  const handleResetToHome = useCallback(() => {
+    setSelectedCategory(null);
+    setSelectedBrand(null);
+    setSearchQuery('');
+    setSelectedTab('All');
+    // Smooth scroll to top
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    // Load all products smoothly
+    InteractionManager.runAfterInteractions(() => {
+      loadProducts();
+    });
+  }, []);
+
   // Memoize sorted product arrays to avoid recalculating on every render
   const topRatedProducts = useMemo(() => {
     if (products.length === 0) return [];
@@ -302,7 +316,7 @@ const HomeScreen: React.FC = () => {
         response = await productService.getAllProducts({ limit: 20 });
       }
       
-      if (response.success && response.data) {
+      if ((response as any).success !== false && response.data) {
         const productArray = Array.isArray(response.data)
           ? response.data
           : (response.data as any).products || [];
@@ -517,20 +531,6 @@ const HomeScreen: React.FC = () => {
     // Navigate to brands screen
     navigation.navigate('Brands');
   };
-
-  // Quick reset to home - clear all filters
-  const handleResetToHome = useCallback(() => {
-    setSelectedCategory(null);
-    setSelectedBrand(null);
-    setSearchQuery('');
-    setSelectedTab('All');
-    // Smooth scroll to top
-    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-    // Load all products smoothly
-    InteractionManager.runAfterInteractions(() => {
-      loadProducts();
-    });
-  }, []);
 
   const renderCategoryItem = ({ item }: { item: Category }) => {
     // Safety check - ensure item is valid before rendering

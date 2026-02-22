@@ -53,12 +53,17 @@ const cartSlice = createSlice({
     },
     addItem: (state, action: PayloadAction<CartItem>) => {
       const existingItem = state.items.find(
-        (item) =>
-          item._id === action.payload._id ||
-          (typeof item.product === 'object' &&
-            typeof action.payload.product === 'object' &&
-            item.product._id === action.payload.product._id &&
-            item.variation?._id === action.payload.variation?._id)
+        (item) => {
+          if (item._id === action.payload._id) return true;
+          if (typeof item.product === 'object' &&
+              typeof action.payload.product === 'object' &&
+              item.product._id === action.payload.product._id) {
+            const itemVarId = typeof item.variation === 'object' ? item.variation?._id : null;
+            const payloadVarId = typeof action.payload.variation === 'object' ? action.payload.variation?._id : null;
+            return itemVarId === payloadVarId;
+          }
+          return false;
+        }
       );
 
       if (existingItem) {

@@ -213,10 +213,9 @@ const LoginScreen: React.FC = () => {
             onPress={handleGoogleLogin}
             loading={googleLoading}
             disabled={loading || googleLoading}
-            style={styles.googleButton}
+            style={[styles.googleButton, { borderColor: Colors.secondary }]}
             buttonColor={Colors.white}
             textColor={Colors.primary}
-            borderColor={Colors.secondary}
           >
             Continue with Google
           </Button>

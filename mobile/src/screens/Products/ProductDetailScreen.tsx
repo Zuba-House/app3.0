@@ -140,11 +140,20 @@ const ProductDetailScreen: React.FC = () => {
         setProduct(cleanedProduct);
         
         // Add to recently viewed
+        const getImageUrl = (img: any): string | null => {
+          if (typeof img === 'string') return img;
+          if (img && typeof img === 'object' && img.url) return img.url;
+          return null;
+        };
+        const imageUrls = Array.isArray(cleanedProduct.images)
+          ? cleanedProduct.images.map(getImageUrl).filter((url): url is string => url !== null)
+          : [];
+        
         addToRecentlyViewed({
           _id: cleanedProduct._id,
           name: cleanedProduct.name,
           price: cleanedProduct.price,
-          images: cleanedProduct.images,
+          images: imageUrls,
           featuredImage: cleanedProduct.featuredImage,
         });
       } else {

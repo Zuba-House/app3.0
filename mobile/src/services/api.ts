@@ -34,9 +34,9 @@ const makeRequest = async <T = any>(
   try {
     const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string> || {}),
     };
 
     if (token) {
@@ -160,22 +160,24 @@ const makeRequest = async <T = any>(
     }
 
     // Handle token expiration (401)
-    if (response.status === 401 && !options.headers?.['X-Retry']) {
+    const retryHeader = (options.headers as Record<string, string>)?.['X-Retry'];
+    if (response.status === 401 && !retryHeader) {
       if (isRefreshing) {
         // Queue requests while refreshing
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((newToken: string | null) => {
-            if (newToken) {
-              headers.Authorization = `Bearer ${newToken}`;
-            }
-            return makeRequest<T>(url, {
-              ...options,
-              headers: { ...headers, 'X-Retry': 'true' },
-            });
-          })
-          .catch((err) => Promise.reject(err));
+        return new Promise<ApiResponse<T>>((resolve, reject) => {
+          failedQueue.push({ 
+            resolve: (token: string | null) => {
+              if (token) {
+                headers.Authorization = `Bearer ${token}`;
+              }
+              makeRequest<T>(url, {
+                ...options,
+                headers: { ...headers, 'X-Retry': 'true' } as HeadersInit,
+              }).then(resolve).catch(reject);
+            }, 
+            reject: (err: any) => reject(err)
+          });
+        });
       }
 
       isRefreshing = true;

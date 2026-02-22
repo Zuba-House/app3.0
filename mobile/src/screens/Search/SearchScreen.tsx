@@ -84,7 +84,7 @@ const SearchScreen: React.FC = () => {
     try {
       setLoading(true);
       const response = await productService.getAllProducts({ limit: 50 });
-      if (response.success && response.data) {
+      if ((response as any).success !== false && response.data) {
         const productArray = Array.isArray(response.data)
           ? response.data
           : (response.data as any).products || [];
