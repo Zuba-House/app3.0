@@ -138,6 +138,15 @@ const ProductDetailScreen: React.FC = () => {
         console.log('✅ Product loaded:', cleanedProduct.name);
         console.log('🖼️ Product images:', cleanedProduct.images);
         setProduct(cleanedProduct);
+        
+        // Add to recently viewed
+        addToRecentlyViewed({
+          _id: cleanedProduct._id,
+          name: cleanedProduct.name,
+          price: cleanedProduct.price,
+          images: cleanedProduct.images,
+          featuredImage: cleanedProduct.featuredImage,
+        });
       } else {
         console.warn('⚠️ Product not found or response not successful:', {
           success: response.success,
