@@ -22,6 +22,8 @@ import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { setCart } from '../../store/slices/cartSlice';
 import Colors from '../../constants/colors';
+import { addToRecentlyViewed } from '../../components/RecentlyViewed';
+import LimitedStock from '../../components/LimitedStock';
 
 // Helper function to clean product data and remove problematic category properties
 const cleanProductData = (product: any): Product => {
