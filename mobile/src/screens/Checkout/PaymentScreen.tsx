@@ -1,6 +1,6 @@
 /**
  * Payment Screen
- * Handles Stripe payment with WebView
+ * Handles Stripe payment with external browser
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -12,11 +12,12 @@ import {
   TouchableOpacity,
   Platform,
   Linking,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { ActivityIndicator } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { WebView } from 'react-native-webview';
 import { checkoutService } from '../../services/checkout.service';
 import { API_URL } from '../../constants/config';
 import Colors from '../../constants/colors';
@@ -32,31 +33,46 @@ const PaymentScreen: React.FC = () => {
   const route = useRoute<any>();
   const { orderId, amount, onSuccess } = route.params as PaymentScreenParams;
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [paymentComplete, setPaymentComplete] = useState(false);
-  const webViewRef = useRef<WebView>(null);
+  const [waitingForPayment, setWaitingForPayment] = useState(false);
+  const appState = useRef(AppState.currentState);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    createCheckoutSession();
+    // Listen for app state changes to detect when user returns from browser
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
     return () => {
+      subscription.remove();
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, []);
+  }, [sessionId]);
+
+  const handleAppStateChange = (nextAppState: AppStateStatus) => {
+    // When app comes back to foreground from background (after browser)
+    if (
+      appState.current.match(/inactive|background/) &&
+      nextAppState === 'active' &&
+      waitingForPayment &&
+      sessionId
+    ) {
+      // User returned from browser, check payment status
+      checkPaymentStatus();
+    }
+    appState.current = nextAppState;
+  };
 
   const createCheckoutSession = async () => {
     try {
       setLoading(true);
 
-      // For React Native, we'll use a deep link or custom URL scheme
-      // Since we can't use localhost, we use the API URL for callbacks
-      const baseUrl = API_URL;
-      const successUrl = `${baseUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}&orderId=${orderId}`;
-      const cancelUrl = `${baseUrl}/payment-cancel?orderId=${orderId}`;
+      // Use API URL for callbacks
+      const successUrl = `${API_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}&orderId=${orderId}`;
+      const cancelUrl = `${API_URL}/payment-cancel?orderId=${orderId}`;
 
       const response = await checkoutService.createCheckoutSession(
         amount,
@@ -68,250 +84,242 @@ const PaymentScreen: React.FC = () => {
       if (response.success && response.data) {
         setCheckoutUrl(response.data.url);
         setSessionId(response.data.sessionId);
+        return response.data;
       } else {
-        // Fallback: Create a simple payment intent and show card form
-        Alert.alert(
-          'Payment Setup',
-          'Unable to create checkout session. Please try again.',
-          [
-            { text: 'Cancel', onPress: () => navigation.goBack() },
-            { text: 'Retry', onPress: createCheckoutSession },
-          ]
-        );
+        Alert.alert('Error', 'Unable to create payment session. Please try again.');
+        return null;
       }
     } catch (error: any) {
       console.error('Error creating checkout session:', error);
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to initialize payment. Please try again.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      Alert.alert('Error', error.message || 'Failed to initialize payment.');
+      return null;
     } finally {
       setLoading(false);
     }
   };
 
-  const handleNavigationStateChange = (navState: any) => {
-    const { url } = navState;
-
-    // Check if payment was successful
-    if (url.includes('payment-success') || url.includes('session_id=')) {
-      setPaymentComplete(true);
-      handlePaymentSuccess();
+  const handlePayNow = async () => {
+    let url = checkoutUrl;
+    
+    if (!url) {
+      const session = await createCheckoutSession();
+      if (!session) return;
+      url = session.url;
     }
 
-    // Check if payment was cancelled
-    if (url.includes('payment-cancel')) {
-      handlePaymentCancel();
+    if (url) {
+      setWaitingForPayment(true);
+      try {
+        const canOpen = await Linking.canOpenURL(url);
+        if (canOpen) {
+          await Linking.openURL(url);
+        } else {
+          Alert.alert('Error', 'Unable to open payment page. Please try again.');
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Failed to open payment page.');
+      }
     }
   };
 
-  const handlePaymentSuccess = async () => {
-    if (!sessionId) {
-      // Still proceed to order confirmation
-      if (onSuccess) onSuccess();
-      navigation.replace('OrderConfirmation', {
-        orderId,
-        total: amount,
-      });
-      return;
-    }
+  const checkPaymentStatus = async () => {
+    if (!sessionId) return;
 
     try {
-      // Poll for payment status
+      setLoading(true);
       let attempts = 0;
       const maxAttempts = 5;
 
-      const checkStatus = async () => {
+      const pollStatus = async (): Promise<boolean> => {
         attempts++;
-        const statusResponse = await checkoutService.getCheckoutStatus(sessionId);
-
-        if (
-          statusResponse.success &&
-          statusResponse.data?.paymentStatus === 'paid'
-        ) {
-          if (onSuccess) onSuccess();
-          navigation.replace('OrderConfirmation', {
-            orderId,
-            total: amount,
-          });
-          return true;
+        
+        try {
+          const response = await checkoutService.getCheckoutStatus(sessionId);
+          
+          if (response.success && response.data) {
+            if (response.data.paymentStatus === 'paid') {
+              // Payment successful
+              setWaitingForPayment(false);
+              if (onSuccess) onSuccess();
+              navigation.replace('OrderConfirmation', {
+                orderId,
+                total: amount,
+              });
+              return true;
+            }
+            
+            if (response.data.status === 'expired') {
+              Alert.alert('Session Expired', 'Your payment session has expired. Please try again.');
+              setWaitingForPayment(false);
+              setCheckoutUrl(null);
+              setSessionId(null);
+              return true;
+            }
+          }
+          
+          if (attempts >= maxAttempts) {
+            // Max attempts reached, ask user
+            Alert.alert(
+              'Payment Status',
+              'Unable to confirm payment status. Did you complete the payment?',
+              [
+                {
+                  text: 'No, Try Again',
+                  onPress: () => {
+                    setWaitingForPayment(false);
+                    setCheckoutUrl(null);
+                    setSessionId(null);
+                  },
+                },
+                {
+                  text: 'Yes, Continue',
+                  onPress: () => {
+                    if (onSuccess) onSuccess();
+                    navigation.replace('OrderConfirmation', {
+                      orderId,
+                      total: amount,
+                    });
+                  },
+                },
+              ]
+            );
+            return true;
+          }
+          
+          return false;
+        } catch (error) {
+          console.error('Error checking status:', error);
+          return false;
         }
-
-        if (attempts >= maxAttempts) {
-          // Payment status unclear, but assume success and proceed
-          if (onSuccess) onSuccess();
-          navigation.replace('OrderConfirmation', {
-            orderId,
-            total: amount,
-          });
-          return true;
-        }
-
-        return false;
       };
 
-      const success = await checkStatus();
+      const success = await pollStatus();
       if (!success) {
+        // Start polling
         pollIntervalRef.current = setInterval(async () => {
-          const result = await checkStatus();
+          const result = await pollStatus();
           if (result && pollIntervalRef.current) {
             clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
           }
         }, 2000);
       }
-    } catch (error) {
-      console.error('Error checking payment status:', error);
-      // Proceed anyway
-      if (onSuccess) onSuccess();
-      navigation.replace('OrderConfirmation', {
-        orderId,
-        total: amount,
-      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handlePaymentCancel = () => {
+  const handleCancel = () => {
     Alert.alert(
-      'Payment Cancelled',
-      'Your payment was cancelled. Would you like to try again?',
+      'Cancel Payment?',
+      'Are you sure you want to cancel this payment?',
       [
+        { text: 'No', style: 'cancel' },
         {
-          text: 'Go Back',
-          style: 'cancel',
-          onPress: () => navigation.goBack(),
-        },
-        {
-          text: 'Try Again',
-          onPress: createCheckoutSession,
+          text: 'Yes',
+          onPress: () => {
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+            }
+            navigation.goBack();
+          },
         },
       ]
     );
   };
 
-  const handleOpenInBrowser = () => {
-    if (checkoutUrl) {
-      Linking.openURL(checkoutUrl);
-    }
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.secondary} />
-        <Text style={styles.loadingText}>Setting up payment...</Text>
-      </View>
-    );
-  }
-
-  if (paymentComplete) {
-    return (
-      <View style={styles.successContainer}>
-        <Ionicons name="checkmark-circle" size={80} color={Colors.secondary} />
-        <Text style={styles.successTitle}>Payment Successful!</Text>
-        <Text style={styles.successText}>Processing your order...</Text>
-        <ActivityIndicator
-          size="small"
-          color={Colors.secondary}
-          style={{ marginTop: 16 }}
-        />
-      </View>
-    );
-  }
-
-  // If WebView is not available or checkout URL failed
-  if (!checkoutUrl) {
-    return (
-      <View style={styles.fallbackContainer}>
-        <View style={styles.fallbackCard}>
-          <Ionicons name="card" size={48} color={Colors.secondary} />
-          <Text style={styles.fallbackTitle}>Secure Payment</Text>
-          <Text style={styles.fallbackText}>
-            Complete your payment of ${amount.toFixed(2)} securely through Stripe.
-          </Text>
-
-          <View style={styles.orderSummary}>
-            <Text style={styles.orderLabel}>Order ID</Text>
-            <Text style={styles.orderValue}>{orderId}</Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={createCheckoutSession}
-          >
-            <Ionicons name="refresh" size={20} color={Colors.white} />
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.cancelButtonText}>Cancel Payment</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() =>
-            Alert.alert(
-              'Cancel Payment?',
-              'Are you sure you want to cancel this payment?',
-              [
-                { text: 'No', style: 'cancel' },
-                { text: 'Yes', onPress: () => navigation.goBack() },
-              ]
-            )
-          }
-          style={styles.closeButton}
-        >
+        <TouchableOpacity onPress={handleCancel} style={styles.closeButton}>
           <Ionicons name="close" size={24} color={Colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Secure Payment</Text>
-        <TouchableOpacity onPress={handleOpenInBrowser} style={styles.externalButton}>
-          <Ionicons name="open-outline" size={20} color={Colors.primary} />
-        </TouchableOpacity>
+        <View style={styles.headerPlaceholder} />
       </View>
 
-      {/* Security Badge */}
-      <View style={styles.securityBadge}>
-        <Ionicons name="shield-checkmark" size={16} color={Colors.secondary} />
-        <Text style={styles.securityText}>Secured by Stripe</Text>
-      </View>
+      <View style={styles.content}>
+        {/* Payment Card */}
+        <View style={styles.paymentCard}>
+          <View style={styles.cardIcon}>
+            <Ionicons name="card" size={48} color={Colors.secondary} />
+          </View>
+          
+          <Text style={styles.title}>Complete Your Payment</Text>
+          <Text style={styles.subtitle}>
+            You'll be redirected to Stripe's secure checkout page
+          </Text>
 
-      {/* WebView for Stripe Checkout */}
-      <View style={styles.webViewContainer}>
-        <WebView
-          ref={webViewRef}
-          source={{ uri: checkoutUrl }}
-          onNavigationStateChange={handleNavigationStateChange}
-          style={styles.webView}
-          startInLoadingState={true}
-          renderLoading={() => (
-            <View style={styles.webViewLoading}>
-              <ActivityIndicator size="large" color={Colors.secondary} />
-              <Text style={styles.webViewLoadingText}>Loading payment form...</Text>
+          {/* Order Summary */}
+          <View style={styles.summaryBox}>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Order ID</Text>
+              <Text style={styles.summaryValue}>#{orderId.slice(-8).toUpperCase()}</Text>
             </View>
+            <View style={styles.divider} />
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Total Amount</Text>
+              <Text style={styles.totalAmount}>${amount.toFixed(2)}</Text>
+            </View>
+          </View>
+
+          {/* Payment Button */}
+          <TouchableOpacity
+            style={[styles.payButton, loading && styles.payButtonDisabled]}
+            onPress={handlePayNow}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={Colors.white} />
+            ) : (
+              <>
+                <Ionicons name="lock-closed" size={20} color={Colors.white} />
+                <Text style={styles.payButtonText}>
+                  {waitingForPayment ? 'Check Payment Status' : 'Pay Now'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {waitingForPayment && (
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={checkPaymentStatus}
+              disabled={loading}
+            >
+              <Ionicons name="refresh" size={18} color={Colors.secondary} />
+              <Text style={styles.retryButtonText}>I've completed payment</Text>
+            </TouchableOpacity>
           )}
-          onError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            console.error('WebView error:', nativeEvent);
-            Alert.alert(
-              'Error',
-              'Unable to load payment form. Would you like to open in browser?',
-              [
-                { text: 'Cancel', onPress: () => navigation.goBack() },
-                { text: 'Open Browser', onPress: handleOpenInBrowser },
-              ]
-            );
-          }}
-        />
+        </View>
+
+        {/* Security Note */}
+        <View style={styles.securityNote}>
+          <Ionicons name="shield-checkmark" size={20} color={Colors.secondary} />
+          <View style={styles.securityTextContainer}>
+            <Text style={styles.securityTitle}>Secure Payment</Text>
+            <Text style={styles.securityText}>
+              Your payment is processed securely by Stripe. We never store your card details.
+            </Text>
+          </View>
+        </View>
+
+        {/* Payment Methods */}
+        <View style={styles.paymentMethods}>
+          <Text style={styles.paymentMethodsTitle}>Accepted Payment Methods</Text>
+          <View style={styles.methodsRow}>
+            <View style={styles.methodBadge}>
+              <Text style={styles.methodText}>VISA</Text>
+            </View>
+            <View style={styles.methodBadge}>
+              <Text style={styles.methodText}>Mastercard</Text>
+            </View>
+            <View style={styles.methodBadge}>
+              <Text style={styles.methodText}>AMEX</Text>
+            </View>
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -322,118 +330,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: Colors.primary,
-  },
-  successContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    padding: 32,
-  },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.primary,
-    marginTop: 20,
-  },
-  successText: {
-    fontSize: 16,
-    color: Colors.primary,
-    opacity: 0.7,
-    marginTop: 8,
-  },
-  fallbackContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-    padding: 20,
-  },
-  fallbackCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 20,
-    padding: 32,
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 360,
-  },
-  fallbackTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.primary,
-    marginTop: 16,
-  },
-  fallbackText: {
-    fontSize: 16,
-    color: Colors.primary,
-    opacity: 0.7,
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 24,
-  },
-  orderSummary: {
-    backgroundColor: Colors.tertiary,
-    borderRadius: 12,
-    padding: 16,
-    width: '100%',
-    marginTop: 24,
-  },
-  orderLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.primary,
-    opacity: 0.6,
-    textTransform: 'uppercase',
-  },
-  orderValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.primary,
-    marginTop: 4,
-  },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    marginTop: 24,
-    width: '100%',
-  },
-  retryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.white,
-    marginLeft: 8,
-  },
-  cancelButton: {
-    paddingVertical: 16,
-    marginTop: 8,
-  },
-  cancelButtonText: {
-    fontSize: 14,
-    color: Colors.primary,
-    opacity: 0.7,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: Platform.OS === 'ios' ? 50 : 16,
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 16,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
@@ -442,48 +345,167 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     color: Colors.primary,
   },
-  externalButton: {
-    padding: 8,
+  headerPlaceholder: {
+    width: 40,
   },
-  securityBadge: {
-    flexDirection: 'row',
+  content: {
+    flex: 1,
+    padding: 20,
+  },
+  paymentCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    padding: 24,
     alignItems: 'center',
-    justifyContent: 'center',
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  cardIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: Colors.tertiary,
-    paddingVertical: 8,
-  },
-  securityText: {
-    fontSize: 12,
-    color: Colors.primary,
-    marginLeft: 6,
-    fontWeight: '500',
-  },
-  webViewContainer: {
-    flex: 1,
-    backgroundColor: Colors.white,
-  },
-  webView: {
-    flex: 1,
-  },
-  webViewLoading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    marginBottom: 20,
   },
-  webViewLoadingText: {
-    marginTop: 12,
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: Colors.primary,
+    marginBottom: 8,
+  },
+  subtitle: {
     fontSize: 14,
     color: Colors.primary,
     opacity: 0.7,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  summaryBox: {
+    width: '100%',
+    backgroundColor: Colors.tertiary,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: Colors.primary,
+    opacity: 0.7,
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  totalAmount: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.secondary,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 4,
+  },
+  payButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    width: '100%',
+  },
+  payButtonDisabled: {
+    opacity: 0.6,
+  },
+  payButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.white,
+    marginLeft: 10,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    marginTop: 12,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.secondary,
+    marginLeft: 8,
+  },
+  securityNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+  },
+  securityTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  securityTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+    marginBottom: 4,
+  },
+  securityText: {
+    fontSize: 13,
+    color: Colors.primary,
+    opacity: 0.7,
+    lineHeight: 18,
+  },
+  paymentMethods: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  paymentMethodsTitle: {
+    fontSize: 12,
+    color: Colors.primary,
+    opacity: 0.6,
+    marginBottom: 12,
+  },
+  methodsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  methodBadge: {
+    backgroundColor: Colors.white,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  methodText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 });
 
