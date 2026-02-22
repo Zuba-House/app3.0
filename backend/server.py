@@ -1,15 +1,20 @@
 """
-Zuba Mobile Web - Backend API Proxy
-This minimal backend proxies requests to the live Zuba API
+Zuba House Mobile App - Backend Proxy
+Simple FastAPI server to serve the mobile web build
 """
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-import httpx
+
 import os
+import json
+from pathlib import Path
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
+import httpx
 
-app = FastAPI(title="Zuba Mobile Web API", version="1.0.0")
+app = FastAPI(title="Zuba House Mobile API")
 
-# CORS configuration
+# CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,26 +23,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Live Zuba API URL
-ZUBA_API_URL = os.getenv("ZUBA_API_URL", "https://zuba-api.onrender.com")
+# Zuba API Base URL
+ZUBA_API_URL = "https://zuba-api.onrender.com"
 
-@app.get("/")
-async def root():
-    return {"message": "Zuba Mobile Web API Proxy", "status": "running"}
-
+# Health check
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "service": "zuba-mobile-web-proxy"}
+    return {"status": "healthy", "app": "Zuba House Mobile"}
 
-# Proxy all /api/* requests to the live Zuba API
+# Proxy API requests to Zuba backend
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def proxy_to_zuba(path: str, request: Request):
-    """Proxy requests to the live Zuba API"""
+async def proxy_api(path: str, request: Request):
+    """Proxy API requests to the Zuba backend"""
     async with httpx.AsyncClient(timeout=30.0) as client:
-        # Build the target URL
-        target_url = f"{ZUBA_API_URL}/api/{path}"
+        url = f"{ZUBA_API_URL}/api/{path}"
         
-        # Get request body if present
+        # Get request body
         body = None
         if request.method in ["POST", "PUT", "PATCH"]:
             try:
@@ -45,27 +46,44 @@ async def proxy_to_zuba(path: str, request: Request):
             except:
                 body = await request.body()
         
-        # Forward headers (excluding host)
-        headers = dict(request.headers)
-        headers.pop("host", None)
-        headers.pop("content-length", None)
+        # Forward headers
+        headers = {}
+        if "authorization" in request.headers:
+            headers["Authorization"] = request.headers["authorization"]
+        if "content-type" in request.headers:
+            headers["Content-Type"] = request.headers["content-type"]
         
         try:
-            # Make the proxied request
             response = await client.request(
                 method=request.method,
-                url=target_url,
-                params=dict(request.query_params),
-                headers=headers,
+                url=url,
                 json=body if isinstance(body, dict) else None,
-                content=body if isinstance(body, bytes) else None
+                content=body if isinstance(body, bytes) else None,
+                headers=headers,
+                params=dict(request.query_params)
             )
             
-            return response.json()
-        except httpx.TimeoutException:
-            raise HTTPException(status_code=504, detail="Gateway timeout")
-        except Exception as e:
-            raise HTTPException(status_code=502, detail=f"Bad gateway: {str(e)}")
+            # Try to return JSON response
+            try:
+                return JSONResponse(
+                    content=response.json(),
+                    status_code=response.status_code
+                )
+            except:
+                return JSONResponse(
+                    content={"message": response.text},
+                    status_code=response.status_code
+                )
+        except httpx.RequestError as e:
+            return JSONResponse(
+                content={"error": True, "message": str(e)},
+                status_code=500
+            )
+
+# Mount static files from mobile dist
+mobile_dist = Path("/app/mobile/dist")
+if mobile_dist.exists():
+    app.mount("/", StaticFiles(directory=str(mobile_dist), html=True), name="mobile")
 
 if __name__ == "__main__":
     import uvicorn
