@@ -1,0 +1,32 @@
+/* Product Detail Image Container - 4:5 Aspect Ratio */
+.product-detail-image-container {
+  position: relative;
+  width: 100%;
+  padding-bottom: 125%; /* 4:5 ratio = 125% (1350/1080) */
+  background: #f8f9fa;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.product-detail-image-container .swiper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.product-detail-image-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 991px) {
+  .product-detail-image-container {
+    padding-bottom: 125%; /* Keep 4:5 ratio on mobile */
+  }
+}
+

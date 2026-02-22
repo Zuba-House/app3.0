@@ -1,0 +1,12 @@
+QUICK FIX - Copy and paste these commands:
+
+cd C:\Users\User\Desktop\zuba-app3.0\web\mobile
+npm uninstall metro metro-cache metro-config metro-resolver metro-runtime
+Remove-Item -Recurse -Force node_modules
+Remove-Item -Force package-lock.json
+npm cache clean --force
+npm install
+npm start
+
+Then press 'a' when Expo starts (if Android emulator is running)
+

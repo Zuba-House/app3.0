@@ -1,0 +1,26 @@
+.media-library-dialog .MuiDialog-paper {
+    min-height: 600px;
+}
+
+.media-item {
+    transition: all 0.2s ease;
+}
+
+.media-item:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.media-item:hover .media-info-overlay {
+    transform: translateY(0);
+}
+
+.media-item.selected {
+    border-color: #1976d2 !important;
+    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.2);
+}
+
+.media-info-overlay {
+    font-size: 12px;
+}
+
