@@ -205,7 +205,10 @@ const MainNavigator = () => {
       <MainStack.Screen
         name="ProductDetail"
         component={ProductDetailScreen}
-        options={{ title: 'Product Details' }}
+        options={{ 
+          headerShown: false,
+          title: '',
+        }}
       />
       <MainStack.Screen
         name="Brands"
