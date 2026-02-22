@@ -943,6 +943,14 @@ const HomeScreen: React.FC = () => {
           customerFavoritesProducts
         )}
 
+        {/* Trending Products - TEMU Style Grid */}
+        {!selectedCategory && !selectedBrand && products.length > 0 && (
+          <TrendingProducts products={products.slice(6, 12)} title="Trending Now" />
+        )}
+
+        {/* Referral Banner - TEMU Style */}
+        {!selectedCategory && !selectedBrand && <ReferralBanner rewardAmount={10} />}
+
         {/* All Products Grid - Only show if category, brand selected or search active */}
         {(selectedCategory || selectedBrand || searchQuery) && (
           <View style={styles.section}>
