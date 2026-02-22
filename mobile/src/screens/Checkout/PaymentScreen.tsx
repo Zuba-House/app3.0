@@ -38,7 +38,7 @@ const PaymentScreen: React.FC = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [waitingForPayment, setWaitingForPayment] = useState(false);
   const appState = useRef(AppState.currentState);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     // Listen for app state changes to detect when user returns from browser
