@@ -32,6 +32,15 @@ import Colors from '../../constants/colors';
 import SearchBar from '../../components/SearchBar';
 import { API_URL } from '../../constants/config';
 
+// TEMU-style components
+import FlashSale from '../../components/FlashSale';
+import DailyCheckIn from '../../components/DailyCheckIn';
+import RecentlyViewed from '../../components/RecentlyViewed';
+import DealOfTheDay from '../../components/DealOfTheDay';
+import CategoryDeals from '../../components/CategoryDeals';
+import ReferralBanner from '../../components/ReferralBanner';
+import TrendingProducts from '../../components/TrendingProducts';
+
 const { width: SCREEN_WIDTH, width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 36) / 2; // 2 columns with tighter spacing (12px padding each side + 12px gap)
 
