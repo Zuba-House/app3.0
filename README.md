@@ -1,144 +1,214 @@
-**Zuba Web 2.0**
+# Zuba House Mobile App
 
-- **Repo:** `zuba-web2.0`
-- **Owner:** Zuba-House
-- **Workspaces:** `admin/`, `client/`, `server/`
+A modern, TEMU-style e-commerce mobile application built with React Native (Expo) for the Zuba House fashion marketplace.
 
-**Overview**:
-- Zuba Web 2.0 is a full-stack e-commerce platform (Admin + Client + Server) built with React (Vite) frontends and a Node.js + Express + MongoDB backend. It supports both Simple and Variable products via an attribute/variation system (WooCommerce/Shopify-style).
+## Features
 
-**High-level features**:
-- Product types: `simple` and `variable` (attribute-driven variations)
-- Admin UI: product creation (AddProductV2), Attributes Manager, Variations Manager
-- Upload images for products and banner images (admin)
-- Cart, orders, payments (Stripe / PayPal hooks prepared)
-- Auth, user management, reviews
+### Core Shopping Features
+- **Home Screen** - Promotional banners, categories, brands, product sections
+- **Product Search** - TEMU-style layout with category sidebar
+- **Product Details** - Full product info, images, add to cart
+- **Shopping Cart** - Quantity management, checkout navigation
+- **Wishlist** - Save favorite products
+- **Order History** - View past orders
 
-**Repository structure (top-level)**
-- `admin/` — Admin dashboard app (React + Vite + Tailwind + MUI)
-- `client/` — Storefront app (React + Vite + Tailwind)
-- `server/` — API server (Node.js + Express + Mongoose)
+### TEMU-Style Features
+- **Flash Sale** - Countdown timers with urgency indicators
+- **Daily Check-In** - Points rewards for daily visits
+- **Deal of the Day** - Featured product with big discount
+- **Trending Products** - Popular items with view counts
+- **Category Deals** - Browse deals by category
+- **Recently Viewed** - Quick access to browsed products
+- **Referral System** - Share and earn rewards
+- **Free Shipping Progress** - Visual indicator for threshold
+- **Limited Stock Alerts** - Urgency notifications
 
-Inside each folder you'll find the usual `package.json`, `src/` and build configs. Key server areas:
-- `server/controllers/` — route handlers
-- `server/models/` — Mongoose models (Product, Attribute, Variation, User, Order, etc.)
-- `server/route/` or `server/routes/` — Express routes
-- `server/config/connectDb.js` — DB connection logic
+### Checkout Flow
+- Multi-step checkout (Address → Shipping → Payment → Review)
+- Address management with form validation
+- Stripe payment integration
+- Order confirmation with animations
 
-**Quick start (local development)**
-Pre-reqs:
-- Node.js 18+ (or compatible)
-- npm or pnpm
-- Docker (recommended) for running a local MongoDB if you don't want to use Atlas
+### Authentication
+- Email/password registration
+- Login with JWT tokens
+- Password reset flow
+- Guest browsing mode
 
-1) Install dependencies for each subproject
-- Admin:
-  ```powershell
-  cd admin
-  npm install
-  ```
-- Client:
-  ```powershell
-  cd client
-  npm install
-  ```
-- Server:
-  ```powershell
-  cd server
-  npm install
-  ```
+## Tech Stack
 
-2) Local MongoDB (recommended for quick dev)
-- Using Docker (recommended):
-  ```powershell
-  docker run -d -p 27017:27017 --name zuba-mongo -e MONGO_INITDB_DATABASE=zuba mongo:6
-  ```
-- Add local DB string to your `server/.env` (or use `.env.sample`):
-  ```text
-  MONGODB_LOCAL_URI=mongodb://localhost:27017/zuba
-  ```
+- **Framework**: React Native 0.81.5 (Expo ~54.0.0)
+- **Navigation**: React Navigation 6.x
+- **State Management**: Redux Toolkit 2.0.1
+- **UI Components**: React Native Paper 5.11.3
+- **Images**: Expo Image 3.0.11
+- **Animations**: React Native Reanimated 4.1.1
+- **Language**: TypeScript 5.3.3
 
-3) Environment variables
-- Copy `server/.env.sample` (or create `server/.env`) and fill in secrets. Example keys used:
-  - `PORT` — server port
-  - `MONGODB_URI` — Atlas connection string (optional)
-  - `MONGODB_LOCAL_URI` — local fallback (recommended for dev)
-  - `EMAIL`, `EMAIL_PASS` — email sending account
-  - `JSON_WEB_TOKEN_SECRET_KEY` — JWT secret
-  - `cloudinary_Config_Cloud_Name`, `cloudinary_Config_api_key`, `cloudinary_Config_api_secret` — Cloudinary for media uploads
-  - `STRIPE_SECRET_KEY`, `PAYPAL_*` — payment provider keys
+## Backend API
 
-Notes:
-- The updated `server/config/connectDb.js` will try `MONGODB_URI` first, then `MONGODB_LOCAL_URI` (if present). Keep your production credentials secure and do not commit them.
+The app connects to the Zuba House backend API:
+- **Base URL**: `https://zuba-api.onrender.com`
+- **Authentication**: JWT tokens
+- **Data**: Shared with Zuba House website
 
-4) Start the server
-```powershell
-cd server
-# run Node directly
-node index.js
-# or if you have a script
-npm run dev
+## Brand Colors
+
+| Color | Hex | Usage |
+|-------|-----|-------|
+| Primary | `#0b2735` | Headers, text, buttons |
+| Secondary | `#efb291` | Prices, accents, active states |
+| Tertiary | `#e5e2db` | Backgrounds, borders |
+
+## Project Structure
+
+```
+mobile/
+├── src/
+│   ├── screens/
+│   │   ├── Auth/           # Login, Register, Password Reset
+│   │   ├── Home/           # Main product browsing
+│   │   ├── Search/         # Product search with sidebar
+│   │   ├── Products/       # Product detail page
+│   │   ├── Cart/           # Shopping cart
+│   │   ├── Checkout/       # Checkout flow screens
+│   │   ├── Address/        # Address management
+│   │   ├── Wishlist/       # Saved products
+│   │   ├── Orders/         # Order history
+│   │   ├── Profile/        # User account
+│   │   └── Brands/         # Brand listing
+│   ├── components/
+│   │   ├── ProductCard.tsx
+│   │   ├── SearchBar.tsx
+│   │   ├── FlashSale.tsx
+│   │   ├── DailyCheckIn.tsx
+│   │   ├── DealOfTheDay.tsx
+│   │   ├── TrendingProducts.tsx
+│   │   ├── CategoryDeals.tsx
+│   │   ├── RecentlyViewed.tsx
+│   │   ├── ReferralBanner.tsx
+│   │   ├── FreeShippingBanner.tsx
+│   │   ├── LimitedStock.tsx
+│   │   └── SplashScreen.tsx
+│   ├── services/
+│   │   ├── api.ts
+│   │   ├── auth.service.ts
+│   │   ├── product.service.ts
+│   │   ├── cart.service.ts
+│   │   ├── checkout.service.ts
+│   │   ├── address.service.ts
+│   │   └── wishlist.service.ts
+│   ├── store/
+│   │   └── slices/
+│   ├── navigation/
+│   │   └── AppNavigator.tsx
+│   ├── constants/
+│   │   ├── config.ts
+│   │   └── colors.ts
+│   └── types/
+├── assets/
+│   └── brands/
+├── app.json
+└── package.json
 ```
 
-5) Start frontend apps
-- Admin
-  ```powershell
-  cd admin
-  npm run dev
-  # Open http://localhost:5173 (or the port printed by Vite)
-  ```
-- Client
-  ```powershell
-  cd client
-  npm run dev
-  # Open http://localhost:5174 (or the port printed by Vite)
-  ```
+## Getting Started
 
-**Common troubleshooting**
-- Mongoose connection errors (Atlas): If you change networks (Wi‑Fi/location), Atlas may block your IP until you whitelist it. Either:
-  - Add your current public IP to Atlas Network Access (recommended for Atlas use), or
-  - Use `MONGODB_LOCAL_URI` and run a local MongoDB for development.
-- If you see React warnings about unique keys — ensure mapped lists include a `key` prop (done in several places).
-- If the dev server shows a syntax/JSX parse error after a code edit, check for unclosed tags or mismatched fragment tags; run the admin/client builds again after the fix.
+### Prerequisites
+- Node.js >= 18.x
+- npm or yarn
+- Expo CLI: `npm install -g expo-cli`
+- Expo Go App (for testing on physical devices)
 
-**Admin-specific notes**
-- The admin app includes new Phase-3 components:
-  - `admin/src/Pages/Products/addProductV2.jsx` — improved product form supporting `productType` (`simple`/`variable`) and `salePrice`
-  - `admin/src/Pages/Products/VariationsManager.jsx` — manage generated variations for variable products
-  - `admin/src/Pages/Attributes/index.jsx` — attributes CRUD UI
-- Image uploads use `admin/src/Components/UploadBox/index.jsx`, which posts to server upload endpoints. Upload handlers now ensure the preview array is always an array and update Admin state immutably.
+### Installation
 
-**Client-specific notes**
-- Product page components updated to use `salePrice` when available. Legacy fields `productRam`, `size`, `productWeight` have been removed from the primary selection flow and replaced by the attribute/variant mechanism.
-- Key client files:
-  - `client/src/components/ProductDetails/index.jsx`
-  - `client/src/Pages/ProductDetails/index.jsx`
+```bash
+# Navigate to mobile directory
+cd mobile
 
-**API endpoints (overview)**
-- Product endpoints (server):
-  - `POST /api/product/create` — create product
-  - `GET /api/product/:id` — get product detail
-  - `GET /api/product/getAllProducts` — listing
-  - `POST /api/product/:id/variations/generate` — auto-generate variations
-  - Variations CRUD: `/api/products/:id/variations` and related endpoints
-- Attributes endpoints:
-  - `GET /api/attributes` — list attributes
-  - CRUD endpoints under `/api/attributes` for creating/updating/removing attributes
-- Cart endpoints:
-  - `POST /api/cart/add` — add to cart
-- Order endpoints, user auth, and payment endpoints are available (search `server/controllers` and `server/route` to see exact routes)
+# Install dependencies
+npm install
 
-**Testing & recommended next steps**
-- Admin: Create a product with `productType=simple`, set `price` and optional `salePrice`, upload images, and publish.
-- Admin: Create attributes and then create a `variable` product; open `VariationsManager` and auto-generate combinations, set per-variation price and stock.
-- Client: View a product, verify pricing display (`salePrice || oldPrice || price`) and add to cart.
-- Implement variation selectors on the client (next planned task) to choose variation and reflect variation-specific price/stock.
+# Start development server
+npm start
 
-**Contributing & code style**
-- Follow existing code conventions: React functional components, Tailwind classes, and MUI controls where used.
-- Run linters and formatters if present before commits.
+# Run on specific platform
+npm run android  # Android
+npm run ios      # iOS (macOS only)
+npm run web      # Web preview
+```
 
-**Contact / Maintainers**
-- Reach out to the project owner and maintainers in the repository for access to production credentials and Atlas configuration.
+### Environment Setup
 
----
+The app uses environment variables for configuration:
+
+```env
+# API Configuration
+API_URL=https://zuba-api.onrender.com
+```
+
+## Key API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/product/getAllProducts` | GET | Fetch all products |
+| `/api/cart/get` | GET | Get user cart |
+| `/api/cart/add` | POST | Add item to cart |
+| `/api/order/create` | POST | Create new order |
+| `/api/address` | GET/POST | Address management |
+| `/api/stripe/create-checkout-session` | POST | Stripe payment |
+
+## Development Workflow
+
+### Adding a New Feature
+1. Create screen in `src/screens/[Feature]/`
+2. Add service methods in `src/services/`
+3. Add navigation route in `AppNavigator.tsx`
+4. Add TypeScript types as needed
+5. Style with brand colors
+
+### Styling Guidelines
+- Use brand colors from `constants/colors.ts`
+- Follow TEMU-style minimalist design
+- Include smooth animations
+- Ensure responsive layouts
+
+## Screenshots
+
+### Home Screen
+- Promotional banner carousel
+- Daily check-in banner
+- Flash sale with countdown
+- Deal of the day
+- Category deals
+- Trending products
+
+### Checkout Flow
+- Address selection
+- Shipping method
+- Payment via Stripe
+- Order confirmation
+
+## Testing
+
+```bash
+# TypeScript check
+npx tsc --noEmit
+
+# Build for web
+npx expo export --platform web
+```
+
+## Version
+
+- **App Version**: 1.0.0
+- **Expo SDK**: ~54.0.0
+- **React Native**: 0.81.5
+
+## License
+
+Proprietary - Zuba House
+
+## Contact
+
+For support: support@zubahouse.com
