@@ -30,6 +30,11 @@ import OrdersScreen from '../screens/Orders/OrdersScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
 import ProductDetailScreen from '../screens/Products/ProductDetailScreen';
 import BrandsScreen from '../screens/Brands/BrandsScreen';
+import CartScreen from '../screens/Cart/CartScreen';
+import CheckoutScreen from '../screens/Checkout/CheckoutScreen';
+import PaymentScreen from '../screens/Checkout/PaymentScreen';
+import OrderConfirmationScreen from '../screens/Checkout/OrderConfirmationScreen';
+import AddAddressScreen from '../screens/Address/AddAddressScreen';
 
 // Navigation Types
 export type RootStackParamList = {
@@ -57,6 +62,12 @@ export type MainStackParamList = {
   MainTabs: undefined;
   ProductDetail: { productId: string };
   Brands: { brandId?: string } | undefined;
+  Cart: undefined;
+  Checkout: undefined;
+  Payment: { orderId: string; amount: number; onSuccess?: () => void };
+  OrderConfirmation: { orderId: string; total: number };
+  AddAddress: { onSave?: (address: any) => void; editAddress?: any };
+  OrderDetail: { orderId: string };
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -182,7 +193,7 @@ const TabNavigator = () => {
   );
 };
 
-// Main Navigator (Tabs + Product Detail)
+// Main Navigator (Tabs + Product Detail + Checkout)
 const MainNavigator = () => {
   return (
     <MainStack.Navigator>
@@ -200,6 +211,31 @@ const MainNavigator = () => {
         name="Brands"
         component={BrandsScreen}
         options={{ title: 'All Brands', headerShown: false }}
+      />
+      <MainStack.Screen
+        name="Cart"
+        component={CartScreen}
+        options={{ title: 'Shopping Cart', headerShown: false }}
+      />
+      <MainStack.Screen
+        name="Checkout"
+        component={CheckoutScreen}
+        options={{ headerShown: false }}
+      />
+      <MainStack.Screen
+        name="Payment"
+        component={PaymentScreen}
+        options={{ headerShown: false }}
+      />
+      <MainStack.Screen
+        name="OrderConfirmation"
+        component={OrderConfirmationScreen}
+        options={{ headerShown: false }}
+      />
+      <MainStack.Screen
+        name="AddAddress"
+        component={AddAddressScreen}
+        options={{ headerShown: false }}
       />
     </MainStack.Navigator>
   );
