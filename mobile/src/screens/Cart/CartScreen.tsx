@@ -101,8 +101,8 @@ const CartScreen: React.FC = () => {
       Alert.alert('Empty Cart', 'Your cart is empty');
       return;
     }
-    // Navigate to checkout screen (to be implemented)
-    Alert.alert('Checkout', 'Checkout screen coming soon');
+    // Navigate to checkout screen
+    navigation.navigate('Checkout');
   };
 
   const renderCartItem = ({ item }: { item: CartItem }) => {
