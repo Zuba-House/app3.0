@@ -1,11 +1,12 @@
 /**
  * Temu-Style Search Bar Component
- * Clean white search bar with camera and search icons on the right
+ * Clean white search bar with camera, cart and search icons
  */
 
 import React, { useState } from 'react';
 import {
   View,
+  Text,
   TextInput,
   StyleSheet,
   TouchableOpacity,
@@ -13,7 +14,10 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppSelector } from '../store/hooks';
+import { selectCartCount } from '../store/slices/cartSlice';
 import Colors from '../constants/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -24,6 +28,7 @@ interface SearchBarProps {
   placeholder?: string;
   onFocus?: () => void;
   navigateToSearch?: boolean;
+  showCart?: boolean;
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({
@@ -32,7 +37,10 @@ const SearchBar: React.FC<SearchBarProps> = ({
   placeholder = 'Search products...',
   onFocus,
   navigateToSearch = false,
+  showCart = true,
 }) => {
+  const navigation = useNavigation<any>();
+  const cartCount = useAppSelector(selectCartCount);
   const [searchQuery, setSearchQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
 
@@ -54,10 +62,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
     Keyboard.dismiss();
   };
 
-  const handleCameraPress = () => {
-    // Placeholder for image search functionality
-    console.log('Camera search pressed');
-    Keyboard.dismiss();
+  const handleCartPress = () => {
+    navigation.navigate('Cart');
   };
 
   return (
@@ -70,6 +76,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             isFocused && styles.searchInputContainerFocused,
           ]}
         >
+          <Ionicons name="search-outline" size={18} color="#999" style={styles.searchIcon} />
           <TextInput
             placeholder={placeholder}
             placeholderTextColor="#999"
@@ -105,33 +112,29 @@ const SearchBar: React.FC<SearchBarProps> = ({
           )}
         </View>
         
-        {/* Action Buttons - Camera and Search (Temu Style) */}
+        {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
-          {/* Camera Button */}
-          <TouchableOpacity 
-            onPress={handleCameraPress} 
-            style={styles.cameraButton}
-            activeOpacity={0.7}
-          >
-            <Ionicons 
-              name="camera-outline" 
-              size={22} 
-              color={Colors.primary} 
-            />
-          </TouchableOpacity>
-          
-          {/* Search Button - Circular */}
-          <TouchableOpacity 
-            onPress={handleSearchSubmit} 
-            style={styles.searchButton}
-            activeOpacity={0.7}
-          >
-            <Ionicons 
-              name="search" 
-              size={20} 
-              color={Colors.white} 
-            />
-          </TouchableOpacity>
+          {/* Cart Button with Badge */}
+          {showCart && (
+            <TouchableOpacity 
+              onPress={handleCartPress} 
+              style={styles.cartButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name="cart-outline" 
+                size={24} 
+                color={Colors.primary} 
+              />
+              {cartCount > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </View>
@@ -159,23 +162,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: SCREEN_WIDTH * 0.04,
     paddingTop: Platform.OS === 'ios' ? 50 : 12,
     paddingBottom: 12,
-    gap: 8,
+    gap: 10,
   },
   searchInputContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: 20,
-    paddingHorizontal: 16,
+    backgroundColor: Colors.tertiary,
+    borderRadius: 24,
+    paddingHorizontal: 14,
     paddingVertical: Platform.OS === 'ios' ? 10 : 8,
     minHeight: 44,
     maxHeight: 44,
-    borderWidth: 0.5,
-    borderColor: '#e0e0e0',
   },
   searchInputContainerFocused: {
+    borderWidth: 1.5,
     borderColor: Colors.secondary,
+  },
+  searchIcon: {
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
@@ -201,33 +206,31 @@ const styles = StyleSheet.create({
   actionButtonsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
-  cameraButton: {
+  cartButton: {
     width: 44,
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 22,
+    position: 'relative',
   },
-  searchButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 22,
-    width: 44,
-    height: 44,
+  cartBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: Colors.secondary,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: Colors.shadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
+    paddingHorizontal: 4,
+  },
+  cartBadgeText: {
+    color: Colors.primary,
+    fontSize: 10,
+    fontWeight: '700',
   },
 });
 
