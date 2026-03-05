@@ -19,12 +19,36 @@ export interface CreateOrderData {
   shippingMethodId: string;
   paymentMethod: string;
   couponCode?: string;
+  giftCardCode?: string;
   notes?: string;
 }
 
 export interface CheckoutSession {
   url: string;
   sessionId: string;
+  paymentIntentId?: string;
+}
+
+export interface CouponValidation {
+  valid: boolean;
+  coupon?: {
+    code: string;
+    discountType: 'percentage' | 'fixed';
+    discountAmount: number;
+    minimumAmount?: number;
+    freeShipping?: boolean;
+  };
+  error?: string;
+}
+
+export interface GiftCardValidation {
+  valid: boolean;
+  giftCard?: {
+    code: string;
+    currentBalance: number;
+    currency: string;
+  };
+  error?: string;
 }
 
 export const checkoutService = {
@@ -73,8 +97,39 @@ export const checkoutService = {
   /**
    * Validate coupon code
    */
-  validateCoupon: async (couponCode: string): Promise<ApiResponse<{ discount: number; type: string }>> => {
-    const response = await postData<{ discount: number; type: string }>(API_ENDPOINTS.VALIDATE_COUPON, { code: couponCode });
+  validateCoupon: async (couponCode: string): Promise<ApiResponse<CouponValidation>> => {
+    const response = await postData<CouponValidation>(API_ENDPOINTS.VALIDATE_COUPON, { code: couponCode });
+    return response;
+  },
+
+  /**
+   * Apply coupon to cart
+   */
+  applyCoupon: async (couponCode: string, cartItems: any[], cartTotal: number): Promise<ApiResponse<{ discount: number; type: string; freeShipping?: boolean }>> => {
+    const response = await postData<{ discount: number; type: string; freeShipping?: boolean }>(API_ENDPOINTS.APPLY_COUPON, { 
+      code: couponCode,
+      cartItems,
+      cartTotal
+    });
+    return response;
+  },
+
+  /**
+   * Validate gift card code
+   */
+  validateGiftCard: async (code: string): Promise<ApiResponse<GiftCardValidation>> => {
+    const response = await postData<GiftCardValidation>(API_ENDPOINTS.VALIDATE_GIFT_CARD, { code });
+    return response;
+  },
+
+  /**
+   * Apply gift card to cart
+   */
+  applyGiftCard: async (code: string, cartTotal: number): Promise<ApiResponse<{ discount: number; giftCard: GiftCardValidation['giftCard'] }>> => {
+    const response = await postData<{ discount: number; giftCard: GiftCardValidation['giftCard'] }>(API_ENDPOINTS.APPLY_GIFT_CARD, { 
+      code,
+      cartTotal
+    });
     return response;
   },
 
@@ -91,14 +146,15 @@ export const checkoutService = {
 
   /**
    * Create Stripe checkout session (redirects to Stripe hosted checkout)
+   * Supports: Credit/Debit cards, Apple Pay, Google Pay
    */
   createCheckoutSession: async (
     amount: number,
     orderId: string,
-    successUrl: string,
-    cancelUrl: string
+    successUrl?: string,
+    cancelUrl?: string
   ): Promise<ApiResponse<CheckoutSession>> => {
-    const response = await postData<CheckoutSession>('/api/stripe/create-checkout-session', {
+    const response = await postData<CheckoutSession>(API_ENDPOINTS.CREATE_CHECKOUT_SESSION, {
       amount,
       orderId,
       successUrl,
@@ -120,7 +176,7 @@ export const checkoutService = {
     amountTotal: number;
     currency: string;
   }>> => {
-    const response = await fetchDataFromApi(`/api/stripe/checkout-status/${sessionId}`);
+    const response = await fetchDataFromApi(`${API_ENDPOINTS.GET_CHECKOUT_STATUS}/${sessionId}`);
     return response;
   },
 
@@ -135,15 +191,24 @@ export const checkoutService = {
   /**
    * Calculate order totals
    */
-  calculateTotals: (subtotal: number, shippingCost: number, discount: number = 0, taxRate: number = 0.13) => {
-    const taxableAmount = subtotal - discount;
+  calculateTotals: (
+    subtotal: number, 
+    shippingCost: number, 
+    couponDiscount: number = 0,
+    giftCardDiscount: number = 0,
+    taxRate: number = 0.13
+  ) => {
+    const totalDiscount = couponDiscount + giftCardDiscount;
+    const taxableAmount = Math.max(0, subtotal - totalDiscount);
     const tax = taxableAmount * taxRate;
-    const total = taxableAmount + tax + shippingCost;
+    const total = Math.max(0, taxableAmount + tax + shippingCost);
 
     return {
       subtotal,
       shippingCost,
-      discount,
+      couponDiscount,
+      giftCardDiscount,
+      discount: totalDiscount,
       tax: Math.round(tax * 100) / 100,
       total: Math.round(total * 100) / 100,
     };

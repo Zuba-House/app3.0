@@ -13,6 +13,7 @@ import {
   Alert,
   Dimensions,
   Platform,
+  TextInput,
 } from 'react-native';
 import { ActivityIndicator } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -48,13 +49,23 @@ const CheckoutScreen: React.FC = () => {
   const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<ShippingMethod | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'stripe'>('stripe');
+  
+  // Coupon & Gift Card state
   const [couponCode, setCouponCode] = useState('');
-  const [discount, setDiscount] = useState(0);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; type: string } | null>(null);
+  const [giftCardCode, setGiftCardCode] = useState('');
+  const [appliedGiftCard, setAppliedGiftCard] = useState<{ code: string; discount: number; balance: number } | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [giftCardLoading, setGiftCardLoading] = useState(false);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [giftCardDiscount, setGiftCardDiscount] = useState(0);
 
   // Calculated totals
   const [totals, setTotals] = useState({
     subtotal: 0,
     shippingCost: 0,
+    couponDiscount: 0,
+    giftCardDiscount: 0,
     discount: 0,
     tax: 0,
     total: 0,
@@ -71,9 +82,9 @@ const CheckoutScreen: React.FC = () => {
   useEffect(() => {
     // Recalculate totals when shipping or discount changes
     const shippingCost = selectedShipping?.price || 0;
-    const newTotals = checkoutService.calculateTotals(cartTotal, shippingCost, discount);
+    const newTotals = checkoutService.calculateTotals(cartTotal, shippingCost, couponDiscount, giftCardDiscount);
     setTotals(newTotals);
-  }, [cartTotal, selectedShipping, discount]);
+  }, [cartTotal, selectedShipping, couponDiscount, giftCardDiscount]);
 
   const loadInitialData = async () => {
     try {
@@ -101,6 +112,77 @@ const CheckoutScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      Alert.alert('Error', 'Please enter a coupon code');
+      return;
+    }
+    
+    try {
+      setCouponLoading(true);
+      const response = await checkoutService.applyCoupon(couponCode.trim(), cartItems, cartTotal);
+      
+      if (response.success && response.data) {
+        const discount = response.data.discount || 0;
+        setCouponDiscount(discount);
+        setAppliedCoupon({
+          code: couponCode.trim().toUpperCase(),
+          discount,
+          type: response.data.type || 'fixed'
+        });
+        Alert.alert('Success', `Coupon applied! You saved $${discount.toFixed(2)}`);
+      } else {
+        Alert.alert('Invalid Coupon', (response as any).error || 'This coupon is not valid');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to apply coupon');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponCode('');
+    setCouponDiscount(0);
+    setAppliedCoupon(null);
+  };
+
+  const handleApplyGiftCard = async () => {
+    if (!giftCardCode.trim()) {
+      Alert.alert('Error', 'Please enter a gift card code');
+      return;
+    }
+    
+    try {
+      setGiftCardLoading(true);
+      const response = await checkoutService.applyGiftCard(giftCardCode.trim(), cartTotal);
+      
+      if (response.success && response.data) {
+        const discount = response.data.discount || 0;
+        const giftCard = response.data.giftCard;
+        setGiftCardDiscount(discount);
+        setAppliedGiftCard({
+          code: giftCardCode.trim().toUpperCase(),
+          discount,
+          balance: giftCard?.currentBalance || 0
+        });
+        Alert.alert('Success', `Gift card applied! $${discount.toFixed(2)} will be deducted`);
+      } else {
+        Alert.alert('Invalid Gift Card', (response as any).error || 'This gift card is not valid');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to apply gift card');
+    } finally {
+      setGiftCardLoading(false);
+    }
+  };
+
+  const handleRemoveGiftCard = () => {
+    setGiftCardCode('');
+    setGiftCardDiscount(0);
+    setAppliedGiftCard(null);
   };
 
   const handleAddAddress = () => {
@@ -151,7 +233,8 @@ const CheckoutScreen: React.FC = () => {
         shippingAddressId: selectedAddress._id,
         shippingMethodId: selectedShipping._id,
         paymentMethod: paymentMethod,
-        couponCode: couponCode || undefined,
+        couponCode: appliedCoupon?.code || undefined,
+        giftCardCode: appliedGiftCard?.code || undefined,
       };
 
       const orderResponse = await checkoutService.createOrder(orderData);
@@ -365,7 +448,7 @@ const CheckoutScreen: React.FC = () => {
           <View style={styles.paymentInfo}>
             <Text style={styles.paymentName}>Credit/Debit Card</Text>
             <Text style={styles.paymentDescription}>
-              Pay securely with Stripe
+              Pay securely with Stripe (Apple Pay / Google Pay supported)
             </Text>
           </View>
           <View style={styles.paymentLogos}>
@@ -374,6 +457,92 @@ const CheckoutScreen: React.FC = () => {
           </View>
         </View>
       </TouchableOpacity>
+
+      {/* Coupon Code Section */}
+      <View style={styles.discountSection}>
+        <Text style={styles.discountSectionTitle}>Have a Coupon?</Text>
+        {appliedCoupon ? (
+          <View style={styles.appliedDiscountCard}>
+            <View style={styles.appliedDiscountInfo}>
+              <Ionicons name="pricetag" size={20} color="#4CAF50" />
+              <View style={styles.appliedDiscountText}>
+                <Text style={styles.appliedCode}>{appliedCoupon.code}</Text>
+                <Text style={styles.appliedSavings}>
+                  You save ${appliedCoupon.discount.toFixed(2)}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={handleRemoveCoupon} style={styles.removeButton}>
+              <Ionicons name="close-circle" size={24} color="#E60012" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.discountInputRow}>
+            <TextInput
+              style={styles.discountInput}
+              placeholder="Enter coupon code"
+              value={couponCode}
+              onChangeText={setCouponCode}
+              autoCapitalize="characters"
+              placeholderTextColor={Colors.primary + '80'}
+            />
+            <TouchableOpacity 
+              style={[styles.applyButton, couponLoading && styles.applyButtonDisabled]}
+              onPress={handleApplyCoupon}
+              disabled={couponLoading}
+            >
+              {couponLoading ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : (
+                <Text style={styles.applyButtonText}>Apply</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {/* Gift Card Section */}
+      <View style={styles.discountSection}>
+        <Text style={styles.discountSectionTitle}>Have a Gift Card?</Text>
+        {appliedGiftCard ? (
+          <View style={styles.appliedDiscountCard}>
+            <View style={styles.appliedDiscountInfo}>
+              <Ionicons name="gift" size={20} color="#9C27B0" />
+              <View style={styles.appliedDiscountText}>
+                <Text style={styles.appliedCode}>{appliedGiftCard.code}</Text>
+                <Text style={styles.appliedSavings}>
+                  Applied: ${appliedGiftCard.discount.toFixed(2)} (Balance: ${appliedGiftCard.balance.toFixed(2)})
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={handleRemoveGiftCard} style={styles.removeButton}>
+              <Ionicons name="close-circle" size={24} color="#E60012" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.discountInputRow}>
+            <TextInput
+              style={styles.discountInput}
+              placeholder="Enter gift card code"
+              value={giftCardCode}
+              onChangeText={setGiftCardCode}
+              autoCapitalize="characters"
+              placeholderTextColor={Colors.primary + '80'}
+            />
+            <TouchableOpacity 
+              style={[styles.applyButton, styles.giftCardButton, giftCardLoading && styles.applyButtonDisabled]}
+              onPress={handleApplyGiftCard}
+              disabled={giftCardLoading}
+            >
+              {giftCardLoading ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : (
+                <Text style={styles.applyButtonText}>Apply</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
 
       <View style={styles.securityNote}>
         <Ionicons name="shield-checkmark" size={16} color={Colors.secondary} />
@@ -458,11 +627,19 @@ const CheckoutScreen: React.FC = () => {
           <Text style={styles.totalLabel}>Shipping</Text>
           <Text style={styles.totalValue}>${totals.shippingCost.toFixed(2)}</Text>
         </View>
-        {totals.discount > 0 && (
+        {totals.couponDiscount > 0 && (
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Discount</Text>
+            <Text style={styles.totalLabel}>Coupon ({appliedCoupon?.code})</Text>
             <Text style={[styles.totalValue, styles.discountValue]}>
-              -${totals.discount.toFixed(2)}
+              -${totals.couponDiscount.toFixed(2)}
+            </Text>
+          </View>
+        )}
+        {totals.giftCardDiscount > 0 && (
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Gift Card ({appliedGiftCard?.code})</Text>
+            <Text style={[styles.totalValue, styles.discountValue]}>
+              -${totals.giftCardDiscount.toFixed(2)}
             </Text>
           </View>
         )}
@@ -1011,6 +1188,88 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.white,
     marginRight: 8,
+  },
+  // Coupon & Gift Card Styles
+  discountSection: {
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+  },
+  discountSectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+    marginBottom: 12,
+  },
+  discountInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  discountInput: {
+    flex: 1,
+    height: 44,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: Colors.primary,
+    backgroundColor: Colors.tertiary,
+  },
+  applyButton: {
+    height: 44,
+    paddingHorizontal: 20,
+    backgroundColor: Colors.secondary,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  giftCardButton: {
+    backgroundColor: '#9C27B0',
+  },
+  applyButtonDisabled: {
+    opacity: 0.6,
+  },
+  applyButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.white,
+  },
+  appliedDiscountCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.tertiary,
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    borderStyle: 'dashed',
+  },
+  appliedDiscountInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  appliedDiscountText: {
+    marginLeft: 10,
+    flex: 1,
+  },
+  appliedCode: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  appliedSavings: {
+    fontSize: 12,
+    color: '#4CAF50',
+    marginTop: 2,
+  },
+  removeButton: {
+    padding: 4,
   },
 });
 

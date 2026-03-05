@@ -61,14 +61,22 @@ export const API_ENDPOINTS = {
   UPLOAD_IMAGE: '/api/media/upload',
 
   // Coupons
-  VALIDATE_COUPON: '/api/coupons',
+  VALIDATE_COUPON: '/api/coupons/validate',
+  APPLY_COUPON: '/api/coupons/apply',
   GET_COUPONS: '/api/coupons',
+
+  // Gift Cards
+  VALIDATE_GIFT_CARD: '/api/gift-cards/validate',
+  APPLY_GIFT_CARD: '/api/gift-cards/apply',
+  GET_MY_GIFT_CARDS: '/api/gift-cards/my-cards',
 
   // Shipping
   GET_SHIPPING_RATES: '/api/shipping/rates',
 
   // Payment
   CREATE_PAYMENT_INTENT: '/api/stripe/create-payment-intent',
+  CREATE_CHECKOUT_SESSION: '/api/stripe/create-checkout-session',
+  GET_CHECKOUT_STATUS: '/api/stripe/checkout-status',
 } as const;
 
 // Storage Keys

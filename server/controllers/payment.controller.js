@@ -201,3 +201,204 @@ export const stripeHealth = async (req, res) => {
     });
   }
 };
+
+/**
+ * Create Stripe Checkout Session for mobile/web payments
+ * POST /api/stripe/create-checkout-session
+ * Supports: Credit/Debit cards, Apple Pay, Google Pay (automatic)
+ */
+export const createCheckoutSession = async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({
+        success: false,
+        error: 'Payment processing unavailable',
+        message: 'Stripe is not configured'
+      });
+    }
+
+    const { amount, orderId, successUrl, cancelUrl, metadata = {} } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid amount'
+      });
+    }
+
+    const currency = (process.env.CURRENCY || process.env.STRIPE_CURRENCY || 'USD').toLowerCase();
+    const baseUrl = process.env.API_URL || process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
+
+    // Create checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'payment',
+      line_items: [
+        {
+          price_data: {
+            currency,
+            product_data: {
+              name: `Order ${orderId ? '#' + orderId.slice(-8).toUpperCase() : ''}`,
+              description: 'Zuba House Order',
+            },
+            unit_amount: Math.round(amount * 100), // Convert to cents
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: successUrl || `${baseUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}&orderId=${orderId}`,
+      cancel_url: cancelUrl || `${baseUrl}/payment-cancel?orderId=${orderId}`,
+      metadata: {
+        orderId: orderId || '',
+        source: metadata.source || 'web',
+        ...metadata
+      },
+      // Enable additional payment methods
+      payment_method_options: {
+        card: {
+          setup_future_usage: 'off_session' // Allow saving card for future payments
+        }
+      },
+      // Phone number collection for shipping
+      phone_number_collection: {
+        enabled: false
+      },
+      // Customer info
+      ...(req.userId && { client_reference_id: req.userId }),
+    });
+
+    console.log('[Stripe] Checkout session created:', session.id);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        url: session.url,
+        sessionId: session.id,
+        paymentIntentId: session.payment_intent
+      }
+    });
+
+  } catch (err) {
+    console.error('[Stripe] Error creating checkout session:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to create checkout session',
+      detail: err?.message
+    });
+  }
+};
+
+/**
+ * Get Checkout Session Status
+ * GET /api/stripe/checkout-status/:sessionId
+ */
+export const getCheckoutStatus = async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({
+        success: false,
+        error: 'Stripe not configured'
+      });
+    }
+
+    const { sessionId } = req.params;
+
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Session ID is required'
+      });
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        status: session.status,
+        paymentStatus: session.payment_status,
+        amountTotal: session.amount_total ? session.amount_total / 100 : 0,
+        currency: session.currency?.toUpperCase(),
+        customerEmail: session.customer_email,
+        metadata: session.metadata
+      }
+    });
+
+  } catch (err) {
+    console.error('[Stripe] Error getting checkout status:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get checkout status',
+      detail: err?.message
+    });
+  }
+};
+
+/**
+ * Stripe Webhook Handler
+ * POST /api/stripe/webhook
+ */
+export const stripeWebhook = async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.warn('[Stripe Webhook] No webhook secret configured');
+    return res.status(400).json({ error: 'Webhook not configured' });
+  }
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err) {
+    console.error('[Stripe Webhook] Signature verification failed:', err?.message);
+    return res.status(400).json({ error: `Webhook Error: ${err?.message}` });
+  }
+
+  // Handle the event
+  switch (event.type) {
+    case 'checkout.session.completed':
+      const session = event.data.object;
+      console.log('[Stripe Webhook] Payment successful for session:', session.id);
+      
+      // Update order status if orderId is in metadata
+      if (session.metadata?.orderId) {
+        try {
+          const { default: OrderModel } = await import('../models/order.model.js');
+          await OrderModel.findByIdAndUpdate(session.metadata.orderId, {
+            payment_status: 'PAID',
+            paymentId: session.payment_intent,
+            $push: {
+              statusHistory: {
+                status: 'Payment Received',
+                timestamp: new Date(),
+                note: `Stripe payment ${session.payment_intent}`
+              }
+            }
+          });
+          console.log('[Stripe Webhook] Order updated:', session.metadata.orderId);
+        } catch (orderErr) {
+          console.error('[Stripe Webhook] Failed to update order:', orderErr);
+        }
+      }
+      break;
+
+    case 'checkout.session.expired':
+      console.log('[Stripe Webhook] Session expired:', event.data.object.id);
+      break;
+
+    case 'payment_intent.succeeded':
+      console.log('[Stripe Webhook] Payment intent succeeded:', event.data.object.id);
+      break;
+
+    case 'payment_intent.payment_failed':
+      console.log('[Stripe Webhook] Payment failed:', event.data.object.id);
+      break;
+
+    default:
+      console.log('[Stripe Webhook] Unhandled event type:', event.type);
+  }
+
+  res.json({ received: true });
+};
