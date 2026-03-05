@@ -46,6 +46,9 @@
         "projectId": "zuba-house-019"
       }
     },
+    "packagerOpts": {
+      "config": "metro.config.js"
+    },
   }
 }
 

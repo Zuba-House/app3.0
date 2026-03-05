@@ -31,6 +31,7 @@ import { setCart } from '../../store/slices/cartSlice';
 import Colors from '../../constants/colors';
 import { addToRecentlyViewed } from '../../components/RecentlyViewed';
 import ProductCard from '../../components/ProductCard';
+import { analyticsService } from '../../services/analytics.service';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IMAGE_HEIGHT = SCREEN_WIDTH; // Square images for better display
@@ -155,6 +156,13 @@ const ProductDetailScreen: React.FC = () => {
         const cleanedProduct = cleanProductData(productData);
         setProduct(cleanedProduct);
         
+        // Track product view
+        analyticsService.productView(
+          cleanedProduct._id,
+          cleanedProduct.name,
+          cleanedProduct.salePrice || cleanedProduct.price
+        );
+        
         // Add to recently viewed
         const getImageUrl = (img: any): string | null => {
           if (typeof img === 'string') return img;
@@ -247,6 +255,10 @@ const ProductDetailScreen: React.FC = () => {
         if (cartResponse.success && cartResponse.data) {
           dispatch(setCart(cartResponse.data));
         }
+
+        // Track add to cart
+        const price = selectedVariation?.salePrice || selectedVariation?.price || product.salePrice || product.price;
+        analyticsService.addToCart(product._id, product.name, price, quantity);
 
         Alert.alert('✅ Added to Cart', `${product.name} added to your cart`, [
           { text: 'Continue Shopping', style: 'cancel' },
@@ -414,10 +426,16 @@ const ProductDetailScreen: React.FC = () => {
   
   // Check if variable product needs variation selection
   // For variable products, we need all attributes selected
+  const getSelectedAttributes = () => {
+    if (!selectedVariation || !selectedVariation.attributes) return {};
+    return selectedVariation.attributes;
+  };
+  
   const allAttributesSelected = product.productType === 'variable' && product.attributes && Array.isArray(product.attributes)
     ? product.attributes.every(attr => {
-        if (!selectedVariation || !attr) return false;
-        return selectedVariation.attributes?.[attr.name] !== undefined;
+        if (!attr || !attr.name) return true;
+        const selectedAttrs = getSelectedAttributes();
+        return selectedAttrs[attr.name] !== undefined && selectedAttrs[attr.name] !== null;
       })
     : true;
   

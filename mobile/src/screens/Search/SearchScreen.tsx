@@ -25,6 +25,7 @@ import ProductCard from '../../components/ProductCard';
 import Colors from '../../constants/colors';
 import SearchBar from '../../components/SearchBar';
 import { API_URL } from '../../constants/config';
+import { analyticsService } from '../../services/analytics.service';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Responsive sidebar width - smaller on small screens
@@ -116,6 +117,10 @@ const SearchScreen: React.FC = () => {
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
+    // Track search
+    if (query.trim()) {
+      analyticsService.search(query.trim(), products.length);
+    }
     // Frontend-only search for now
     if (!query.trim()) {
       loadAllProducts();
@@ -126,6 +131,10 @@ const SearchScreen: React.FC = () => {
   const handleCategorySelect = (categoryId: string | null) => {
     setSelectedCategory(categoryId);
     if (categoryId) {
+      const category = categories.find(c => c._id === categoryId);
+      if (category) {
+        analyticsService.categoryView(categoryId, category.name);
+      }
       loadProductsByCategory(categoryId);
     } else {
       loadAllProducts();

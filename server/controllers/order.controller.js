@@ -759,6 +759,22 @@ export const updateOrderStatusController = async (request, response) => {
                     orderId: order._id,
                     isRead: false
                 });
+                
+                // Send push notification
+                try {
+                    const { sendOrderNotification } = await import('./notification.controller.js');
+                    const orderNumber = order.orderNumber || order._id.toString().slice(-8).toUpperCase();
+                    await sendOrderNotification(
+                        order.userId.toString(),
+                        order._id.toString(),
+                        status.toUpperCase(),
+                        orderNumber
+                    );
+                    console.log('✅ Push notification sent for order status update');
+                } catch (pushError) {
+                    // Don't fail order update if push notification fails
+                    console.error('⚠️ Failed to send push notification:', pushError.message);
+                }
             } catch (notifError) {
                 // Don't fail if notification model doesn't exist yet
                 console.log('Notification not created (model may not exist yet):', notifError.message);

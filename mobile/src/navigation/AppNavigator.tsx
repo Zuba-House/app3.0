@@ -16,6 +16,8 @@ import { setCredentials } from '../store/slices/authSlice';
 import { User } from '../types/user.types';
 import Colors from '../constants/colors';
 import SplashScreen from '../components/SplashScreen';
+import { notificationService } from '../services/notification.service';
+import { analyticsService } from '../services/analytics.service';
 
 // Screens
 import LoginScreen from '../screens/Auth/LoginScreen';
@@ -273,6 +275,8 @@ const AppNavigator: React.FC = () => {
                   )) || '',
                 })
               );
+              // Initialize analytics with user ID
+              analyticsService.initialize(user._id);
             } else {
               // Invalid user data, clear storage
               await AsyncStorage.multiRemove([
@@ -299,6 +303,24 @@ const AppNavigator: React.FC = () => {
     };
 
     checkAuth();
+    
+    // Initialize push notifications
+    const initNotifications = async () => {
+      try {
+        const token = await notificationService.initialize();
+        if (token) {
+          console.log('✅ Push notifications initialized');
+          // Register token with backend when user logs in (handled in auth flow)
+        }
+      } catch (error) {
+        console.error('Error initializing notifications:', error);
+      }
+    };
+    
+    initNotifications();
+    
+    // Initialize analytics
+    analyticsService.initialize();
   }, [dispatch]);
 
   // Show beautiful animated splash screen

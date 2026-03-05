@@ -21,7 +21,36 @@ const analyticsRouter = Router();
 // ========================================
 
 // Track page view (called from client-side)
-analyticsRouter.post('/track', trackPageView);
+// Enhanced to support mobile app events
+analyticsRouter.post('/track', async (req, res, next) => {
+  try {
+    const { event, properties, userId } = req.body;
+    
+    // Store event in analytics model if available (for mobile app events)
+    if (event && properties && properties.platform === 'mobile') {
+      try {
+        const AnalyticsModel = (await import('../models/analytics.model.js')).default;
+        await AnalyticsModel.create({
+          event,
+          properties: properties || {},
+          userId: userId || req.userId || null,
+          timestamp: new Date(),
+          platform: 'mobile',
+        });
+      } catch (dbError) {
+        // Silent fail - analytics shouldn't break the app
+        console.warn('Analytics storage failed:', dbError.message);
+      }
+    }
+    
+    // Call existing middleware for web tracking
+    return trackPageView(req, res, next);
+  } catch (error) {
+    console.error('Error in analytics track:', error);
+    // Fallback to existing middleware
+    return trackPageView(req, res, next);
+  }
+});
 
 // ========================================
 // PROTECTED ROUTES (Admin only)

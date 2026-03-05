@@ -26,6 +26,7 @@ import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectCartItems, selectCartTotal, clearCart } from '../../store/slices/cartSlice';
 import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import Colors from '../../constants/colors';
+import { analyticsService } from '../../services/analytics.service';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -228,6 +229,9 @@ const CheckoutScreen: React.FC = () => {
     try {
       setProcessing(true);
 
+      // Track checkout start
+      analyticsService.checkoutStart(totals.total, cartItems.length);
+
       // Create order first
       const orderData: CreateOrderData = {
         shippingAddressId: selectedAddress._id,
@@ -245,6 +249,17 @@ const CheckoutScreen: React.FC = () => {
           orderId: orderResponse.data._id || orderResponse.data.orderId,
           amount: totals.total,
           onSuccess: () => {
+            // Track purchase
+            analyticsService.purchase(
+              orderResponse.data._id || orderResponse.data.orderId,
+              totals.total,
+              cartItems.map(item => ({
+                id: item.product?._id || item.productId,
+                name: item.product?.name || 'Unknown',
+                price: item.price,
+                quantity: item.quantity,
+              }))
+            );
             dispatch(clearCart());
             navigation.navigate('OrderConfirmation', {
               orderId: orderResponse.data._id || orderResponse.data.orderId,
