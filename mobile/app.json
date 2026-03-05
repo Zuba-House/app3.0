@@ -8,6 +8,16 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#0b2735",
+          "sounds": []
+        }
+      ]
+    ],
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -15,15 +25,20 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.zuba.mobile",
+      "bundleIdentifier": "com.zubahouse.customer",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "splash": {
         "image": "./assets/splash.png",
         "resizeMode": "contain",
         "backgroundColor": "#e5e2db"
+      },
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
-      "package": "com.zuba.mobile",
+      "package": "com.zubahouse.customer",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0b2735"
@@ -35,7 +50,14 @@
       }
     },
     "extra": {
-      "apiUrl": "https://zuba-api.onrender.com"
+      "apiUrl": "https://zuba-api.onrender.com",
+      "eas": {
+        "projectId": "zuba-house-019"
+      }
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#0b2735"
     }
   }
 }

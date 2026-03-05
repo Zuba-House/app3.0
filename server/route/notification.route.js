@@ -1,8 +1,28 @@
 import { Router } from "express";
-import auth from "../middlewares/auth.js";
+import auth, { optionalAuth } from "../middlewares/auth.js";
 import NotificationModel from "../models/notification.model.js";
+import {
+  registerPushToken,
+  sendNotification,
+  broadcastNotification,
+  getNotificationHistory,
+  updatePreferences,
+  removePushToken
+} from "../controllers/notification.controller.js";
 
 const notificationRouter = Router();
+
+// Push token management
+notificationRouter.post('/register-token', optionalAuth, registerPushToken);
+notificationRouter.delete('/token', optionalAuth, removePushToken);
+
+// Push notification sending (admin only in production)
+notificationRouter.post('/send', optionalAuth, sendNotification);
+notificationRouter.post('/broadcast', optionalAuth, broadcastNotification);
+
+// User notification preferences
+notificationRouter.get('/history', auth, getNotificationHistory);
+notificationRouter.put('/preferences', auth, updatePreferences);
 
 // Get all notifications for logged-in user
 notificationRouter.get('/notifications', auth, async (request, response) => {
