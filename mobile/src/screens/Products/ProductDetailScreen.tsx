@@ -97,7 +97,7 @@ const ProductDetailScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const { productId } = route.params;
+  const productId = route.params?.productId;
 
   const [product, setProduct] = useState<Product | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
@@ -114,7 +114,13 @@ const ProductDetailScreen: React.FC = () => {
   const scrollX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    loadProduct();
+    if (productId) {
+      loadProduct();
+    } else {
+      setLoading(false);
+      Alert.alert('Error', 'Product ID is missing');
+      navigation.goBack();
+    }
   }, [productId]);
 
   useEffect(() => {
@@ -124,6 +130,11 @@ const ProductDetailScreen: React.FC = () => {
   }, [product]);
 
   const loadProduct = async () => {
+    if (!productId) {
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
       const response = await productService.getProductById(productId);
@@ -403,14 +414,14 @@ const ProductDetailScreen: React.FC = () => {
   
   // Check if variable product needs variation selection
   // For variable products, we need all attributes selected
-  const allAttributesSelected = product.productType === 'variable' && product.attributes
+  const allAttributesSelected = product.productType === 'variable' && product.attributes && Array.isArray(product.attributes)
     ? product.attributes.every(attr => {
-        if (!selectedVariation) return false;
+        if (!selectedVariation || !attr) return false;
         return selectedVariation.attributes?.[attr.name] !== undefined;
       })
     : true;
   
-  const needsVariation = product.productType === 'variable' && product.variations && product.variations.length > 0 
+  const needsVariation = product.productType === 'variable' && product.variations && Array.isArray(product.variations) && product.variations.length > 0 
     ? !allAttributesSelected || !selectedVariation
     : false;
 
@@ -570,31 +581,35 @@ const ProductDetailScreen: React.FC = () => {
           </View>
 
           {/* Variations - TEMU Style */}
-          {product.productType === 'variable' && product.variations && product.variations.length > 0 && (
+          {product.productType === 'variable' && product.variations && Array.isArray(product.variations) && product.variations.length > 0 && (
             <View style={styles.variationSection}>
               <Text style={styles.sectionTitle}>
-                {product.attributes && product.attributes.length > 0
-                  ? product.attributes.map((attr) => attr.name).join(' & ')
+                {product.attributes && Array.isArray(product.attributes) && product.attributes.length > 0
+                  ? product.attributes.map((attr) => attr?.name || '').filter(Boolean).join(' & ')
                   : 'Select Options'}
               </Text>
               
               {/* Group variations by attribute */}
-              {product.attributes && product.attributes.map((attribute) => {
+              {product.attributes && Array.isArray(product.attributes) && product.attributes.map((attribute) => {
+                if (!attribute || !attribute.values || !Array.isArray(attribute.values)) return null;
+                
                 const availableValues = new Set(
-                  product.variations
-                    ?.filter(v => v.stock > 0)
+                  (product.variations || [])
+                    .filter(v => v && (v.stock || 0) > 0)
                     .map(v => v.attributes?.[attribute.name])
                     .filter(Boolean) || []
                 );
                 
                 return (
-                  <View key={attribute._id} style={styles.attributeGroup}>
+                  <View key={attribute._id || attribute.name} style={styles.attributeGroup}>
                     <Text style={styles.attributeLabel}>{attribute.name}:</Text>
                     <View style={styles.attributeValues}>
                       {attribute.values.map((value) => {
+                        if (!value) return null;
+                        
                         // Find variation with this attribute value
-                        const matchingVariation = product.variations?.find(
-                          v => v.attributes?.[attribute.name] === value && v.stock > 0
+                        const matchingVariation = (product.variations || []).find(
+                          v => v && v.attributes?.[attribute.name] === value && (v.stock || 0) > 0
                         );
                         const isSelected = selectedVariation?.attributes?.[attribute.name] === value;
                         const isAvailable = availableValues.has(value);
@@ -618,18 +633,21 @@ const ProductDetailScreen: React.FC = () => {
                               // Find variation matching all selected attributes
                               // First, get all required attributes
                               const allRequiredAttrs: Record<string, string> = {};
-                              product.attributes?.forEach(attr => {
-                                if (newAttrs[attr.name]) {
-                                  allRequiredAttrs[attr.name] = newAttrs[attr.name];
-                                } else if (selectedVariation?.attributes?.[attr.name]) {
-                                  allRequiredAttrs[attr.name] = selectedVariation.attributes[attr.name];
+                              (product.attributes || []).forEach(attr => {
+                                if (attr && attr.name) {
+                                  if (newAttrs[attr.name]) {
+                                    allRequiredAttrs[attr.name] = newAttrs[attr.name];
+                                  } else if (selectedVariation?.attributes?.[attr.name]) {
+                                    allRequiredAttrs[attr.name] = selectedVariation.attributes[attr.name];
+                                  }
                                 }
                               });
                               
                               // Find variation matching all required attributes
-                              const fullMatch = product.variations?.find(v => {
-                                if (!v.attributes) return false;
-                                return product.attributes?.every(attr => {
+                              const fullMatch = (product.variations || []).find(v => {
+                                if (!v || !v.attributes) return false;
+                                return (product.attributes || []).every(attr => {
+                                  if (!attr || !attr.name) return true;
                                   const requiredValue = allRequiredAttrs[attr.name];
                                   return requiredValue && v.attributes?.[attr.name] === requiredValue;
                                 });
@@ -640,7 +658,8 @@ const ProductDetailScreen: React.FC = () => {
                               } else {
                                 // If we have all attributes but no match, try to find closest
                                 // Otherwise, create a temporary selection object
-                                const tempVariation = product.variations?.find(v => {
+                                const tempVariation = (product.variations || []).find(v => {
+                                  if (!v || !v.attributes) return false;
                                   return Object.keys(allRequiredAttrs).every(
                                     key => v.attributes?.[key] === allRequiredAttrs[key]
                                   );
@@ -648,9 +667,9 @@ const ProductDetailScreen: React.FC = () => {
                                 
                                 if (tempVariation) {
                                   setSelectedVariation(tempVariation);
-                                } else if (Object.keys(allRequiredAttrs).length === product.attributes?.length) {
+                                } else if (Object.keys(allRequiredAttrs).length === (product.attributes || []).length) {
                                   // All attributes selected but no match - show error or use first available
-                                  const firstAvailable = product.variations?.find(v => v.stock > 0);
+                                  const firstAvailable = (product.variations || []).find(v => v && (v.stock || 0) > 0);
                                   if (firstAvailable) {
                                     setSelectedVariation(firstAvailable);
                                   }
