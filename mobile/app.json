@@ -8,16 +8,7 @@
     "assetBundlePatterns": [
       "**/*"
     ],
-    "plugins": [
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/notification-icon.png",
-          "color": "#0b2735",
-          "sounds": []
-        }
-      ]
-    ],
+    "plugins": [],
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -55,10 +46,6 @@
         "projectId": "zuba-house-019"
       }
     },
-    "notification": {
-      "icon": "./assets/notification-icon.png",
-      "color": "#0b2735"
-    }
   }
 }
 
