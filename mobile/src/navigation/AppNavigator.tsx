@@ -304,16 +304,17 @@ const AppNavigator: React.FC = () => {
 
     checkAuth();
     
-    // Initialize push notifications
+    // Initialize push notifications (silently - errors are handled in service)
     const initNotifications = async () => {
       try {
         const token = await notificationService.initialize();
         if (token) {
-          console.log('✅ Push notifications initialized');
-          // Register token with backend when user logs in (handled in auth flow)
+          // Token registered - will be sent to backend on login
         }
+        // If no token, that's fine - notifications are optional
       } catch (error) {
-        console.error('Error initializing notifications:', error);
+        // Errors are already handled gracefully in notificationService
+        // No need to log or show to user
       }
     };
     

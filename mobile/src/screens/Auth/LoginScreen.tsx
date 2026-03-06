@@ -117,19 +117,93 @@ const LoginScreen: React.FC = () => {
     setError(null);
 
     try {
-      // For now, show a helpful message
-      // Google OAuth requires backend configuration to exchange the auth code
-      // The backend endpoint exists, but needs Google OAuth credentials configured
-      setError('Google login requires OAuth credentials setup. Please use email/password for now. Contact support to enable Google login.');
+      // Import Google auth helper
+      const { signInWithGoogle } = await import('../../utils/googleAuth');
       
-      // TODO: Once Google OAuth is configured on backend:
-      // 1. Get Google user info from OAuth flow
-      // 2. Call authService.loginWithGoogle() with user info
-      // 3. Handle success/error
-      
+      // Start Google OAuth flow
+      const googleResult = await signInWithGoogle();
+
+      if (!googleResult.success) {
+        setError(googleResult.error || 'Google login failed. Please try again.');
+        return;
+      }
+
+      // Check if we have required user info
+      if (!googleResult.email || !googleResult.name) {
+        setError('Unable to get user information from Google. Please try again.');
+        return;
+      }
+
+      // Call backend to authenticate with Google
+      const response = await authService.loginWithGoogle({
+        name: googleResult.name,
+        email: googleResult.email,
+        avatar: googleResult.avatar,
+        mobile: googleResult.mobile,
+      });
+
+      console.log('🔐 Google login response received:', JSON.stringify(response, null, 2));
+
+      // Check if we have access token
+      if (response && response.accessToken) {
+        // If user is empty, try to fetch it
+        if (!response.user || Object.keys(response.user).length === 0) {
+          try {
+            const userResponse = await authService.getCurrentUser();
+            if (userResponse) {
+              dispatch(
+                setCredentials({
+                  user: userResponse,
+                  accessToken: response.accessToken,
+                  refreshToken: response.refreshToken || '',
+                })
+              );
+            } else {
+              dispatch(
+                setCredentials({
+                  user: {} as any, // Will be fetched later
+                  accessToken: response.accessToken,
+                  refreshToken: response.refreshToken || '',
+                })
+              );
+            }
+          } catch (userError) {
+            console.error('Error fetching user:', userError);
+            // Still set credentials with token, user can be fetched later
+            dispatch(
+              setCredentials({
+                user: {} as any,
+                accessToken: response.accessToken,
+                refreshToken: response.refreshToken || '',
+              })
+            );
+          }
+        } else {
+          dispatch(
+            setCredentials({
+              user: response.user,
+              accessToken: response.accessToken,
+              refreshToken: response.refreshToken || '',
+            })
+          );
+        }
+        // Navigation will be handled by AppNavigator automatically
+      } else {
+        throw new Error('Invalid response from server - no access token');
+      }
     } catch (err: any) {
       console.error('Google login error:', err);
-      setError(err.message || 'Google login failed. Please use email/password.');
+      const errorMessage = err.message || 'Google login failed. Please try again.';
+      
+      // Provide helpful error messages
+      if (errorMessage.includes('not configured') || errorMessage.includes('GOOGLE_CLIENT_ID')) {
+        setError('Google login is not configured yet. Please use email/password login or contact support.');
+      } else if (errorMessage.includes('cancelled')) {
+        // User cancelled - don't show error, just stop loading
+        setError(null);
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setGoogleLoading(false);
     }

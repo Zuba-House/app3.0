@@ -3,6 +3,7 @@
     "name": "Zuba",
     "slug": "zuba-mobile",
     "version": "1.0.0",
+    "scheme": "zuba",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "assetBundlePatterns": [
@@ -44,7 +45,8 @@
       "apiUrl": "https://zuba-api.onrender.com",
       "eas": {
         "projectId": "zuba-house-019"
-      }
+      },
+      "googleClientId": "473177050132-tbjv9abc8bt4fep3eq7grm0faqa3e5dt.apps.googleusercontent.com"
     },
     "packagerOpts": {
       "config": "metro.config.js"

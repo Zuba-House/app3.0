@@ -228,6 +228,7 @@ const ProductDetailScreen: React.FC = () => {
   };
 
   const handleAddToCart = async () => {
+    // Validation: Check authentication
     if (!isAuthenticated) {
       Alert.alert('Login Required', 'Please login to add items to cart', [
         { text: 'Cancel', style: 'cancel' },
@@ -239,39 +240,127 @@ const ProductDetailScreen: React.FC = () => {
       return;
     }
 
-    if (!product) return;
+    // Validation: Check product exists
+    if (!product) {
+      Alert.alert('Error', 'Product information is missing');
+      return;
+    }
+
+    // Validation: Check if product needs variation selection
+    if (needsVariation) {
+      Alert.alert('Select Options', 'Please select all required options before adding to cart');
+      return;
+    }
+
+    // Validation: Check stock availability
+    if (isOutOfStock) {
+      Alert.alert('Out of Stock', 'This item is currently out of stock');
+      return;
+    }
+
+    // Validation: Check quantity doesn't exceed stock
+    if (quantity > currentStock) {
+      Alert.alert(
+        'Insufficient Stock',
+        `Only ${currentStock} item${currentStock > 1 ? 's' : ''} available. Please adjust quantity.`,
+        [
+          {
+            text: 'Set to Max',
+            onPress: () => setQuantity(currentStock),
+          },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+
+    // Validation: Check quantity is valid
+    if (quantity < 1) {
+      Alert.alert('Invalid Quantity', 'Please select a valid quantity');
+      return;
+    }
 
     try {
       setAddingToCart(true);
+
+      // Prepare variation data
+      const variationId = selectedVariation?._id || undefined;
+      const variationData = selectedVariation || undefined;
+
+      // Call API to add to cart
       const response = await cartService.addToCart(
         product._id,
         quantity,
-        selectedVariation?._id,
-        selectedVariation
+        variationId,
+        variationData
       );
 
       if (response.success) {
-        const cartResponse = await cartService.getCart();
-        if (cartResponse.success && cartResponse.data) {
-          dispatch(setCart(cartResponse.data));
+        // Refresh cart from server to get latest state
+        try {
+          const cartResponse = await cartService.getCart();
+          if (cartResponse.success && cartResponse.data) {
+            dispatch(setCart(cartResponse.data));
+          }
+        } catch (cartError) {
+          console.error('Error refreshing cart:', cartError);
+          // Continue even if cart refresh fails
         }
 
-        // Track add to cart
-        const price = selectedVariation?.salePrice || selectedVariation?.price || product.salePrice || product.price;
-        analyticsService.addToCart(product._id, product.name, price, quantity);
+        // Track analytics
+        try {
+          const price = selectedVariation?.salePrice || selectedVariation?.price || product.salePrice || product.price;
+          analyticsService.addToCart(product._id, product.name, price, quantity);
+        } catch (analyticsError) {
+          console.error('Error tracking analytics:', analyticsError);
+          // Continue even if analytics fails
+        }
 
-        Alert.alert('✅ Added to Cart', `${product.name} added to your cart`, [
-          { text: 'Continue Shopping', style: 'cancel' },
-          {
-            text: 'View Cart',
-            onPress: () => navigation.navigate('Cart'),
-          },
-        ]);
+        // Show success message
+        const productName = product.name || 'Product';
+        const variationText = selectedVariation && product.productType === 'variable'
+          ? ` (${Object.values(selectedVariation.attributes || {}).join(', ')})`
+          : '';
+
+        Alert.alert(
+          '✅ Added to Cart',
+          `${productName}${variationText}\nQuantity: ${quantity}\n\nAdded to your cart successfully!`,
+          [
+            { text: 'Continue Shopping', style: 'cancel' },
+            {
+              text: 'View Cart',
+              onPress: () => navigation.navigate('Cart'),
+            },
+          ]
+        );
+
+        // Reset quantity to 1 after successful add (optional UX improvement)
+        // setQuantity(1);
       } else {
-        Alert.alert('Error', response.message || 'Failed to add to cart');
+        // Handle API error response
+        const errorMessage = response.message || response.error || 'Failed to add to cart';
+        
+        // Check for specific error types
+        if (errorMessage.toLowerCase().includes('stock') || errorMessage.toLowerCase().includes('available')) {
+          Alert.alert('Stock Issue', errorMessage);
+        } else if (errorMessage.toLowerCase().includes('variation') || errorMessage.toLowerCase().includes('option')) {
+          Alert.alert('Selection Required', errorMessage);
+        } else {
+          Alert.alert('Error', errorMessage);
+        }
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to add to cart');
+      console.error('Add to cart error:', error);
+      
+      // Handle network errors
+      if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        Alert.alert(
+          'Connection Error',
+          'Unable to connect to server. Please check your internet connection and try again.'
+        );
+      } else {
+        Alert.alert('Error', error.message || 'Failed to add to cart. Please try again.');
+      }
     } finally {
       setAddingToCart(false);
     }
@@ -614,7 +703,14 @@ const ProductDetailScreen: React.FC = () => {
                 const availableValues = new Set(
                   (product.variations || [])
                     .filter(v => v && (v.stock || 0) > 0)
-                    .map(v => v.attributes?.[attribute.name])
+                    .map(v => {
+                      const attrValue = v.attributes?.[attribute.name];
+                      // Handle both string and object formats
+                      if (typeof attrValue === 'object' && attrValue !== null) {
+                        return (attrValue as any)?.label || (attrValue as any)?.value || (attrValue as any)?.slug || String(attrValue);
+                      }
+                      return attrValue;
+                    })
                     .filter(Boolean) || []
                 );
                 
@@ -625,16 +721,41 @@ const ProductDetailScreen: React.FC = () => {
                       {attribute.values.map((value) => {
                         if (!value) return null;
                         
+                        // Handle value as string or object with {valueId, label, slug}
+                        const valueString = typeof value === 'string' 
+                          ? value 
+                          : (value as any)?.label || (value as any)?.value || (value as any)?.slug || String(value);
+                        const valueId = typeof value === 'string' 
+                          ? value 
+                          : (value as any)?.valueId || (value as any)?.slug || valueString;
+                        
                         // Find variation with this attribute value
                         const matchingVariation = (product.variations || []).find(
-                          v => v && v.attributes?.[attribute.name] === value && (v.stock || 0) > 0
+                          v => {
+                            if (!v || !v.attributes || (v.stock || 0) <= 0) return false;
+                            const attrValue = v.attributes[attribute.name];
+                            // Compare both string and object formats
+                            return attrValue === valueString || 
+                                   attrValue === valueId ||
+                                   (typeof attrValue === 'object' && (attrValue as any)?.label === valueString) ||
+                                   (typeof value === 'object' && (value as any)?.valueId && attrValue === (value as any).valueId);
+                          }
                         );
-                        const isSelected = selectedVariation?.attributes?.[attribute.name] === value;
-                        const isAvailable = availableValues.has(value);
+                        const isSelected = selectedVariation?.attributes?.[attribute.name] === valueString ||
+                                          selectedVariation?.attributes?.[attribute.name] === valueId ||
+                                          (typeof selectedVariation?.attributes?.[attribute.name] === 'object' && 
+                                           (selectedVariation.attributes[attribute.name] as any)?.label === valueString);
+                        const isAvailable = availableValues.has(valueString) || availableValues.has(valueId) ||
+                                          Array.from(availableValues).some(v => {
+                                            if (typeof v === 'object') {
+                                              return (v as any)?.label === valueString || (v as any)?.valueId === valueId;
+                                            }
+                                            return v === valueString || v === valueId;
+                                          });
                         
                         return (
                           <TouchableOpacity
-                            key={value}
+                            key={valueId || valueString}
                             style={[
                               styles.attributeButton,
                               isSelected && styles.attributeButtonSelected,
@@ -646,7 +767,7 @@ const ProductDetailScreen: React.FC = () => {
                               // If this is the first attribute or same attribute, just select this value
                               // Otherwise, find variation matching all selected attributes
                               const currentAttrs = selectedVariation?.attributes || {};
-                              const newAttrs = { ...currentAttrs, [attribute.name]: value };
+                              const newAttrs = { ...currentAttrs, [attribute.name]: valueString };
                               
                               // Find variation matching all selected attributes
                               // First, get all required attributes
@@ -703,7 +824,7 @@ const ProductDetailScreen: React.FC = () => {
                                 !isAvailable && styles.attributeTextDisabled,
                               ]}
                             >
-                              {value}
+                              {valueString}
                             </Text>
                             {!isAvailable && (
                               <Text style={styles.outOfStockLabel}>Out</Text>
@@ -749,26 +870,53 @@ const ProductDetailScreen: React.FC = () => {
             <View style={styles.quantityControls}>
               <TouchableOpacity
                 style={[styles.quantityButton, quantity <= 1 && styles.quantityButtonDisabled]}
-                onPress={() => setQuantity(Math.max(1, quantity - 1))}
-                disabled={quantity <= 1}
+                onPress={() => {
+                  const newQuantity = Math.max(1, quantity - 1);
+                  setQuantity(newQuantity);
+                }}
+                disabled={quantity <= 1 || addingToCart}
               >
-                <Ionicons name="remove" size={20} color={quantity <= 1 ? Colors.border : Colors.primary} />
+                <Ionicons name="remove" size={20} color={quantity <= 1 || addingToCart ? Colors.border : Colors.primary} />
               </TouchableOpacity>
               <Text style={styles.quantity}>{quantity}</Text>
               <TouchableOpacity
                 style={[
                   styles.quantityButton,
-                  quantity >= currentStock && styles.quantityButtonDisabled,
+                  (quantity >= currentStock || currentStock === 0) && styles.quantityButtonDisabled,
                 ]}
-                onPress={() => setQuantity(Math.min(currentStock || 99, quantity + 1))}
-                disabled={quantity >= currentStock || currentStock === 0}
+                onPress={() => {
+                  const maxQuantity = currentStock > 0 ? currentStock : 99;
+                  const newQuantity = Math.min(maxQuantity, quantity + 1);
+                  setQuantity(newQuantity);
+                  
+                  // Show warning if trying to exceed stock
+                  if (newQuantity >= currentStock && currentStock > 0) {
+                    // Visual feedback is enough, no alert needed
+                  }
+                }}
+                disabled={quantity >= currentStock || currentStock === 0 || addingToCart}
               >
-                <Ionicons name="add" size={20} color={quantity >= currentStock || currentStock === 0 ? Colors.border : Colors.primary} />
+                <Ionicons 
+                  name="add" 
+                  size={20} 
+                  color={
+                    quantity >= currentStock || currentStock === 0 || addingToCart
+                      ? Colors.border 
+                      : Colors.primary
+                  } 
+                />
               </TouchableOpacity>
             </View>
             <Text style={styles.stockText}>
-              {currentStock > 0 ? `${currentStock} available` : 'Out of stock'}
+              {currentStock > 0 
+                ? `${currentStock} available${currentStock <= 10 ? ' - Limited stock!' : ''}` 
+                : 'Out of stock'}
             </Text>
+            {quantity > currentStock && currentStock > 0 && (
+              <Text style={styles.stockWarning}>
+                ⚠️ Maximum {currentStock} available
+              </Text>
+            )}
           </View>
 
           {/* Description */}
@@ -1217,6 +1365,13 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     opacity: 0.7,
     marginTop: 4,
+  },
+  stockWarning: {
+    fontSize: 12,
+    color: '#E60012',
+    fontWeight: '600',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   section: {
     marginBottom: 24,

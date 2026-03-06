@@ -40,7 +40,7 @@ class NotificationService {
     try {
       // Check if running on physical device
       if (!Device.isDevice) {
-        console.log('Push notifications require a physical device');
+        // Silently fail for emulators/simulators - this is expected
         return null;
       }
 
@@ -54,7 +54,7 @@ class NotificationService {
       }
 
       if (finalStatus !== 'granted') {
-        console.log('Push notification permission not granted');
+        // Permission not granted - silently fail, user can enable later
         return null;
       }
 
@@ -64,16 +64,28 @@ class NotificationService {
       });
       
       this.expoPushToken = tokenData.data;
-      console.log('Push token:', this.expoPushToken);
+      console.log('✅ Push notifications initialized');
 
       // Configure Android notification channel
       if (Platform.OS === 'android') {
-        await this.setupAndroidChannels();
+        try {
+          await this.setupAndroidChannels();
+        } catch (channelError) {
+          // Channel setup failed, but continue - not critical
+          console.log('Note: Android channel setup failed (non-critical)');
+        }
       }
 
       return this.expoPushToken;
-    } catch (error) {
-      console.error('Error initializing push notifications:', error);
+    } catch (error: any) {
+      // Silently handle errors - don't show to user
+      // Common errors: projectId mismatch, network issues, etc.
+      // These are not critical for app functionality
+      if (error?.message?.includes('projectId')) {
+        console.log('Note: Push notifications require correct projectId in app.json');
+      } else {
+        console.log('Note: Push notifications unavailable (non-critical)');
+      }
       return null;
     }
   }
