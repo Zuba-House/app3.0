@@ -45,9 +45,16 @@ const getGoogleClientId = (): string | null => {
     }
   }
   
-  // Try reading from app.json extra section
+  // Try reading from app.json extra section - use expoClientId (Expo standard)
   try {
-    const clientId = Constants.expoConfig?.extra?.googleClientId;
+    // First try expoClientId (Expo standard)
+    let clientId = Constants.expoConfig?.extra?.expoClientId;
+    
+    // Fallback to googleClientId for backward compatibility
+    if (!clientId) {
+      clientId = Constants.expoConfig?.extra?.googleClientId;
+    }
+    
     if (clientId && 
         typeof clientId === 'string' &&
         clientId !== 'YOUR_GOOGLE_CLIENT_ID_HERE' && 
