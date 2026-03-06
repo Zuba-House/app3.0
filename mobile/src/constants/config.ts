@@ -90,8 +90,8 @@ export const STORAGE_KEYS = {
 
 // App Constants
 export const PAGINATION = {
-  DEFAULT_PAGE_SIZE: 20,
-  MAX_PAGE_SIZE: 100,
+  DEFAULT_PAGE_SIZE: 50, // Increased to show more products
+  MAX_PAGE_SIZE: 200, // Increased max limit
 } as const;
 
 export const CART = {

@@ -21,7 +21,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { cartService } from '../../services/cart.service';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { selectCartItems, selectCartTotal, setCart } from '../../store/slices/cartSlice';
+import { selectCartItems, selectCartTotal, setCart, updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { CartItem } from '../../types/cart.types';
 import Colors from '../../constants/colors';
@@ -42,6 +42,7 @@ const CartScreen: React.FC = () => {
       if (isAuthenticated) {
         loadCart();
       } else {
+        // Guest cart: Use Redux store (already loaded)
         setLoading(false);
       }
     }, [isAuthenticated])
@@ -199,31 +200,8 @@ const CartScreen: React.FC = () => {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <View style={styles.emptyContainer}>
-        <View style={styles.emptyIconContainer}>
-          <Ionicons name="lock-closed-outline" size={64} color={Colors.secondary} />
-        </View>
-        <Text style={styles.emptyTitle}>Please Login</Text>
-        <Text style={styles.emptySubtitle}>
-          You need to be logged in to view your cart
-        </Text>
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => navigation.navigate('Auth', { screen: 'Login' })}
-        >
-          <Text style={styles.primaryButtonText}>Login</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
-        >
-          <Text style={styles.secondaryButtonText}>Continue Shopping</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // Guest checkout enabled - show cart even if not authenticated
+  // Cart items are stored in Redux store for guests
 
   if (cartItems.length === 0) {
     return (

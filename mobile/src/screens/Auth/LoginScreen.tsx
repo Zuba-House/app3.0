@@ -21,6 +21,7 @@ import { LoginCredentials } from '../../types/user.types';
 import { AuthStackParamList } from '../../navigation/AppNavigator';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Colors from '../../constants/colors';
+import { signInWithGoogle } from '../../utils/googleAuth';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -117,9 +118,6 @@ const LoginScreen: React.FC = () => {
     setError(null);
 
     try {
-      // Import Google auth helper
-      const { signInWithGoogle } = await import('../../utils/googleAuth');
-      
       // Start Google OAuth flow
       const googleResult = await signInWithGoogle();
 

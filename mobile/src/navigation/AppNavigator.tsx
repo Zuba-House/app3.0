@@ -37,6 +37,9 @@ import CheckoutScreen from '../screens/Checkout/CheckoutScreen';
 import PaymentScreen from '../screens/Checkout/PaymentScreen';
 import OrderConfirmationScreen from '../screens/Checkout/OrderConfirmationScreen';
 import AddAddressScreen from '../screens/Address/AddAddressScreen';
+import HelpSupportScreen from '../screens/Support/HelpSupportScreen';
+import AboutScreen from '../screens/About/AboutScreen';
+import NotificationsScreen from '../screens/Settings/NotificationsScreen';
 
 // Navigation Types
 export type RootStackParamList = {
@@ -70,6 +73,9 @@ export type MainStackParamList = {
   OrderConfirmation: { orderId: string; total: number };
   AddAddress: { onSave?: (address: any) => void; editAddress?: any };
   OrderDetail: { orderId: string };
+  HelpSupport: undefined;
+  About: undefined;
+  Notifications: undefined;
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -240,6 +246,21 @@ const MainNavigator = () => {
       <MainStack.Screen
         name="AddAddress"
         component={AddAddressScreen}
+        options={{ headerShown: false }}
+      />
+      <MainStack.Screen
+        name="HelpSupport"
+        component={HelpSupportScreen}
+        options={{ headerShown: false }}
+      />
+      <MainStack.Screen
+        name="About"
+        component={AboutScreen}
+        options={{ headerShown: false }}
+      />
+      <MainStack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
         options={{ headerShown: false }}
       />
     </MainStack.Navigator>

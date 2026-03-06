@@ -27,7 +27,7 @@ import { wishlistService } from '../../services/wishlist.service';
 import { Product } from '../../types/product.types';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectIsAuthenticated } from '../../store/slices/authSlice';
-import { setCart } from '../../store/slices/cartSlice';
+import { setCart, addItem } from '../../store/slices/cartSlice';
 import Colors from '../../constants/colors';
 import { addToRecentlyViewed } from '../../components/RecentlyViewed';
 import ProductCard from '../../components/ProductCard';
@@ -204,7 +204,7 @@ const ProductDetailScreen: React.FC = () => {
       } else if (brand) {
         response = await productService.getProductsByBrand(brand, 1, 10);
       } else {
-        response = await productService.getAllProducts({ limit: 10 });
+        response = await productService.getAllProducts({ limit: 20 }); // Show more related products
       }
       
       if ((response as any).success !== false && response.data) {
@@ -228,17 +228,8 @@ const ProductDetailScreen: React.FC = () => {
   };
 
   const handleAddToCart = async () => {
-    // Validation: Check authentication
-    if (!isAuthenticated) {
-      Alert.alert('Login Required', 'Please login to add items to cart', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Login',
-          onPress: () => navigation.navigate('Auth', { screen: 'Login' }),
-        },
-      ]);
-      return;
-    }
+    // Guest checkout enabled - allow adding to cart without login
+    // If not authenticated, we'll use local cart (Redux store)
 
     // Validation: Check product exists
     if (!product) {
@@ -287,33 +278,85 @@ const ProductDetailScreen: React.FC = () => {
       const variationId = selectedVariation?._id || undefined;
       const variationData = selectedVariation || undefined;
 
-      // Call API to add to cart
-      const response = await cartService.addToCart(
-        product._id,
-        quantity,
-        variationId,
-        variationData
-      );
+      // Calculate price
+      const price = selectedVariation?.salePrice || selectedVariation?.price || product.salePrice || product.price;
 
-      if (response.success) {
-        // Refresh cart from server to get latest state
-        try {
-          const cartResponse = await cartService.getCart();
-          if (cartResponse.success && cartResponse.data) {
-            dispatch(setCart(cartResponse.data));
+      if (isAuthenticated) {
+        // Authenticated user: Use API
+        const response = await cartService.addToCart(
+          product._id,
+          quantity,
+          variationId,
+          variationData
+        );
+
+        if (response.success) {
+          // Refresh cart from server to get latest state
+          try {
+            const cartResponse = await cartService.getCart();
+            if (cartResponse.success && cartResponse.data) {
+              dispatch(setCart(cartResponse.data));
+            }
+          } catch (cartError) {
+            console.error('Error refreshing cart:', cartError);
+            // Continue even if cart refresh fails
           }
-        } catch (cartError) {
-          console.error('Error refreshing cart:', cartError);
-          // Continue even if cart refresh fails
+
+          // Track analytics
+          try {
+            analyticsService.addToCart(product._id, product.name, price, quantity);
+          } catch (analyticsError) {
+            console.error('Error tracking analytics:', analyticsError);
+          }
+
+          // Show success message
+          const productName = product.name || 'Product';
+          const variationText = selectedVariation && product.productType === 'variable'
+            ? ` (${Object.values(selectedVariation.attributes || {}).join(', ')})`
+            : '';
+
+          Alert.alert(
+            '✅ Added to Cart',
+            `${productName}${variationText}\nQuantity: ${quantity}\n\nAdded to your cart successfully!`,
+            [
+              { text: 'Continue Shopping', style: 'cancel' },
+              {
+                text: 'View Cart',
+                onPress: () => navigation.navigate('Cart'),
+              },
+            ]
+          );
+        } else {
+          // Handle API error response
+          const errorMessage = response.message || response.error || 'Failed to add to cart';
+          
+          // Check for specific error types
+          if (errorMessage.toLowerCase().includes('stock') || errorMessage.toLowerCase().includes('available')) {
+            Alert.alert('Stock Issue', errorMessage);
+          } else if (errorMessage.toLowerCase().includes('variation') || errorMessage.toLowerCase().includes('option')) {
+            Alert.alert('Selection Required', errorMessage);
+          } else {
+            Alert.alert('Error', errorMessage);
+          }
         }
+      } else {
+        // Guest user: Use local Redux store
+        const cartItem = {
+          _id: `guest_${Date.now()}_${Math.random()}`,
+          product: product,
+          variation: variationData || undefined,
+          quantity: quantity,
+          price: price,
+          subtotal: price * quantity,
+        };
+
+        dispatch(addItem(cartItem));
 
         // Track analytics
         try {
-          const price = selectedVariation?.salePrice || selectedVariation?.price || product.salePrice || product.price;
           analyticsService.addToCart(product._id, product.name, price, quantity);
         } catch (analyticsError) {
           console.error('Error tracking analytics:', analyticsError);
-          // Continue even if analytics fails
         }
 
         // Show success message
@@ -324,7 +367,7 @@ const ProductDetailScreen: React.FC = () => {
 
         Alert.alert(
           '✅ Added to Cart',
-          `${productName}${variationText}\nQuantity: ${quantity}\n\nAdded to your cart successfully!`,
+          `${productName}${variationText}\nQuantity: ${quantity}\n\nAdded to your cart! You can checkout as a guest.`,
           [
             { text: 'Continue Shopping', style: 'cancel' },
             {
@@ -333,21 +376,6 @@ const ProductDetailScreen: React.FC = () => {
             },
           ]
         );
-
-        // Reset quantity to 1 after successful add (optional UX improvement)
-        // setQuantity(1);
-      } else {
-        // Handle API error response
-        const errorMessage = response.message || response.error || 'Failed to add to cart';
-        
-        // Check for specific error types
-        if (errorMessage.toLowerCase().includes('stock') || errorMessage.toLowerCase().includes('available')) {
-          Alert.alert('Stock Issue', errorMessage);
-        } else if (errorMessage.toLowerCase().includes('variation') || errorMessage.toLowerCase().includes('option')) {
-          Alert.alert('Selection Required', errorMessage);
-        } else {
-          Alert.alert('Error', errorMessage);
-        }
       }
     } catch (error: any) {
       console.error('Add to cart error:', error);

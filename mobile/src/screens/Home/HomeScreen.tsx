@@ -313,7 +313,7 @@ const HomeScreen: React.FC = () => {
       } else {
         // Frontend-only search - just show all products
         // No backend search calls to avoid level3 errors
-        response = await productService.getAllProducts({ limit: 20 });
+        response = await productService.getAllProducts({ limit: 50 }); // Load more products
       }
       
       if ((response as any).success !== false && response.data) {

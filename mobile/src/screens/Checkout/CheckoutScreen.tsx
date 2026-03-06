@@ -73,12 +73,9 @@ const CheckoutScreen: React.FC = () => {
   });
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigation.navigate('Auth', { screen: 'Login' });
-      return;
-    }
+    // Allow guest checkout - load data even if not authenticated
     loadInitialData();
-  }, [isAuthenticated]);
+  }, []);
 
   useEffect(() => {
     // Recalculate totals when shipping or discount changes
@@ -90,10 +87,14 @@ const CheckoutScreen: React.FC = () => {
   const loadInitialData = async () => {
     try {
       setLoading(true);
-      const [addressRes, shippingRes] = await Promise.all([
-        addressService.getAddresses(),
-        checkoutService.getShippingRates(),
-      ]);
+      
+      // Load addresses only if authenticated
+      const addressRes = isAuthenticated 
+        ? await addressService.getAddresses()
+        : { success: true, data: [] };
+      
+      // Shipping rates are available for everyone
+      const shippingRes = await checkoutService.getShippingRates();
 
       if (addressRes.success && addressRes.data) {
         const addressList = Array.isArray(addressRes.data) ? addressRes.data : [];
@@ -198,7 +199,18 @@ const CheckoutScreen: React.FC = () => {
   const handleNextStep = () => {
     if (currentStep === 'address') {
       if (!selectedAddress) {
-        Alert.alert('Address Required', 'Please select a shipping address');
+        // For guests, allow adding address
+        if (!isAuthenticated) {
+          navigation.navigate('AddAddress', {
+            onSave: (newAddress: Address) => {
+              setAddresses([newAddress]);
+              setSelectedAddress(newAddress);
+              setCurrentStep('shipping');
+            },
+          });
+          return;
+        }
+        Alert.alert('Address Required', 'Please select or add a shipping address');
         return;
       }
       setCurrentStep('shipping');

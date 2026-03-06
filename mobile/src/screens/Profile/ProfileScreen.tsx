@@ -87,20 +87,20 @@ const ProfileScreen: React.FC = () => {
       icon: 'notifications-outline',
       title: 'Notifications',
       subtitle: 'Manage notifications',
-      onPress: () => Alert.alert('Coming Soon', 'Notification settings coming soon'),
+      onPress: () => navigation.navigate('Notifications'),
       showArrow: true,
     },
     {
       icon: 'help-circle-outline',
       title: 'Help & Support',
       subtitle: 'FAQs and customer support',
-      onPress: () => Alert.alert('Coming Soon', 'Help center coming soon'),
+      onPress: () => navigation.navigate('HelpSupport'),
       showArrow: true,
     },
     {
       icon: 'information-circle-outline',
       title: 'About Zuba House',
-      onPress: () => Alert.alert('Zuba House', 'Version 1.0.0\n\nYour favorite African fashion marketplace'),
+      onPress: () => navigation.navigate('About'),
       showArrow: true,
     },
   ];
