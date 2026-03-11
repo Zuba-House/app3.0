@@ -44,40 +44,6 @@ import TrendingProducts from '../../components/TrendingProducts';
 const { width: SCREEN_WIDTH, width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 36) / 2; // 2 columns with tighter spacing (12px padding each side + 12px gap)
 
-// Brand configuration
-interface Brand {
-  id: string;
-  name: string;
-  logo: any; // require() for local assets
-  verified: boolean;
-}
-
-const BRANDS: Brand[] = [
-  {
-    id: 'NGOMA',
-    name: 'NGOMA',
-    logo: require('../../../assets/brands/ngoma.png'),
-    verified: true,
-  },
-  {
-    id: 'Afrolago',
-    name: 'Afrolago',
-    logo: require('../../../assets/brands/afrolago.jpg'),
-    verified: true,
-  },
-  {
-    id: 'KanyanaWorld',
-    name: 'KanyanaWorld',
-    logo: require('../../../assets/brands/KanyanaWorld.jpg'),
-    verified: true,
-  },
-  {
-    id: 'Kwesa',
-    name: 'Kwesa',
-    logo: require('../../../assets/brands/kwesa.jpg'),
-    verified: true,
-  },
-];
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -89,7 +55,6 @@ const HomeScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [selectedTab, setSelectedTab] = useState<string>('All');
   
@@ -112,7 +77,6 @@ const HomeScreen: React.FC = () => {
   // Quick reset to home - clear all filters (defined early for useFocusEffect)
   const handleResetToHome = useCallback(() => {
     setSelectedCategory(null);
-    setSelectedBrand(null);
     setSearchQuery('');
     setSelectedTab('All');
     // Smooth scroll to top
@@ -138,6 +102,46 @@ const HomeScreen: React.FC = () => {
     if (products.length === 0) return [];
     return [...products].slice(0, 4);
   }, [products]);
+
+  // Calculate trending products based on likes (wishlistCount) and purchases (totalSales)
+  const trendingProducts = useMemo(() => {
+    if (products.length === 0) return [];
+    
+    // Calculate trending score: wishlistCount + totalSales + views
+    const productsWithTrendingScore = products.map((product: any) => {
+      const wishlistCount = product.wishlistCount || 0;
+      const totalSales = product.totalSales || 0;
+      const views = product.views || 0;
+      const reviewCount = product.reviewCount || 0;
+      
+      // Trending score: weighted combination
+      // Likes (wishlist) are worth 2x, sales are worth 3x, views are worth 1x, reviews are worth 1.5x
+      const trendingScore = (wishlistCount * 2) + (totalSales * 3) + views + (reviewCount * 1.5);
+      
+      return {
+        ...product,
+        trendingScore,
+      };
+    });
+    
+    // Sort by trending score (highest first)
+    const sorted = productsWithTrendingScore.sort((a: any, b: any) => 
+      (b.trendingScore || 0) - (a.trendingScore || 0)
+    );
+    
+    // Return top 8 trending products
+    const trending = sorted.slice(0, 8);
+    
+    // If no products have any trending data (all scores are 0), use default (featured or top-rated)
+    if (trending.length > 0 && trending[0].trendingScore === 0) {
+      // Fallback to featured products or top-rated
+      return featuredProducts.length > 0 
+        ? featuredProducts.slice(0, 8)
+        : topRatedProducts.slice(0, 8);
+    }
+    
+    return trending;
+  }, [products, featuredProducts, topRatedProducts]);
   const [currentPromoIndex, setCurrentPromoIndex] = useState(0);
   const promoFlatListRef = useRef<FlatList>(null);
   const promoScrollX = useRef(new Animated.Value(0)).current;
@@ -230,7 +234,7 @@ const HomeScreen: React.FC = () => {
           }
 
           // If filters are active, reset them when returning to Home from another tab
-          if (selectedCategory || selectedBrand || searchQuery) {
+          if (selectedCategory || searchQuery) {
             handleResetToHome();
           } else {
             // Just scroll to top if no filters
@@ -253,7 +257,7 @@ const HomeScreen: React.FC = () => {
       return () => {
         clearTimeout(timer);
       };
-    }, [selectedCategory, selectedBrand, searchQuery, handleResetToHome])
+    }, [selectedCategory, searchQuery, handleResetToHome])
   );
 
   // Auto-slide promotional banners
@@ -302,14 +306,11 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  const loadProducts = async (categoryId?: string | null, search?: string, brand?: string | null) => {
+  const loadProducts = async (categoryId?: string | null, search?: string) => {
     try {
       let response;
       if (categoryId) {
         response = await productService.getProductsByCategory(categoryId, 1, 20);
-      } else if (brand) {
-        // Filter by brand using the filters endpoint
-        response = await productService.getProductsByBrand(brand, 1, 20);
       } else {
         // Frontend-only search - just show all products
         // No backend search calls to avoid level3 errors
@@ -357,12 +358,12 @@ const HomeScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    if (selectedCategory || searchQuery || selectedBrand) {
-      loadProducts(selectedCategory, searchQuery, selectedBrand);
+    if (selectedCategory || searchQuery) {
+      loadProducts(selectedCategory, searchQuery);
     } else {
       loadData();
     }
-  }, [selectedCategory, searchQuery, selectedBrand]);
+  }, [selectedCategory, searchQuery]);
 
   const loadCategories = async () => {
     try {
@@ -456,7 +457,6 @@ const HomeScreen: React.FC = () => {
     filterJustSetRef.current = true;
     
     setSelectedCategory(categoryId);
-    setSelectedBrand(null);
     setSearchQuery('');
     
     // Scroll to top to show filtered products
@@ -487,7 +487,6 @@ const HomeScreen: React.FC = () => {
     filterJustSetRef.current = true;
     
     setSelectedCategory(category._id);
-    setSelectedBrand(null);
     setSearchQuery('');
     setSelectedTab(category.name);
     
@@ -504,33 +503,7 @@ const HomeScreen: React.FC = () => {
     }, 1000);
   }, []);
 
-  const handleBrandPress = (brandId: string) => {
-    // Mark that filter was set intentionally
-    filterJustSetRef.current = true;
-    
-    setSelectedBrand(brandId);
-    setSelectedCategory(null);
-    setSearchQuery('');
-    setSelectedTab(brandId);
-    
-    // Scroll to top to show filtered products
-    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-    
-    // Use InteractionManager for smoother transition
-    InteractionManager.runAfterInteractions(() => {
-      loadProducts(null, undefined, brandId);
-    });
-    
-    // Reset the flag after a delay (in case useFocusEffect runs)
-    setTimeout(() => {
-      filterJustSetRef.current = false;
-    }, 1000);
-  };
 
-  const handleViewMoreBrands = () => {
-    // Navigate to brands screen
-    navigation.navigate('Brands');
-  };
 
   const renderCategoryItem = ({ item }: { item: Category }) => {
     // Safety check - ensure item is valid before rendering
@@ -664,45 +637,6 @@ const HomeScreen: React.FC = () => {
     );
   };
 
-  // Render brands grid section (2x2)
-  const renderBrandsGridSection = () => {
-    return (
-      <View style={styles.brandsGridSection}>
-        <View style={styles.brandsSectionHeader}>
-          <View style={styles.sectionHeaderLeft}>
-            <Text style={styles.sectionTitle}>Shop by Brands</Text>
-            <Text style={styles.sectionSubtitle}>Verified sellers</Text>
-          </View>
-          <TouchableOpacity onPress={handleViewMoreBrands} activeOpacity={0.7}>
-            <Text style={styles.viewMoreText}>View more</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.brandsGrid}>
-          {BRANDS.map((brand) => (
-            <TouchableOpacity
-              key={brand.id}
-              style={styles.brandGridItem}
-              onPress={() => handleBrandPress(brand.id)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.brandLogoContainer}>
-                <Image
-                  source={brand.logo}
-                  style={styles.brandLogo}
-                  contentFit="contain"
-                  cachePolicy="memory-disk"
-                  transition={100}
-                />
-              </View>
-              <Text style={styles.brandName} numberOfLines={1}>
-                {brand.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    );
-  };
 
   // Use actual categories for tabs
   const categoryTabs = [
@@ -881,10 +815,10 @@ const HomeScreen: React.FC = () => {
         {!selectedCategory && renderPromoBanner()}
 
         {/* Daily Check-In Banner - TEMU Style */}
-        {!selectedCategory && !selectedBrand && <DailyCheckIn />}
+        {!selectedCategory && <DailyCheckIn />}
 
         {/* Flash Sale - TEMU Style */}
-        {!selectedCategory && !selectedBrand && products.length > 0 && (
+        {!selectedCategory && products.length > 0 && (
           <FlashSale 
             products={products.slice(0, 8)} 
             title="Flash Sale"
@@ -892,35 +826,40 @@ const HomeScreen: React.FC = () => {
         )}
 
         {/* Deal of the Day - TEMU Style */}
-        {!selectedCategory && !selectedBrand && featuredProducts.length > 0 && (
+        {!selectedCategory && featuredProducts.length > 0 && (
           <DealOfTheDay product={featuredProducts[0]} />
         )}
 
-        {/* Brands Grid - 2x2 */}
-        {!selectedCategory && !selectedBrand && renderBrandsGridSection()}
+        {/* Trends Section - Based on customer likes and purchases */}
+        {!selectedCategory && trendingProducts.length > 0 && (
+          <TrendingProducts 
+            products={trendingProducts} 
+            title="Trends" 
+          />
+        )}
 
         {/* Category Deals - TEMU Style */}
-        {!selectedCategory && !selectedBrand && <CategoryDeals />}
+        {!selectedCategory && <CategoryDeals />}
 
         {/* Recently Viewed - TEMU Style */}
-        {!selectedCategory && !selectedBrand && <RecentlyViewed />}
+        {!selectedCategory && <RecentlyViewed />}
 
         {/* Featured Deals - Horizontal Scroll */}
-        {!selectedCategory && !selectedBrand && featuredProducts.length > 0 && renderHorizontalProductSection(
+        {!selectedCategory && featuredProducts.length > 0 && renderHorizontalProductSection(
           'Featured Deals',
           'Limited time offers',
           featuredProducts
         )}
 
         {/* Top Rated Products - Horizontal Scroll */}
-        {!selectedCategory && !selectedBrand && topRatedProducts.length > 0 && renderHorizontalProductSection(
+        {!selectedCategory && topRatedProducts.length > 0 && renderHorizontalProductSection(
           'Top Rated Finds',
           '4+ star products',
           topRatedProducts
         )}
 
         {/* New Arrivals Section */}
-        {!selectedCategory && !selectedBrand && newArrivalsProducts.length > 0 && (
+        {!selectedCategory && newArrivalsProducts.length > 0 && (
           <View style={styles.section}>
             {renderSectionHeader('Just In: New Arrivals', 'Fresh picks for you')}
             <FlatList
@@ -937,27 +876,21 @@ const HomeScreen: React.FC = () => {
         )}
 
         {/* Customer Favorites - Horizontal Scroll */}
-        {!selectedCategory && !selectedBrand && customerFavoritesProducts.length > 0 && renderHorizontalProductSection(
+        {!selectedCategory && customerFavoritesProducts.length > 0 && renderHorizontalProductSection(
           'Customer Favorites',
           'Most loved products',
           customerFavoritesProducts
         )}
 
-        {/* Trending Products - TEMU Style Grid */}
-        {!selectedCategory && !selectedBrand && products.length > 0 && (
-          <TrendingProducts products={products.slice(6, 12)} title="Trending Now" />
-        )}
 
         {/* Referral Banner - TEMU Style */}
         {!selectedCategory && !selectedBrand && <ReferralBanner rewardAmount={10} />}
 
-        {/* All Products Grid - Only show if category, brand selected or search active */}
-        {(selectedCategory || selectedBrand || searchQuery) && (
+        {/* All Products Grid - Only show if category selected or search active */}
+        {(selectedCategory || searchQuery) && (
           <View style={styles.section}>
             {renderSectionHeader(
-              selectedBrand
-                ? `${BRANDS.find(b => b.id === selectedBrand)?.name || selectedBrand} Products`
-                : selectedCategory
+              selectedCategory
                 ? `Products in ${categories.find(c => c?._id === selectedCategory)?.name || 'Category'}`
                 : `Search Results for "${searchQuery}"`,
               undefined,
@@ -1003,7 +936,7 @@ const HomeScreen: React.FC = () => {
         )}
 
         {/* All Products Grid - Show when no filters */}
-        {!selectedCategory && !selectedBrand && !searchQuery && products.length > 0 && (
+        {!selectedCategory && !searchQuery && products.length > 0 && (
           <View style={styles.section}>
             {renderSectionHeader('Shop All Products', 'Discover amazing deals')}
             <FlatList
@@ -1511,75 +1444,6 @@ const styles = StyleSheet.create({
   horizontalProductCardInner: {
     width: '100%',
     margin: 0,
-  },
-  brandsGridSection: {
-    marginTop: 20,
-    marginBottom: 8,
-    paddingHorizontal: 16,
-  },
-  brandsSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  brandsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  brandGridItem: {
-    width: (SCREEN_WIDTH - 48) / 2,
-    backgroundColor: Colors.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Platform.select({
-      ios: {
-        shadowColor: Colors.shadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  brandLogoContainer: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: Colors.tertiary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    overflow: 'hidden',
-    position: 'relative',
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-  },
-  brandLogo: {
-    width: '85%',
-    height: '85%',
-    borderRadius: 40,
-  },
-  brandName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.primary,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  viewMoreText: {
-    fontSize: 13,
-    color: Colors.secondary,
-    fontWeight: '600',
-    marginTop: 2,
   },
 });
 

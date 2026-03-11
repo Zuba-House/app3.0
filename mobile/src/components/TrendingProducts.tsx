@@ -44,9 +44,14 @@ const TrendingProducts: React.FC<TrendingProductsProps> = ({
       ? (imageUrl as any).url
       : imageUrl;
 
-    // Mock data for trending indicators
-    const viewCount = Math.floor(Math.random() * 5000) + 1000;
-    const trendingUp = Math.random() > 0.3;
+    // Real trending data from product
+    const viewCount = (item as any).views || 0;
+    const wishlistCount = (item as any).wishlistCount || 0;
+    const totalSales = (item as any).totalSales || 0;
+    const trendingScore = (wishlistCount * 2) + (totalSales * 3) + viewCount;
+    
+    // Determine if trending up based on actual data
+    const trendingUp = trendingScore > 10 || totalSales > 5;
 
     return (
       <TouchableOpacity
