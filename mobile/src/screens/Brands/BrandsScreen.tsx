@@ -163,8 +163,8 @@ const BrandsScreen: React.FC = () => {
         // Clean products and add ratings
         const productsWithReviews = productArray.map((product: any) => ({
           ...product,
-          rating: product.rating || Math.random() * 2 + 3.5,
-          reviewCount: product.reviewCount || Math.floor(Math.random() * 5000) + 100,
+          rating: product.rating || 0,
+          reviewCount: product.reviewCount || 0,
         }));
         
         setProducts(productsWithReviews);

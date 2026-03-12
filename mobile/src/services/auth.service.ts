@@ -30,7 +30,8 @@ export const authService = {
       credentials
     );
 
-    console.log('🔐 Login response:', JSON.stringify(response, null, 2));
+    // Logging disabled for production - uncomment for debugging
+    // console.log('🔐 Login response:', JSON.stringify(response, null, 2));
 
     // Backend returns: { success: true, error: false, message: "Login successfully", data: { accesstoken, refreshToken } }
     // Note: backend uses "accesstoken" (lowercase) not "accessToken"
@@ -55,9 +56,11 @@ export const authService = {
 
       // Fetch user details separately (backend doesn't return user in login response)
       try {
-        console.log('🔍 Fetching user details with token:', accessToken.substring(0, 20) + '...');
+        // Logging disabled for production - uncomment for debugging
+        // console.log('🔍 Fetching user details with token:', accessToken.substring(0, 20) + '...');
         const userResponse = await fetchDataFromApi<User>(API_ENDPOINTS.GET_CURRENT_USER);
-        console.log('👤 User details response:', JSON.stringify(userResponse, null, 2));
+        // Logging disabled for production - uncomment for debugging
+        // console.log('👤 User details response:', JSON.stringify(userResponse, null, 2));
         
         if (userResponse.success && userResponse.data) {
           await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userResponse.data));
@@ -258,7 +261,8 @@ export const authService = {
       }
     );
 
-    console.log('🔐 Google auth response:', JSON.stringify(response, null, 2));
+    // Logging disabled for production - uncomment for debugging
+    // console.log('🔐 Google auth response:', JSON.stringify(response, null, 2));
 
     if (response.success && response.data) {
       const data = response.data;

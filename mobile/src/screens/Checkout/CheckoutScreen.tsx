@@ -27,6 +27,7 @@ import { selectCartItems, selectCartTotal, clearCart } from '../../store/slices/
 import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import Colors from '../../constants/colors';
 import { analyticsService } from '../../services/analytics.service';
+import { showError } from '../../utils/toast';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -111,6 +112,7 @@ const CheckoutScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading checkout data:', error);
+      showError('Failed to load checkout information. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -26,6 +26,8 @@ import Colors from '../../constants/colors';
 import SearchBar from '../../components/SearchBar';
 import { API_URL } from '../../constants/config';
 import { analyticsService } from '../../services/analytics.service';
+import { showError } from '../../utils/toast';
+import { showError } from '../../utils/toast';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Responsive sidebar width - smaller on small screens
@@ -101,8 +103,8 @@ const SearchScreen: React.FC = () => {
           return {
             ...product,
             category: safeCategory,
-            rating: product.rating || Math.random() * 2 + 3.5,
-            reviewCount: product.reviewCount || Math.floor(Math.random() * 5000) + 100,
+            rating: product.rating || 0,
+            reviewCount: product.reviewCount || 0,
           };
         });
         setProducts(productsWithReviews);
@@ -110,6 +112,7 @@ const SearchScreen: React.FC = () => {
     } catch (error) {
       console.error('Error loading products:', error);
       setProducts([]);
+      showError('Failed to load products. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -121,7 +124,7 @@ const SearchScreen: React.FC = () => {
     if (query.trim()) {
       analyticsService.search(query.trim(), products.length);
     }
-    // Frontend-only search for now
+    // Search will be handled by useEffect that watches searchQuery
     if (!query.trim()) {
       loadAllProducts();
       return;
@@ -161,8 +164,8 @@ const SearchScreen: React.FC = () => {
           return {
             ...product,
             category: safeCategory,
-            rating: product.rating || Math.random() * 2 + 3.5,
-            reviewCount: product.reviewCount || Math.floor(Math.random() * 5000) + 100,
+            rating: product.rating || 0,
+            reviewCount: product.reviewCount || 0,
           };
         });
         setProducts(productsWithReviews);
@@ -209,7 +212,73 @@ const SearchScreen: React.FC = () => {
     );
   };
 
-  const filteredProducts = searchQuery.trim()
+  // Use search results if available, otherwise filter locally
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Update search when query changes
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      performSearch(searchQuery.trim());
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchQuery]);
+
+  const performSearch = async (query: string) => {
+    if (!query || query.trim() === '') {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const response = await productService.searchProducts(query);
+      
+      if (response.success && response.data) {
+        const productArray = Array.isArray(response.data)
+          ? response.data
+          : (response.data as any).products || [];
+        
+        // Clean products
+        const productsWithReviews = productArray.map((product: any) => {
+          let safeCategory: string | Category = '';
+          if (product.category) {
+            if (typeof product.category === 'object' && product.category !== null) {
+              safeCategory = product.category._id || '';
+            } else if (typeof product.category === 'string') {
+              safeCategory = product.category;
+            }
+          }
+          
+          return {
+            ...product,
+            category: safeCategory,
+            rating: product.rating || 0,
+            reviewCount: product.reviewCount || 0,
+          };
+        });
+        
+        setSearchResults(productsWithReviews);
+      } else {
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      showError('Search failed. Please try again.');
+      // Fallback to local filtering
+      const localResults = products.filter((p) =>
+        p.name.toLowerCase().includes(query.toLowerCase())
+      );
+      setSearchResults(localResults);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const filteredProducts = searchQuery.trim() && searchResults.length > 0
+    ? searchResults
+    : searchQuery.trim()
     ? products.filter((p) =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase())
       )

@@ -83,11 +83,13 @@ export const signInWithGoogle = async (): Promise<GoogleAuthResult> => {
       };
     }
 
-    console.log('🔐 Starting Google OAuth flow...');
-    console.log('Using Client ID:', expoClientId.substring(0, 20) + '...');
+    // Logging disabled for production - uncomment for debugging
+    // console.log('🔐 Starting Google OAuth flow...');
+    // console.log('Using Client ID:', expoClientId.substring(0, 20) + '...');
 
     const redirectUri = getRedirectUri();
-    console.log('🔐 Redirect URI:', redirectUri);
+    // Logging disabled for production - uncomment for debugging
+    // console.log('🔐 Redirect URI:', redirectUri);
 
     // Build Google OAuth URL
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +

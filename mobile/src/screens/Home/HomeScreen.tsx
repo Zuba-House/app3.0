@@ -25,12 +25,11 @@ import { productService } from '../../services/product.service';
 import { categoryService, Category } from '../../services/category.service';
 import { Product } from '../../types/product.types';
 import ProductCard from '../../components/ProductCard';
-import { useAppSelector } from '../../store/hooks';
-import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { Image } from 'expo-image';
 import Colors from '../../constants/colors';
 import SearchBar from '../../components/SearchBar';
 import { API_URL } from '../../constants/config';
+import { showError } from '../../utils/toast';
 
 // TEMU-style components
 import FlashSale from '../../components/FlashSale';
@@ -47,7 +46,6 @@ const CARD_WIDTH = (width - 36) / 2; // 2 columns with tighter spacing (12px pad
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
@@ -57,6 +55,11 @@ const HomeScreen: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [selectedTab, setSelectedTab] = useState<string>('All');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   
   // Cache for loaded data to avoid unnecessary reloads
   const dataCacheRef = useRef<{
@@ -301,26 +304,35 @@ const HomeScreen: React.FC = () => {
       dataCacheRef.current.lastLoad = Date.now();
     } catch (error) {
       console.error('Error loading data:', error);
+      showError('Failed to load data. Please pull down to refresh.');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadProducts = async (categoryId?: string | null, search?: string) => {
+  const loadProducts = async (categoryId?: string | null, search?: string, page: number = 1, append: boolean = false) => {
     try {
+      if (append) {
+        setLoadingMore(true);
+      }
+      
       let response;
+      const pageSize = 20; // Products per page
+      
       if (categoryId) {
-        response = await productService.getProductsByCategory(categoryId, 1, 20);
+        response = await productService.getProductsByCategory(categoryId, page, pageSize);
       } else {
-        // Frontend-only search - just show all products
-        // No backend search calls to avoid level3 errors
-        response = await productService.getAllProducts({ limit: 50 }); // Load more products
+        response = await productService.getAllProducts({ 
+          page, 
+          limit: pageSize 
+        });
       }
       
       if ((response as any).success !== false && response.data) {
         const productArray = Array.isArray(response.data)
           ? response.data
           : (response.data as any).products || [];
+        
         // Clean and ensure all products have reviews/ratings
         const productsWithReviews = productArray.map((product: any) => {
           // Clean category property - always convert to string ID
@@ -335,31 +347,67 @@ const HomeScreen: React.FC = () => {
           
           return {
             ...product,
-            category: safeCategory, // Replace with safe category
-            rating: product.rating || Math.random() * 2 + 3.5,
-            reviewCount: product.reviewCount || Math.floor(Math.random() * 5000) + 100,
+            category: safeCategory,
+            rating: product.rating || 0,
+            reviewCount: product.reviewCount || 0,
           };
         });
-        setProducts(productsWithReviews);
-        setFilteredProducts(productsWithReviews);
         
-        // Update cache if loading all products
-        if (!categoryId && !brand) {
+        if (append) {
+          // Append to existing products
+          setProducts(prev => [...prev, ...productsWithReviews]);
+          setFilteredProducts(prev => [...prev, ...productsWithReviews]);
+        } else {
+          // Replace products
+          setProducts(productsWithReviews);
+          setFilteredProducts(productsWithReviews);
+        }
+        
+        // Check if there are more products
+        const hasMoreProducts = productsWithReviews.length === pageSize;
+        setHasMore(hasMoreProducts);
+        setCurrentPage(page);
+        
+        // Update cache if loading all products (first page only)
+        if (!categoryId && page === 1) {
           dataCacheRef.current.allProducts = productsWithReviews;
         }
       } else {
-        // If no results, clear filtered products
-        setFilteredProducts([]);
+        // If no results
+        if (!append) {
+          setFilteredProducts([]);
+        }
+        setHasMore(false);
       }
     } catch (error) {
       console.error('Error loading products:', error);
-      setFilteredProducts([]);
+      if (!append) {
+        setFilteredProducts([]);
+        showError('Failed to load products. Please try again.');
+      }
+      setHasMore(false);
+    } finally {
+      if (append) {
+        setLoadingMore(false);
+      }
     }
   };
+  
+  // Load more products (for infinite scroll)
+  const loadMoreProducts = useCallback(() => {
+    if (!loadingMore && hasMore && !loading) {
+      const nextPage = currentPage + 1;
+      loadProducts(selectedCategory, searchQuery, nextPage, true);
+    }
+  }, [currentPage, hasMore, loadingMore, loading, selectedCategory, searchQuery]);
 
   useEffect(() => {
+    // Reset pagination when filters change
+    setCurrentPage(1);
+    setHasMore(true);
+    
     if (selectedCategory || searchQuery) {
-      loadProducts(selectedCategory, searchQuery);
+      loadProducts(selectedCategory, searchQuery, 1, false);
     } else {
       loadData();
     }
@@ -401,6 +449,7 @@ const HomeScreen: React.FC = () => {
     } catch (error) {
       console.error('Error loading categories:', error);
       setCategories([]); // Set empty array on error
+      // Don't show error for categories - it's not critical
     }
   };
 
@@ -424,8 +473,8 @@ const HomeScreen: React.FC = () => {
           return {
             ...product,
             category: safeCategory, // Replace with safe category
-            rating: product.rating || Math.random() * 2 + 3.5,
-            reviewCount: product.reviewCount || Math.floor(Math.random() * 5000) + 100,
+            rating: product.rating || 0,
+            reviewCount: product.reviewCount || 0,
           };
         });
         const featured = productsWithReviews.slice(0, 6);
@@ -435,21 +484,67 @@ const HomeScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading featured products:', error);
+      // Don't show error for featured products - it's not critical
     }
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    // Reset pagination
+    setCurrentPage(1);
+    setHasMore(true);
     await loadData(true); // Force refresh
     setRefreshing(false);
   };
 
-  const handleSearch = (query: string) => {
-    // Frontend-only search - just update query state
-    // No backend calls to avoid level3 errors
+  const handleSearch = async (query: string) => {
     setSearchQuery(query);
-    // Just reload all products (no filtering)
-    loadProducts();
+    
+    if (!query || query.trim() === '') {
+      // If search is empty, load all products
+      loadProducts();
+      return;
+    }
+    
+    try {
+      // Use backend search API
+      const response = await productService.searchProducts(query.trim());
+      
+      if (response.success && response.data) {
+        const productArray = Array.isArray(response.data)
+          ? response.data
+          : (response.data as any).products || [];
+        
+        // Clean products
+        const productsWithReviews = productArray.map((product: any) => {
+          let safeCategory: string | Category = '';
+          if (product.category) {
+            if (typeof product.category === 'object' && product.category !== null) {
+              safeCategory = product.category._id || '';
+            } else if (typeof product.category === 'string') {
+              safeCategory = product.category;
+            }
+          }
+          
+          return {
+            ...product,
+            category: safeCategory,
+            rating: product.rating || 0,
+            reviewCount: product.reviewCount || 0,
+          };
+        });
+        
+        setProducts(productsWithReviews);
+        setFilteredProducts(productsWithReviews);
+      } else {
+        setFilteredProducts([]);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      showError('Search failed. Please try again.');
+      // Fallback: load all products
+      loadProducts();
+    }
   };
 
   const handleCategorySelect = useCallback((categoryId: string | null) => {
@@ -884,7 +979,7 @@ const HomeScreen: React.FC = () => {
 
 
         {/* Referral Banner - TEMU Style */}
-        {!selectedCategory && !selectedBrand && <ReferralBanner rewardAmount={10} />}
+        {!selectedCategory && <ReferralBanner rewardAmount={10} />}
 
         {/* All Products Grid - Only show if category selected or search active */}
         {(selectedCategory || searchQuery) && (
@@ -950,6 +1045,16 @@ const HomeScreen: React.FC = () => {
               initialNumToRender={6}
               maxToRenderPerBatch={10}
               windowSize={10}
+              onEndReached={loadMoreProducts}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={
+                loadingMore ? (
+                  <View style={styles.loadingMoreContainer}>
+                    <ActivityIndicator size="small" color={Colors.secondary} />
+                    <Text style={styles.loadingMoreText}>Loading more...</Text>
+                  </View>
+                ) : null
+              }
               getItemLayout={(data, index) => ({
                 length: CARD_WIDTH + 12,
                 offset: (CARD_WIDTH + 12) * Math.floor(index / 2),
@@ -1444,6 +1549,17 @@ const styles = StyleSheet.create({
   horizontalProductCardInner: {
     width: '100%',
     margin: 0,
+  },
+  loadingMoreContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingMoreText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: Colors.primary,
+    opacity: 0.6,
   },
 });
 

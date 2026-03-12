@@ -44,18 +44,20 @@ const makeRequest = async <T = any>(
     }
 
     const fullUrl = `${API_URL}${url}`;
-    console.log('🌐 Making API request:', fullUrl);
-    console.log('📤 Request headers:', JSON.stringify(headers, null, 2));
-    console.log('📤 Request options:', JSON.stringify(options, null, 2));
+    // Logging disabled for production - uncomment for debugging
+    // console.log('🌐 Making API request:', fullUrl);
+    // console.log('📤 Request headers:', JSON.stringify(headers, null, 2));
+    // console.log('📤 Request options:', JSON.stringify(options, null, 2));
 
     const response = await fetch(fullUrl, {
       ...options,
       headers,
     });
 
-    console.log('📥 Response status:', response.status);
-    console.log('📥 Response ok:', response.ok);
-    console.log('📥 Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
+    // Logging disabled for production - uncomment for debugging
+    // console.log('📥 Response status:', response.status);
+    // console.log('📥 Response ok:', response.ok);
+    // console.log('📥 Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
 
     let data: any;
     try {
@@ -146,7 +148,8 @@ const makeRequest = async <T = any>(
       };
       
       data = cleanDataImmediately(rawData);
-      console.log('📥 Response data (cleaned):', JSON.stringify(data, null, 2));
+      // Logging disabled for production - uncomment for debugging
+      // console.log('📥 Response data (cleaned):', JSON.stringify(data, null, 2));
     } catch (parseError) {
       console.error('❌ JSON parse error:', parseError);
       throw new Error('Invalid response from server');

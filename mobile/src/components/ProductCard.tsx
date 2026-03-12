@@ -114,7 +114,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
   
   // Log for debugging
   if (!imageUrl) {
-    console.log('⚠️ No image found for product:', product.name, {
+    // Logging disabled for production - uncomment for debugging
+    // console.log('⚠️ No image found for product:', product.name, {
       hasImages: !!product.images,
       imagesLength: product.images?.length,
       hasImage: !!(product as any).image,
@@ -131,13 +132,15 @@ const ProductCard: React.FC<ProductCardProps> = ({
     : null;
 
   // Calculate sold count for display
-  const soldCount = (product as any).soldCount || product.reviewCount || Math.floor(Math.random() * 500) + 10;
+  const soldCount = (product as any).soldCount || (product as any).totalSales || product.reviewCount || 0;
   const soldText = soldCount >= 1000 
     ? `${(soldCount / 1000).toFixed(1)}K+ sold`
-    : `${soldCount} sold`;
+    : soldCount > 0
+    ? `${soldCount} sold`
+    : '';
 
   // Star rating display
-  const rating = product.rating || Math.random() * 1.5 + 3.5;
+  const rating = product.rating || 0;
   const fullStars = Math.floor(rating);
   const hasHalfStar = rating % 1 >= 0.5;
 

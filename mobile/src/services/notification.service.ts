@@ -64,7 +64,8 @@ class NotificationService {
       });
       
       this.expoPushToken = tokenData.data;
-      console.log('✅ Push notifications initialized');
+      // Logging disabled for production - uncomment for debugging
+      // console.log('✅ Push notifications initialized');
 
       // Configure Android notification channel
       if (Platform.OS === 'android') {
@@ -150,7 +151,8 @@ class NotificationService {
     // Listener for when notification is received while app is foregrounded
     this.notificationListener = Notifications.addNotificationReceivedListener(
       (notification) => {
-        console.log('Notification received:', notification);
+        // Logging disabled for production - uncomment for debugging
+        // console.log('Notification received:', notification);
         if (onNotification) {
           onNotification(notification);
         }
@@ -160,7 +162,8 @@ class NotificationService {
     // Listener for when user interacts with notification
     this.responseListener = Notifications.addNotificationResponseReceivedListener(
       (response) => {
-        console.log('Notification response:', response);
+        // Logging disabled for production - uncomment for debugging
+        // console.log('Notification response:', response);
         if (onNotificationResponse) {
           onNotificationResponse(response);
         }

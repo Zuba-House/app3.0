@@ -48,7 +48,8 @@ const LoginScreen: React.FC = () => {
       const credentials: LoginCredentials = { email, password };
       const response = await authService.login(credentials);
 
-      console.log('🔐 Login response received:', JSON.stringify(response, null, 2));
+      // Logging disabled for production - uncomment for debugging
+      // console.log('🔐 Login response received:', JSON.stringify(response, null, 2));
 
       // Check if we have access token (user might be empty initially)
       if (response && response.accessToken) {
@@ -140,7 +141,8 @@ const LoginScreen: React.FC = () => {
         mobile: googleResult.mobile,
       });
 
-      console.log('🔐 Google login response received:', JSON.stringify(response, null, 2));
+      // Logging disabled for production - uncomment for debugging
+      // console.log('🔐 Google login response received:', JSON.stringify(response, null, 2));
 
       // Check if we have access token
       if (response && response.accessToken) {

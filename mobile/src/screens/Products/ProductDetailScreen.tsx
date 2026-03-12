@@ -535,8 +535,8 @@ const ProductDetailScreen: React.FC = () => {
     ? Math.round(((originalPrice - displayPrice) / originalPrice) * 100)
     : 0;
   
-  const rating = product.rating || 4.5;
-  const reviewCount = product.reviewCount || Math.floor(Math.random() * 5000) + 100;
+  const rating = product.rating || 0;
+  const reviewCount = product.reviewCount || 0;
   const soldCount = Math.floor(reviewCount * 0.8);
   const stockStatus = currentStock > 0 && currentStock <= 10;
   const isOutOfStock = currentStock === 0;

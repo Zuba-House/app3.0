@@ -25,6 +25,7 @@ import { selectCartItems, selectCartTotal, setCart, updateQuantity, removeItem }
 import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { CartItem } from '../../types/cart.types';
 import Colors from '../../constants/colors';
+import { showError } from '../../utils/toast';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -57,6 +58,7 @@ const CartScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading cart:', error);
+      showError('Failed to load cart. Please try again.');
     } finally {
       setLoading(false);
     }

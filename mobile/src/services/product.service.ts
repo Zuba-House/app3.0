@@ -55,7 +55,8 @@ export const productService = {
         { query: query, page: 1, limit: 50 }
       );
       
-      console.log('🔍 Search response:', JSON.stringify(response, null, 2));
+      // Logging disabled for production - uncomment for debugging
+      // console.log('🔍 Search response:', JSON.stringify(response, null, 2));
       
       // Backend returns { success: true, products: [...] }
       if (response.success) {
