@@ -3,7 +3,7 @@
  * Multi-step checkout flow with address, shipping, and payment
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,10 +22,12 @@ import { addressService } from '../../services/address.service';
 import { checkoutService, CreateOrderData } from '../../services/checkout.service';
 import { cartService } from '../../services/cart.service';
 import { Address, ShippingMethod } from '../../types/address.types';
+import { ApiResponse } from '../../types/api.types';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectCartItems, selectCartTotal, clearCart } from '../../store/slices/cartSlice';
 import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import Colors from '../../constants/colors';
+import { getDeliveryEstimateForMethod } from '../../constants/shipping';
 import { analyticsService } from '../../services/analytics.service';
 import { showError } from '../../utils/toast';
 
@@ -39,6 +41,7 @@ const CheckoutScreen: React.FC = () => {
   const cartItems = useAppSelector(selectCartItems);
   const cartTotal = useAppSelector(selectCartTotal);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const shippingLocation = useAppSelector((state) => state.shippingLocation);
 
   // Checkout state
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('address');
@@ -51,7 +54,7 @@ const CheckoutScreen: React.FC = () => {
   const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<ShippingMethod | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'stripe'>('stripe');
-  
+
   // Coupon & Gift Card state
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; type: string } | null>(null);
@@ -84,6 +87,22 @@ const CheckoutScreen: React.FC = () => {
     const newTotals = checkoutService.calculateTotals(cartTotal, shippingCost, couponDiscount, giftCardDiscount);
     setTotals(newTotals);
   }, [cartTotal, selectedShipping, couponDiscount, giftCardDiscount]);
+
+  const hasNavigatedToAddAddressRef = useRef(false);
+  useEffect(() => {
+    if (loading || currentStep !== 'address') return;
+    if (addresses.length > 0) return;
+    if (hasNavigatedToAddAddressRef.current) return;
+    hasNavigatedToAddAddressRef.current = true;
+    navigation.navigate('AddAddress', {
+      isGuestCheckout: !isAuthenticated,
+      onSave: (newAddress: Address) => {
+        setAddresses([newAddress]);
+        setSelectedAddress(newAddress);
+        setCurrentStep('shipping');
+      },
+    });
+  }, [loading, currentStep, addresses.length, isAuthenticated, navigation]);
 
   const loadInitialData = async () => {
     try {
@@ -201,9 +220,9 @@ const CheckoutScreen: React.FC = () => {
   const handleNextStep = () => {
     if (currentStep === 'address') {
       if (!selectedAddress) {
-        // For guests, allow adding address
         if (!isAuthenticated) {
           navigation.navigate('AddAddress', {
+            isGuestCheckout: true,
             onSave: (newAddress: Address) => {
               setAddresses([newAddress]);
               setSelectedAddress(newAddress);
@@ -239,50 +258,76 @@ const CheckoutScreen: React.FC = () => {
       Alert.alert('Error', 'Please complete all checkout steps');
       return;
     }
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Log in to place order',
+        'Please log in or create an account to place your order. You can use the buttons above.',
+      );
+      return;
+    }
 
     try {
       setProcessing(true);
-
-      // Track checkout start
       analyticsService.checkoutStart(totals.total, cartItems.length);
 
-      // Create order first
+      let addressId = selectedAddress._id;
+      const isGuestAddress = !addressId || String(addressId).startsWith('guest-');
+      if (isGuestAddress) {
+        const payload = {
+          contactInfo: {
+            firstName: selectedAddress.name?.split(' ')[0] || '',
+            lastName: selectedAddress.name?.split(' ').slice(1).join(' ') || '',
+            phone: selectedAddress.phone || '',
+          },
+          address: {
+            addressLine1: selectedAddress.addressLine1,
+            addressLine2: selectedAddress.addressLine2 || '',
+            city: selectedAddress.city,
+            province: selectedAddress.state,
+            provinceCode: selectedAddress.state?.slice(0, 2)?.toUpperCase() || '',
+            postalCode: selectedAddress.postalCode,
+            country: selectedAddress.country,
+            countryCode: selectedAddress.countryCode || 'CA',
+          },
+        };
+        const addRes = await addressService.addAddress(payload as any);
+        if (addRes.success && addRes.data?._id) addressId = addRes.data._id;
+      }
+
       const orderData: CreateOrderData = {
-        shippingAddressId: selectedAddress._id,
+        shippingAddressId: addressId,
         shippingMethodId: selectedShipping._id,
         paymentMethod: paymentMethod,
         couponCode: appliedCoupon?.code || undefined,
         giftCardCode: appliedGiftCard?.code || undefined,
       };
-
       const orderResponse = await checkoutService.createOrder(orderData);
 
       if (orderResponse.success && orderResponse.data) {
-        // Navigate to payment screen with order info
+        const orderId = orderResponse.data._id || orderResponse.data.orderId;
         navigation.navigate('Payment', {
-          orderId: orderResponse.data._id || orderResponse.data.orderId,
+          orderId,
           amount: totals.total,
           onSuccess: () => {
-            // Track purchase
             analyticsService.purchase(
-              orderResponse.data._id || orderResponse.data.orderId,
+              orderId,
               totals.total,
               cartItems.map(item => ({
-                id: item.product?._id || item.productId,
-                name: item.product?.name || 'Unknown',
+                id: typeof item.product === 'object' ? item.product?._id : '',
+                name: typeof item.product === 'object' ? item.product?.name || 'Unknown' : 'Unknown',
                 price: item.price,
                 quantity: item.quantity,
               }))
             );
             dispatch(clearCart());
             navigation.navigate('OrderConfirmation', {
-              orderId: orderResponse.data._id || orderResponse.data.orderId,
+              orderId,
               total: totals.total,
             });
           },
         });
       } else {
-        Alert.alert('Error', orderResponse.message || 'Failed to create order');
+        Alert.alert('Error', (orderResponse as any).message || 'Failed to create order');
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to place order');
@@ -351,10 +396,26 @@ const CheckoutScreen: React.FC = () => {
       {addresses.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="location-outline" size={48} color={Colors.secondary} />
-          <Text style={styles.emptyText}>No addresses saved</Text>
-          <TouchableOpacity style={styles.addButton} onPress={handleAddAddress}>
+          <Text style={styles.emptyText}>
+            {isAuthenticated ? 'No addresses saved' : 'Add your shipping address'}
+          </Text>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={isAuthenticated ? handleAddAddress : () => {
+              navigation.navigate('AddAddress', {
+                isGuestCheckout: true,
+                onSave: (newAddress: Address) => {
+                  setAddresses([newAddress]);
+                  setSelectedAddress(newAddress);
+                  setCurrentStep('shipping');
+                },
+              });
+            }}
+          >
             <Ionicons name="add" size={20} color={Colors.white} />
-            <Text style={styles.addButtonText}>Add New Address</Text>
+            <Text style={styles.addButtonText}>
+              {isAuthenticated ? 'Add New Address' : 'Add Shipping Address'}
+            </Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -399,10 +460,15 @@ const CheckoutScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
           ))}
-
           <TouchableOpacity
             style={styles.addAddressLink}
-            onPress={handleAddAddress}
+            onPress={isAuthenticated ? handleAddAddress : () => navigation.navigate('AddAddress', {
+              isGuestCheckout: true,
+              onSave: (newAddress: Address) => {
+                setAddresses([...addresses, newAddress]);
+                setSelectedAddress(newAddress);
+              },
+            })}
           >
             <Ionicons name="add-circle-outline" size={20} color={Colors.secondary} />
             <Text style={styles.addAddressText}>Add New Address</Text>
@@ -415,6 +481,9 @@ const CheckoutScreen: React.FC = () => {
   const renderShippingStep = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Shipping Method</Text>
+      <Text style={styles.stepSubtitle}>
+        Zuba House Regular & Express
+      </Text>
 
       {shippingMethods.map((method) => (
         <TouchableOpacity
@@ -445,7 +514,9 @@ const CheckoutScreen: React.FC = () => {
             <Text style={styles.shippingDescription}>{method.description}</Text>
             <View style={styles.shippingMeta}>
               <Ionicons name="time-outline" size={14} color={Colors.primary} />
-              <Text style={styles.shippingEta}>{method.estimatedDays}</Text>
+              <Text style={styles.shippingEta}>
+                {getDeliveryEstimateForMethod(method._id, shippingLocation.countryCode)}
+              </Text>
               {method.carrier && (
                 <>
                   <Text style={styles.shippingDivider}>•</Text>
@@ -585,6 +656,30 @@ const CheckoutScreen: React.FC = () => {
   const renderReviewStep = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Order Review</Text>
+
+      {!isAuthenticated && (
+        <View style={styles.authBlock}>
+          <Text style={styles.authBlockTitle}>Log in or create an account to place your order</Text>
+          <View style={styles.authButtonsRow}>
+            <TouchableOpacity
+              style={styles.authButtonSecondary}
+              onPress={() => navigation.navigate('Auth', { screen: 'Login' })}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="log-in-outline" size={20} color={Colors.primary} />
+              <Text style={styles.authButtonSecondaryText}>Log in</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.authButtonPrimary}
+              onPress={() => navigation.navigate('Auth', { screen: 'Register' })}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="person-add-outline" size={20} color={Colors.white} />
+              <Text style={styles.authButtonPrimaryText}>Create account</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Shipping Address Summary */}
       <View style={styles.reviewSection}>
@@ -852,7 +947,65 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: Colors.primary,
+    marginBottom: 8,
+  },
+  stepSubtitle: {
+    fontSize: 13,
+    color: Colors.primary,
+    opacity: 0.7,
     marginBottom: 16,
+  },
+  authBlock: {
+    marginBottom: 16,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  authBlockTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+    marginBottom: 12,
+  },
+  authButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  authButtonSecondary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.white,
+  },
+  authButtonPrimary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+  },
+  authButtonSecondaryText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  authButtonPrimaryText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.white,
   },
   emptyState: {
     alignItems: 'center',

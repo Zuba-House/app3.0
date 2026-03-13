@@ -52,7 +52,7 @@ const cartSlice = createSlice({
       state.total = totals.total;
     },
     addItem: (state, action: PayloadAction<CartItem>) => {
-      const existingItem = state.items.find(
+      const existingIndex = state.items.findIndex(
         (item) => {
           if (item._id === action.payload._id) return true;
           if (typeof item.product === 'object' &&
@@ -66,11 +66,14 @@ const cartSlice = createSlice({
         }
       );
 
-      if (existingItem) {
+      if (existingIndex >= 0) {
+        const existingItem = state.items[existingIndex];
         existingItem.quantity += action.payload.quantity;
         existingItem.subtotal = existingItem.price * existingItem.quantity;
+        state.items.splice(existingIndex, 1);
+        state.items.unshift(existingItem);
       } else {
-        state.items.push(action.payload);
+        state.items.unshift(action.payload);
       }
 
       const totals = calculateTotals(state.items);

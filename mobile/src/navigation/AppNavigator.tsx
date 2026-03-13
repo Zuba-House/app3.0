@@ -13,11 +13,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { STORAGE_KEYS } from '../constants/config';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setCredentials } from '../store/slices/authSlice';
+import { setShippingLocation } from '../store/slices/shippingLocationSlice';
 import { User } from '../types/user.types';
 import Colors from '../constants/colors';
 import SplashScreen from '../components/SplashScreen';
 import { notificationService } from '../services/notification.service';
 import { analyticsService } from '../services/analytics.service';
+import { locationService } from '../services/location.service';
 
 // Screens
 import LoginScreen from '../screens/Auth/LoginScreen';
@@ -37,7 +39,10 @@ import CheckoutScreen from '../screens/Checkout/CheckoutScreen';
 import PaymentScreen from '../screens/Checkout/PaymentScreen';
 import OrderConfirmationScreen from '../screens/Checkout/OrderConfirmationScreen';
 import AddAddressScreen from '../screens/Address/AddAddressScreen';
+import SelectLocationScreen from '../screens/Address/SelectLocationScreen';
 import HelpSupportScreen from '../screens/Support/HelpSupportScreen';
+import ReturnPolicyScreen from '../screens/Support/ReturnPolicyScreen';
+import SafePaymentsPrivacyScreen from '../screens/Support/SafePaymentsPrivacyScreen';
 import AboutScreen from '../screens/About/AboutScreen';
 import NotificationsScreen from '../screens/Settings/NotificationsScreen';
 
@@ -72,8 +77,11 @@ export type MainStackParamList = {
   Payment: { orderId: string; amount: number; onSuccess?: () => void };
   OrderConfirmation: { orderId: string; total: number };
   AddAddress: { onSave?: (address: any) => void; editAddress?: any };
+  SelectLocation: undefined;
   OrderDetail: { orderId: string };
   HelpSupport: undefined;
+  ReturnPolicy: undefined;
+  SafePaymentsPrivacy: undefined;
   About: undefined;
   Notifications: undefined;
 };
@@ -249,8 +257,23 @@ const MainNavigator = () => {
         options={{ headerShown: false }}
       />
       <MainStack.Screen
+        name="SelectLocation"
+        component={SelectLocationScreen}
+        options={{ headerShown: false }}
+      />
+      <MainStack.Screen
         name="HelpSupport"
         component={HelpSupportScreen}
+        options={{ headerShown: false }}
+      />
+      <MainStack.Screen
+        name="ReturnPolicy"
+        component={ReturnPolicyScreen}
+        options={{ headerShown: false }}
+      />
+      <MainStack.Screen
+        name="SafePaymentsPrivacy"
+        component={SafePaymentsPrivacyScreen}
         options={{ headerShown: false }}
       />
       <MainStack.Screen
@@ -343,6 +366,36 @@ const AppNavigator: React.FC = () => {
     
     // Initialize analytics
     analyticsService.initialize();
+  }, [dispatch]);
+
+  // Load or auto-detect shipping location (non-blocking)
+  useEffect(() => {
+    const initShippingLocation = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(STORAGE_KEYS.SHIPPING_LOCATION);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.countryCode) {
+            dispatch(setShippingLocation(parsed));
+            return;
+          }
+        }
+        const loc = await locationService.getLocationFromIP();
+        if (loc) {
+          const state = {
+            countryCode: loc.countryCode,
+            countryName: loc.countryName,
+            region: loc.region ?? null,
+            city: loc.city ?? null,
+          };
+          dispatch(setShippingLocation(state));
+          await AsyncStorage.setItem(STORAGE_KEYS.SHIPPING_LOCATION, JSON.stringify(state));
+        }
+      } catch {
+        // ignore
+      }
+    };
+    initShippingLocation();
   }, [dispatch]);
 
   // Show beautiful animated splash screen

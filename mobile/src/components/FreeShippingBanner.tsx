@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../constants/colors';
+import { FREE_SHIPPING_THRESHOLD } from '../constants/config';
 
 interface FreeShippingBannerProps {
   currentTotal: number;
@@ -21,7 +22,7 @@ interface FreeShippingBannerProps {
 
 const FreeShippingBanner: React.FC<FreeShippingBannerProps> = ({
   currentTotal,
-  threshold = 50,
+  threshold = FREE_SHIPPING_THRESHOLD,
 }) => {
   const navigation = useNavigation<any>();
   const progress = Math.min((currentTotal / threshold) * 100, 100);

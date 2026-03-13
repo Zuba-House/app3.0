@@ -25,9 +25,10 @@ const analyticsRouter = Router();
 analyticsRouter.post('/track', async (req, res, next) => {
   try {
     const { event, properties, userId } = req.body;
-    
+    const isMobile = properties?.platform === 'mobile';
+
     // Store event in analytics model if available (for mobile app events)
-    if (event && properties && properties.platform === 'mobile') {
+    if (event && properties && isMobile) {
       try {
         const AnalyticsModel = (await import('../models/analytics.model.js')).default;
         await AnalyticsModel.create({
@@ -41,14 +42,15 @@ analyticsRouter.post('/track', async (req, res, next) => {
         // Silent fail - analytics shouldn't break the app
         console.warn('Analytics storage failed:', dbError.message);
       }
+      // Mobile app: don't call trackPageView (requires 'page') - return success
+      return res.json({ success: true, tracked: true });
     }
-    
-    // Call existing middleware for web tracking
+
+    // Web: call existing middleware for page-view tracking
     return trackPageView(req, res, next);
   } catch (error) {
     console.error('Error in analytics track:', error);
-    // Fallback to existing middleware
-    return trackPageView(req, res, next);
+    return res.status(500).json({ error: true, message: 'Tracking failed' });
   }
 });
 

@@ -47,8 +47,8 @@ export const API_ENDPOINTS = {
   CREATE_ORDER: '/api/order/create',
 
   // Address
-  GET_ADDRESSES: '/api/address',
-  ADD_ADDRESS: '/api/address',
+  GET_ADDRESSES: '/api/address/get',
+  ADD_ADDRESS: '/api/address/add',
   UPDATE_ADDRESS: '/api/address',
   DELETE_ADDRESS: '/api/address',
 
@@ -70,8 +70,12 @@ export const API_ENDPOINTS = {
   APPLY_GIFT_CARD: '/api/gift-cards/apply',
   GET_MY_GIFT_CARDS: '/api/gift-cards/my-cards',
 
-  // Shipping
+  // Shipping (rates + address/phone autocomplete, same as web via backend)
   GET_SHIPPING_RATES: '/api/shipping/rates',
+  ADDRESS_AUTOCOMPLETE: '/api/shipping/address-autocomplete',
+  ADDRESS_DETAILS: '/api/shipping/address-details',
+  PARSE_PHONE: '/api/shipping/parse-phone',
+  VALIDATE_PHONE: '/api/shipping/validate-phone',
 
   // Payment
   CREATE_PAYMENT_INTENT: '/api/stripe/create-payment-intent',
@@ -86,6 +90,7 @@ export const STORAGE_KEYS = {
   USER: 'user',
   CART: 'cart',
   RECENT_SEARCHES: 'recentSearches',
+  SHIPPING_LOCATION: 'shippingLocation',
 } as const;
 
 // App Constants
@@ -98,6 +103,9 @@ export const CART = {
   MAX_QUANTITY: 99,
   MIN_QUANTITY: 1,
 } as const;
+
+/** Order total above this amount (exclusive) gets free shipping */
+export const FREE_SHIPPING_THRESHOLD = 200;
 
 // Error Messages
 export const ERROR_MESSAGES = {

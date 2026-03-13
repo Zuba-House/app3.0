@@ -749,7 +749,6 @@ const HomeScreen: React.FC = () => {
           setSelectedTab(tab.name);
           if (tab.id) {
             setSelectedCategory(tab.id);
-            setSelectedBrand(null);
             setSearchQuery('');
             InteractionManager.runAfterInteractions(() => {
               loadProducts(tab.id);

@@ -33,7 +33,7 @@ const faqs: FAQ[] = [
   },
   {
     question: 'How long does shipping take?',
-    answer: 'Standard shipping takes 5-7 business days. Express shipping (2-3 days) is available at checkout. Delivery times may vary by location.',
+    answer: 'Zuba House. Delivery times depend on your location: Canada 1-5 business days, USA 4-7 business days. Zuba House Express is available at checkout for faster delivery.',
   },
   {
     question: 'Can I track my order?',
@@ -41,7 +41,7 @@ const faqs: FAQ[] = [
   },
   {
     question: 'What is your return policy?',
-    answer: 'We offer 30-day returns on unused items in original packaging. Items must be in original condition. See our full return policy for details.',
+    answer: '30-day free returns on unused items in original packaging. We do not accept returns after 30 days. Tap "Return Policy" on any product page for full details.',
   },
   {
     question: 'How do I contact customer support?',
@@ -123,6 +123,28 @@ const HelpSupportScreen: React.FC = () => {
             <View style={styles.contactContent}>
               <Text style={styles.contactTitle}>WhatsApp</Text>
               <Text style={styles.contactSubtitle}>Chat with us instantly</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.contactCard} onPress={() => navigation.navigate('ReturnPolicy')}>
+            <View style={styles.contactIcon}>
+              <Ionicons name="return-down-back-outline" size={24} color={Colors.secondary} />
+            </View>
+            <View style={styles.contactContent}>
+              <Text style={styles.contactTitle}>Return Policy</Text>
+              <Text style={styles.contactSubtitle}>30-day free returns · No returns after 30 days</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.contactCard} onPress={() => navigation.navigate('SafePaymentsPrivacy')}>
+            <View style={styles.contactIcon}>
+              <Ionicons name="shield-checkmark-outline" size={24} color={Colors.secondary} />
+            </View>
+            <View style={styles.contactContent}>
+              <Text style={styles.contactTitle}>Safe Payments & Privacy</Text>
+              <Text style={styles.contactSubtitle}>Encrypted payments · We protect your data</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
           </TouchableOpacity>

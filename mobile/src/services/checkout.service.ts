@@ -67,27 +67,27 @@ export const checkoutService = {
         data: [
           {
             _id: 'standard',
-            name: 'Standard Shipping',
-            description: 'Delivery in 5-7 business days',
+            name: 'Zuba House Regular',
+            description: 'Regular delivery',
             price: 4.99,
-            estimatedDays: '5-7 days',
-            carrier: 'Canada Post',
+            estimatedDays: '1-5 business days',
+            carrier: 'Zuba House',
           },
           {
             _id: 'express',
-            name: 'Express Shipping',
-            description: 'Delivery in 2-3 business days',
+            name: 'Zuba House Express',
+            description: 'Faster delivery',
             price: 9.99,
-            estimatedDays: '2-3 days',
-            carrier: 'FedEx',
+            estimatedDays: '1-3 business days',
+            carrier: 'Zuba House',
           },
           {
             _id: 'overnight',
-            name: 'Overnight Shipping',
-            description: 'Next business day delivery',
+            name: 'Zuba House Express (Overnight)',
+            description: 'Next business day',
             price: 19.99,
-            estimatedDays: '1 day',
-            carrier: 'UPS',
+            estimatedDays: '1 business day',
+            carrier: 'Zuba House',
           },
         ],
       };
@@ -181,10 +181,38 @@ export const checkoutService = {
   },
 
   /**
-   * Create order
+   * Create order (logged-in user with address ID)
    */
   createOrder: async (orderData: CreateOrderData): Promise<ApiResponse<any>> => {
     const response = await postData(API_ENDPOINTS.CREATE_ORDER, orderData);
+    return response;
+  },
+
+  /**
+   * Create order as guest (no auth, inline address and guest customer)
+   */
+  createGuestOrder: async (payload: {
+    products: Array<{ productId?: string; _id?: string; price: number; quantity: number; subTotal?: number }>;
+    shippingAddress: Record<string, any>;
+    guestCustomer: { name: string; email: string; phone: string };
+    totalAmt: number;
+    shippingCost: number;
+    shippingRate?: string;
+  }): Promise<ApiResponse<any>> => {
+    const response = await postData(API_ENDPOINTS.CREATE_ORDER, {
+      isGuestOrder: true,
+      products: payload.products.map((p) => ({
+        productId: p.productId || p._id,
+        price: p.price,
+        quantity: p.quantity,
+        subTotal: p.subTotal ?? p.price * p.quantity,
+      })),
+      shippingAddress: payload.shippingAddress,
+      guestCustomer: payload.guestCustomer,
+      totalAmt: payload.totalAmt,
+      shippingCost: payload.shippingCost,
+      shippingRate: payload.shippingRate,
+    });
     return response;
   },
 

@@ -25,6 +25,7 @@ import { selectCartItems, selectCartTotal, setCart, updateQuantity, removeItem }
 import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { CartItem } from '../../types/cart.types';
 import Colors from '../../constants/colors';
+import { FREE_SHIPPING_THRESHOLD } from '../../constants/config';
 import { showError } from '../../utils/toast';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -66,23 +67,23 @@ const CartScreen: React.FC = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadCart();
+    if (isAuthenticated) await loadCart();
     setRefreshing(false);
   };
 
-  const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
+  const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
     if (newQuantity < 1) {
       handleRemoveItem(itemId);
       return;
     }
-
-    try {
-      const response = await cartService.updateCartItem(itemId, newQuantity);
-      if (response.success) {
-        await loadCart();
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update quantity');
+    if (isAuthenticated) {
+      cartService.updateCartItem(itemId, newQuantity)
+        .then((response) => {
+          if (response.success) loadCart();
+        })
+        .catch(() => Alert.alert('Error', 'Failed to update quantity'));
+    } else {
+      dispatch(updateQuantity({ itemId, quantity: newQuantity }));
     }
   };
 
@@ -92,14 +93,15 @@ const CartScreen: React.FC = () => {
       {
         text: 'Remove',
         style: 'destructive',
-        onPress: async () => {
-          try {
-            const response = await cartService.removeFromCart(itemId);
-            if (response.success) {
-              await loadCart();
-            }
-          } catch (error) {
-            Alert.alert('Error', 'Failed to remove item');
+        onPress: () => {
+          if (isAuthenticated) {
+            cartService.removeFromCart(itemId)
+              .then((response) => {
+                if (response.success) loadCart();
+              })
+              .catch(() => Alert.alert('Error', 'Failed to remove item'));
+          } else {
+            dispatch(removeItem(itemId));
           }
         },
       },
@@ -238,11 +240,11 @@ const CartScreen: React.FC = () => {
       </View>
 
       {/* Free Shipping Progress */}
-      {total < 50 && (
+      {total < FREE_SHIPPING_THRESHOLD && (
         <View style={styles.shippingBanner}>
           <Ionicons name="gift-outline" size={18} color={Colors.secondary} />
           <Text style={styles.shippingText}>
-            Add ${(50 - total).toFixed(2)} more for <Text style={styles.shippingHighlight}>FREE shipping!</Text>
+            Add ${(FREE_SHIPPING_THRESHOLD - total).toFixed(2)} more for <Text style={styles.shippingHighlight}>FREE shipping!</Text>
           </Text>
         </View>
       )}

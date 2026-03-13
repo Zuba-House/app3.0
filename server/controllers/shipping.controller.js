@@ -1,5 +1,9 @@
 import { WAREHOUSE } from '../config/stallion.js';
 import * as shippingService from '../services/shipping.service.js';
+import axios from 'axios';
+
+const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
+const USER_AGENT = 'ZubaHouseBackend/1.0';
 
 /**
  * Get shipping rates
@@ -215,6 +219,207 @@ export const calculateShippingRates = async (req, res) => {
       message: 'Failed to calculate shipping rates',
       error: error.message
     });
+  }
+};
+
+const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_PLACES_API_KEY || '';
+
+/**
+ * Address autocomplete (same as web): Google Places when API key set, else Nominatim.
+ * GET /api/shipping/address-autocomplete?q=...
+ */
+function parseAddressFromNominatim(addr) {
+  if (!addr) return {};
+  const road = addr.road || '';
+  const houseNumber = addr.house_number || '';
+  const addressLine1 = `${houseNumber} ${road}`.trim() || addr.suburb || addr.village || addr.town || addr.city || '';
+  return {
+    addressLine1,
+    city: addr.city || addr.town || addr.village || addr.municipality || addr.county || '',
+    state: addr.state || addr.county || '',
+    postalCode: addr.postcode || '',
+    country: addr.country || '',
+    countryCode: (addr.country_code || '').toUpperCase(),
+  };
+}
+
+function parseAddressFromGooglePlace(result) {
+  if (!result || !result.address_components) return null;
+  const components = {};
+  result.address_components.forEach((c) => {
+    c.types.forEach((t) => {
+      if (!components[t]) components[t] = { long: c.long_name, short: c.short_name };
+    });
+  });
+  const city = components.locality?.long || components.administrative_area_level_2?.long || components.postal_town?.long || '';
+  const state = components.administrative_area_level_1?.long || '';
+  const stateCode = components.administrative_area_level_1?.short || '';
+  const country = components.country?.long || '';
+  const countryCode = (components.country?.short || '').toUpperCase();
+  const postalCode = (components.postal_code?.long || '').replace(/\s/g, '');
+  const streetNumber = components.street_number?.long || '';
+  const route = components.route?.long || '';
+  const addressLine1 = [streetNumber, route].filter(Boolean).join(' ').trim() || (result.formatted_address || '').split(',')[0] || '';
+  return {
+    displayName: result.formatted_address || '',
+    addressLine1,
+    city,
+    state: stateCode || state,
+    postalCode,
+    country,
+    countryCode,
+  };
+}
+
+export const addressAutocomplete = async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (q.length < 3) {
+      return res.json({ success: true, suggestions: [] });
+    }
+
+    if (GOOGLE_MAPS_API_KEY) {
+      const autocompleteUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(q)}&key=${GOOGLE_MAPS_API_KEY}`;
+      const { data: acData } = await axios.get(autocompleteUrl);
+      if (acData.status !== 'OK' && acData.status !== 'ZERO_RESULTS') {
+        return res.json({ success: true, suggestions: [] });
+      }
+      const predictions = acData.predictions || [];
+      if (predictions.length === 0) {
+        return res.json({ success: true, suggestions: [] });
+      }
+      const suggestions = predictions.slice(0, 5).map((p) => ({
+        placeId: p.place_id,
+        displayName: p.description || p.structured_formatting?.main_text || '',
+      }));
+      return res.json({ success: true, suggestions });
+    }
+
+    const url = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5`;
+    const { data } = await axios.get(url, {
+      headers: { 'Accept': 'application/json', 'User-Agent': USER_AGENT },
+    });
+    if (!Array.isArray(data)) {
+      return res.json({ success: true, suggestions: [] });
+    }
+    const suggestions = data.map((item) => {
+      const addr = item.address || {};
+      const parsed = parseAddressFromNominatim(addr);
+      return {
+        displayName: item.display_name || '',
+        addressLine1: parsed.addressLine1 || item.name || '',
+        city: parsed.city || '',
+        state: parsed.state || '',
+        postalCode: parsed.postalCode || '',
+        country: parsed.country || '',
+        countryCode: parsed.countryCode || '',
+      };
+    });
+    return res.json({ success: true, suggestions });
+  } catch (error) {
+    console.error('Address autocomplete error:', error?.message);
+    return res.status(500).json({ success: false, message: 'Address search failed' });
+  }
+};
+
+/**
+ * Get full address for a Google Place ID (used when user selects a Google suggestion).
+ * GET /api/shipping/address-details?place_id=...
+ */
+export const addressDetails = async (req, res) => {
+  try {
+    const placeId = (req.query.place_id || '').trim();
+    if (!placeId) {
+      return res.status(400).json({ success: false, message: 'place_id required' });
+    }
+    if (!GOOGLE_MAPS_API_KEY) {
+      return res.status(503).json({ success: false, message: 'Google Places not configured' });
+    }
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=address_components,formatted_address&key=${GOOGLE_MAPS_API_KEY}`;
+    const { data } = await axios.get(url);
+    if (data.status !== 'OK' || !data.result) {
+      return res.status(404).json({ success: false, message: 'Place not found' });
+    }
+    const parsed = parseAddressFromGooglePlace(data.result);
+    if (!parsed) {
+      return res.status(500).json({ success: false, message: 'Could not parse address' });
+    }
+    return res.json({ success: true, address: parsed });
+  } catch (error) {
+    console.error('Address details error:', error?.message);
+    return res.status(500).json({ success: false, message: 'Address details failed' });
+  }
+};
+
+/**
+ * Parse phone number: detect country (Canada, Rwanda, etc.) and return E.164 + national format
+ * POST /api/shipping/parse-phone
+ * Body: { phone: string } (digits with optional + prefix)
+ */
+export const parsePhone = async (req, res) => {
+  try {
+    const { phone } = req.body;
+    const raw = (phone != null && typeof phone === 'string') ? phone : '';
+
+    let parsePhoneNumberFromString;
+    try {
+      const lib = await import('libphonenumber-js');
+      parsePhoneNumberFromString = lib.parsePhoneNumberFromString;
+    } catch {
+      parsePhoneNumberFromString = null;
+    }
+
+    if (!parsePhoneNumberFromString) {
+      const digits = raw.replace(/\D/g, '');
+      const withPlus = digits.startsWith('+') ? raw.replace(/\D/g, '') : digits;
+      const valid = withPlus.length >= 10 && withPlus.length <= 15;
+      return res.json({
+        success: true,
+        valid,
+        countryCode: 'CA',
+        callingCode: '+1',
+        e164: valid ? (withPlus.startsWith('+') ? withPlus : `+${withPlus}`) : null,
+        national: digits.slice(-10),
+      });
+    }
+
+    const cleaned = raw.replace(/\D/g, '');
+    if (cleaned.length < 10) {
+      return res.json({
+        success: true,
+        valid: false,
+        countryCode: null,
+        callingCode: null,
+        e164: null,
+        national: null,
+      });
+    }
+
+    const withPlus = raw.trim().startsWith('+') ? `+${cleaned}` : `+${cleaned}`;
+    const parsed = parsePhoneNumberFromString(withPlus);
+    if (parsed && parsed.isValid()) {
+      const country = parsed.countryCallingCode;
+      return res.json({
+        success: true,
+        valid: true,
+        countryCode: parsed.country || 'CA',
+        callingCode: `+${country}`,
+        e164: parsed.number,
+        national: parsed.formatNational(),
+      });
+    }
+
+    return res.json({
+      success: true,
+      valid: false,
+      countryCode: null,
+      callingCode: null,
+      e164: null,
+      national: null,
+    });
+  } catch (error) {
+    console.error('Parse phone error:', error?.message);
+    return res.status(500).json({ success: false, message: 'Phone parse failed' });
   }
 };
 

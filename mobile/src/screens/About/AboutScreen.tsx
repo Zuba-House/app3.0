@@ -136,11 +136,11 @@ const AboutScreen: React.FC = () => {
             <Text style={styles.linkText}>Terms of Service</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.linkCard}>
-            <Text style={styles.linkText}>Privacy Policy</Text>
+          <TouchableOpacity style={styles.linkCard} onPress={() => navigation.navigate('SafePaymentsPrivacy')}>
+            <Text style={styles.linkText}>Safe Payments & Privacy</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.linkCard}>
+          <TouchableOpacity style={styles.linkCard} onPress={() => navigation.navigate('ReturnPolicy')}>
             <Text style={styles.linkText}>Return Policy</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
           </TouchableOpacity>
