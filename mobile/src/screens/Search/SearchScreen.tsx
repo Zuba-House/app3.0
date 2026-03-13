@@ -27,7 +27,6 @@ import SearchBar from '../../components/SearchBar';
 import { API_URL } from '../../constants/config';
 import { analyticsService } from '../../services/analytics.service';
 import { showError } from '../../utils/toast';
-import { showError } from '../../utils/toast';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Responsive sidebar width - smaller on small screens

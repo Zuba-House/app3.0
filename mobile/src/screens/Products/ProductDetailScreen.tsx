@@ -728,12 +728,12 @@ const ProductDetailScreen: React.FC = () => {
               {product.attributes && Array.isArray(product.attributes) && product.attributes.map((attribute) => {
                 if (!attribute || !attribute.values || !Array.isArray(attribute.values)) return null;
                 
-                const availableValues = new Set(
+                // Include all variation values so every option is selectable (show price/availability)
+                const allValues = new Set(
                   (product.variations || [])
-                    .filter(v => v && (v.stock || 0) > 0)
+                    .filter(v => v && v.attributes)
                     .map(v => {
                       const attrValue = v.attributes?.[attribute.name];
-                      // Handle both string and object formats
                       if (typeof attrValue === 'object' && attrValue !== null) {
                         return (attrValue as any)?.label || (attrValue as any)?.value || (attrValue as any)?.slug || String(attrValue);
                       }
@@ -741,6 +741,7 @@ const ProductDetailScreen: React.FC = () => {
                     })
                     .filter(Boolean) || []
                 );
+                const availableValues = allValues;
                 
                 return (
                   <View key={attribute._id || attribute.name} style={styles.attributeGroup}>
@@ -757,13 +758,12 @@ const ProductDetailScreen: React.FC = () => {
                           ? value 
                           : (value as any)?.valueId || (value as any)?.slug || valueString;
                         
-                        // Find variation with this attribute value
+                        // Find variation with this attribute value (any stock so option is selectable)
                         const matchingVariation = (product.variations || []).find(
                           v => {
-                            if (!v || !v.attributes || (v.stock || 0) <= 0) return false;
+                            if (!v || !v.attributes) return false;
                             const attrValue = v.attributes[attribute.name];
-                            // Compare both string and object formats
-                            return attrValue === valueString || 
+                            return attrValue === valueString ||
                                    attrValue === valueId ||
                                    (typeof attrValue === 'object' && (attrValue as any)?.label === valueString) ||
                                    (typeof value === 'object' && (value as any)?.valueId && attrValue === (value as any).valueId);
@@ -774,13 +774,20 @@ const ProductDetailScreen: React.FC = () => {
                                           (typeof selectedVariation?.attributes?.[attribute.name] === 'object' && 
                                            (selectedVariation.attributes[attribute.name] as any)?.label === valueString);
                         const isAvailable = availableValues.has(valueString) || availableValues.has(valueId) ||
-                                          Array.from(availableValues).some(v => {
+                                          Array.from(availableValues).some((v: any) => {
                                             if (typeof v === 'object') {
                                               return (v as any)?.label === valueString || (v as any)?.valueId === valueId;
                                             }
                                             return v === valueString || v === valueId;
                                           });
-                        
+                        const hasAnyInStock = (product.variations || []).some(
+                          v => v && v.attributes && (v.stock ?? 0) > 0 &&
+                            (v.attributes[attribute.name] === valueString ||
+                             v.attributes[attribute.name] === valueId ||
+                             (typeof v.attributes[attribute.name] === 'object' && (v.attributes[attribute.name] as any)?.label === valueString))
+                        );
+                        const isInStock = hasAnyInStock;
+
                         return (
                           <TouchableOpacity
                             key={valueId || valueString}
@@ -854,7 +861,7 @@ const ProductDetailScreen: React.FC = () => {
                             >
                               {valueString}
                             </Text>
-                            {!isAvailable && (
+                            {isAvailable && !isInStock && (
                               <Text style={styles.outOfStockLabel}>Out</Text>
                             )}
                           </TouchableOpacity>

@@ -116,12 +116,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
   if (!imageUrl) {
     // Logging disabled for production - uncomment for debugging
     // console.log('⚠️ No image found for product:', product.name, {
-      hasImages: !!product.images,
-      imagesLength: product.images?.length,
-      hasImage: !!(product as any).image,
-      hasImageUrl: !!(product as any).imageUrl,
-      productKeys: Object.keys(product),
-    });
+    //   hasImages: !!product.images,
+    //   imagesLength: product.images?.length,
+    //   hasImage: !!(product as any).image,
+    //   hasImageUrl: !!(product as any).imageUrl,
+    //   productKeys: Object.keys(product),
+    // });
   }
 
   // Calculate stock status for promotional banner (Temu style)
