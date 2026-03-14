@@ -241,7 +241,65 @@ export const authService = {
   },
 
   /**
-   * Google OAuth login/signup
+   * Google OAuth: send authorization code to backend (secure; client_secret stays on server).
+   */
+  loginWithGoogleCode: async (code: string, redirectUri: string): Promise<AuthResponse> => {
+    const response = await postData<any>(API_ENDPOINTS.GOOGLE_AUTH_CODE, {
+      code,
+      redirect_uri: redirectUri,
+    });
+
+    if (response.success && response.data) {
+      const data = response.data;
+      const accessToken = data.accessToken || data.accesstoken;
+      const refreshToken = data.refreshToken || data.refreshToken;
+      const userData = data.user;
+
+      if (!accessToken) {
+        throw new Error(response.message || 'Invalid Google auth response');
+      }
+
+      const itemsToStore: [string, string][] = [
+        [STORAGE_KEYS.ACCESS_TOKEN, accessToken],
+        [STORAGE_KEYS.REFRESH_TOKEN, refreshToken || ''],
+      ];
+      if (userData) {
+        itemsToStore.push([STORAGE_KEYS.USER, JSON.stringify(userData)]);
+      }
+      await AsyncStorage.multiSet(itemsToStore);
+
+      if (userData && userData._id && userData.email) {
+        return {
+          accessToken,
+          refreshToken: refreshToken || '',
+          user: userData as User,
+        };
+      }
+      try {
+        const userResponse = await fetchDataFromApi<User>(API_ENDPOINTS.GET_CURRENT_USER);
+        if (userResponse.success && userResponse.data) {
+          await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userResponse.data));
+          return {
+            accessToken,
+            refreshToken: refreshToken || '',
+            user: userResponse.data,
+          };
+        }
+      } catch {
+        // ignore
+      }
+      return {
+        accessToken,
+        refreshToken: refreshToken || '',
+        user: {} as User,
+      };
+    }
+
+    throw new Error(response.message || 'Google authentication failed');
+  },
+
+  /**
+   * Google OAuth login/signup (legacy: app sends profile; prefer loginWithGoogleCode).
    */
   loginWithGoogle: async (googleData: {
     name: string;
@@ -256,13 +314,10 @@ export const authService = {
         email: googleData.email,
         avatar: googleData.avatar,
         mobile: googleData.mobile,
-        password: '', // Not needed for Google auth
+        password: '',
         role: 'USER',
       }
     );
-
-    // Logging disabled for production - uncomment for debugging
-    // console.log('🔐 Google auth response:', JSON.stringify(response, null, 2));
 
     if (response.success && response.data) {
       const data = response.data;
@@ -273,16 +328,11 @@ export const authService = {
         throw new Error(response.message || 'Invalid Google auth response');
       }
 
-      // Store tokens
-      const itemsToStore: [string, string][] = [];
-      if (accessToken) itemsToStore.push([STORAGE_KEYS.ACCESS_TOKEN, accessToken]);
-      if (refreshToken) itemsToStore.push([STORAGE_KEYS.REFRESH_TOKEN, refreshToken]);
+      await AsyncStorage.multiSet([
+        [STORAGE_KEYS.ACCESS_TOKEN, accessToken],
+        [STORAGE_KEYS.REFRESH_TOKEN, refreshToken || ''],
+      ]);
 
-      if (itemsToStore.length > 0) {
-        await AsyncStorage.multiSet(itemsToStore);
-      }
-
-      // Fetch user details
       try {
         const userResponse = await fetchDataFromApi<User>(API_ENDPOINTS.GET_CURRENT_USER);
         if (userResponse.success && userResponse.data) {
@@ -305,6 +355,14 @@ export const authService = {
     }
 
     throw new Error(response.message || 'Google authentication failed');
+  },
+
+  /**
+   * Verify email OTP (after registration)
+   */
+  verifyEmail: async (email: string, otp: string): Promise<ApiResponse> => {
+    const response = await postData(API_ENDPOINTS.VERIFY_EMAIL, { email, otp });
+    return response;
   },
 
   /**

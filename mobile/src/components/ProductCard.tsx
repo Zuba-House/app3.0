@@ -169,17 +169,14 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </View>
         )}
         
-        {/* Promotional Tags - Temu Style */}
-        <View style={styles.badgesContainer}>
-          {discount > 0 && (
-            <View style={styles.valentineBadge}>
-              <Text style={styles.valentineText}>VALENTINE</Text>
+        {/* Sale badge - only for products on sale */}
+        {discount > 0 && (
+          <View style={styles.badgesContainer}>
+            <View style={styles.saleBadge}>
+              <Text style={styles.saleBadgeText}>ON SALE</Text>
             </View>
-          )}
-          <View style={styles.localBadge}>
-            <Text style={styles.localText}>Local</Text>
           </View>
-        </View>
+        )}
 
         {/* Promo Banner - Temu Style */}
         {showPromoBanner && promoText && (
@@ -280,30 +277,16 @@ const styles = StyleSheet.create({
     gap: 6,
     zIndex: 2,
   },
-  valentineBadge: {
+  saleBadge: {
     backgroundColor: '#E60012',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 4,
   },
-  valentineText: {
+  saleBadgeText: {
     color: Colors.white,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: 'bold',
-  },
-  localBadge: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  localText: {
-    color: Colors.white,
-    fontSize: 9,
-    fontWeight: '600',
   },
   promoBanner: {
     position: 'absolute',

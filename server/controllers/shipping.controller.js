@@ -274,28 +274,32 @@ function parseAddressFromGooglePlace(result) {
 export const addressAutocomplete = async (req, res) => {
   try {
     const q = (req.query.q || '').trim();
-    if (q.length < 3) {
+    if (q.length < 2) {
       return res.json({ success: true, suggestions: [] });
     }
 
     if (GOOGLE_MAPS_API_KEY) {
-      const autocompleteUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(q)}&key=${GOOGLE_MAPS_API_KEY}`;
+      const autocompleteUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(q)}&key=${GOOGLE_MAPS_API_KEY}&types=address`;
       const { data: acData } = await axios.get(autocompleteUrl);
-      if (acData.status !== 'OK' && acData.status !== 'ZERO_RESULTS') {
-        return res.json({ success: true, suggestions: [] });
+      const predictions = (acData.status === 'OK' && acData.predictions) ? acData.predictions : [];
+      if (predictions.length > 0) {
+        const suggestions = predictions.slice(0, 5).map((p) => ({
+          placeId: p.place_id,
+          displayName: p.description || p.structured_formatting?.main_text || '',
+        }));
+        return res.json({ success: true, suggestions });
       }
-      const predictions = acData.predictions || [];
-      if (predictions.length === 0) {
-        return res.json({ success: true, suggestions: [] });
+      if (acData.status === 'REQUEST_DENIED' || acData.status === 'OVER_QUERY_LIMIT') {
+        console.warn('Google Places:', acData.status, acData.error_message || '');
       }
-      const suggestions = predictions.slice(0, 5).map((p) => ({
-        placeId: p.place_id,
-        displayName: p.description || p.structured_formatting?.main_text || '',
-      }));
-      return res.json({ success: true, suggestions });
+      /* Fall through to Nominatim when Google returns no results (e.g. "119 chem Rivermead Gatineau") */
     }
 
-    const url = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5`;
+    let searchQ = q;
+    if (/\bchem\b/i.test(q) && !/\bchemin\b/i.test(q)) {
+      searchQ = q.replace(/\bchem\b/gi, 'chemin');
+    }
+    const url = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(searchQ)}&format=json&addressdetails=1&limit=8`;
     const { data } = await axios.get(url, {
       headers: { 'Accept': 'application/json', 'User-Agent': USER_AGENT },
     });

@@ -61,6 +61,10 @@ const userSchema = mongoose.Schema({
     otpExpires:{
         type:Date
     },
+    forgotPasswordVerifiedAt: {
+        type: Date,
+        default: null
+    },
     role: {
         type: String,
         enum: ['ADMIN', 'USER', 'VENDOR'],

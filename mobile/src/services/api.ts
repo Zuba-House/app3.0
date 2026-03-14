@@ -162,9 +162,10 @@ const makeRequest = async <T = any>(
       throw new Error(data.message || 'Request failed');
     }
 
-    // Handle token expiration (401)
+    // Handle token expiration (401) - retry once with new token to avoid infinite loop
     const retryHeader = (options.headers as Record<string, string>)?.['X-Retry'];
-    if (response.status === 401 && !retryHeader) {
+    const alreadyRetried = (options as any)._retry === true;
+    if (response.status === 401 && !retryHeader && !alreadyRetried) {
       if (isRefreshing) {
         // Queue requests while refreshing
         return new Promise<ApiResponse<T>>((resolve, reject) => {
@@ -215,24 +216,33 @@ const makeRequest = async <T = any>(
 
         const refreshData = (await refreshResponse.json()) as ApiResponse<{
           accessToken: string;
+          refreshToken?: string;
         }>;
 
         if (refreshData.success && refreshData.data?.accessToken) {
           const newAccessToken = refreshData.data.accessToken;
+          const newRefreshToken = refreshData.data.refreshToken;
           await AsyncStorage.setItem(
             STORAGE_KEYS.ACCESS_TOKEN,
             newAccessToken
           );
+          if (newRefreshToken) {
+            await AsyncStorage.setItem(
+              STORAGE_KEYS.REFRESH_TOKEN,
+              newRefreshToken
+            );
+          }
 
           processQueue(null, newAccessToken);
           isRefreshing = false;
 
-          // Retry original request
+          // Retry original request (mark as retry to prevent infinite loop)
           headers.Authorization = `Bearer ${newAccessToken}`;
           return makeRequest<T>(url, {
             ...options,
             headers: { ...headers, 'X-Retry': 'true' },
-          });
+            _retry: true,
+          } as RequestInit & { _retry?: boolean });
         } else {
           throw new Error('Failed to refresh token');
         }
@@ -279,6 +289,8 @@ const makeRequest = async <T = any>(
       responseData = data.result;
     } else if (data.user !== undefined) {
       responseData = data.user;
+    } else if (data.address !== undefined) {
+      responseData = data.address;
     } else if (!data.error && data.success !== false) {
       // If no error and success, data might be at root (but exclude error/success/message fields)
       const { error, success, message, total, page, totalPages, ...rest } = data;

@@ -23,6 +23,8 @@ export const API_ENDPOINTS = {
   GET_CURRENT_USER: '/api/user/user-details',
   UPDATE_PROFILE: '/api/user/me',
   GOOGLE_AUTH: '/api/user/authWithGoogle',
+  GOOGLE_AUTH_CODE: '/api/user/auth/google',
+  VERIFY_EMAIL: '/api/user/verifyEmail',
   FORGOT_PASSWORD: '/api/user/forgot-password',
   VERIFY_FORGOT_PASSWORD_OTP: '/api/user/verify-forgot-password-otp',
   RESET_PASSWORD: '/api/user/reset-password',
@@ -31,6 +33,8 @@ export const API_ENDPOINTS = {
   GET_ALL_PRODUCTS: '/api/product/getAllProducts',
   GET_PRODUCT: '/api/product',
   SEARCH_PRODUCTS: '/api/product/getAllProducts',
+  SEARCH: '/api/search',
+  SEARCH_IMAGE: '/api/search/image',
 
   // Categories
   GET_CATEGORIES: '/api/category',

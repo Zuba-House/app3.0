@@ -119,7 +119,6 @@ const LoginScreen: React.FC = () => {
     setError(null);
 
     try {
-      // Start Google OAuth flow
       const googleResult = await signInWithGoogle();
 
       if (!googleResult.success) {
@@ -127,19 +126,20 @@ const LoginScreen: React.FC = () => {
         return;
       }
 
-      // Check if we have required user info
-      if (!googleResult.email || !googleResult.name) {
-        setError('Unable to get user information from Google. Please try again.');
+      let response;
+      if (googleResult.code && googleResult.redirectUri) {
+        response = await authService.loginWithGoogleCode(googleResult.code, googleResult.redirectUri);
+      } else if (googleResult.email && googleResult.name) {
+        response = await authService.loginWithGoogle({
+          name: googleResult.name,
+          email: googleResult.email,
+          avatar: googleResult.avatar,
+          mobile: googleResult.mobile,
+        });
+      } else {
+        setError('Unable to complete Google sign in. Please try again.');
         return;
       }
-
-      // Call backend to authenticate with Google
-      const response = await authService.loginWithGoogle({
-        name: googleResult.name,
-        email: googleResult.email,
-        avatar: googleResult.avatar,
-        mobile: googleResult.mobile,
-      });
 
       // Logging disabled for production - uncomment for debugging
       // console.log('🔐 Google login response received:', JSON.stringify(response, null, 2));

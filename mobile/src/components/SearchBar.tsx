@@ -29,6 +29,11 @@ interface SearchBarProps {
   onFocus?: () => void;
   navigateToSearch?: boolean;
   showCart?: boolean;
+  /** Controlled: value and onChangeText for search input (e.g. Search screen) */
+  value?: string;
+  onChangeText?: (text: string) => void;
+  /** When set, shows Lens (camera) icon for image search */
+  onLensPress?: () => void;
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({
@@ -38,14 +43,24 @@ const SearchBar: React.FC<SearchBarProps> = ({
   onFocus,
   navigateToSearch = false,
   showCart = true,
+  value: controlledValue,
+  onChangeText: controlledOnChangeText,
+  onLensPress,
 }) => {
   const navigation = useNavigation<any>();
   const cartCount = useAppSelector(selectCartCount);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [internalQuery, setInternalQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
 
+  const isControlled = controlledValue !== undefined && controlledOnChangeText !== undefined;
+  const searchQuery = isControlled ? (controlledValue ?? '') : internalQuery;
+
   const handleSearchChange = (text: string) => {
-    setSearchQuery(text);
+    if (isControlled) {
+      controlledOnChangeText(text);
+    } else {
+      setInternalQuery(text);
+    }
   };
 
   const handleSearchSubmit = () => {
@@ -56,7 +71,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
   };
 
   const clearSearch = () => {
-    setSearchQuery('');
+    handleSearchChange('');
     onCategorySelect?.(null);
     onSearch?.('');
     Keyboard.dismiss();
@@ -207,6 +222,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  lensButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cartButton: {
     width: 44,

@@ -58,17 +58,22 @@ const RegisterScreen: React.FC = () => {
       const registerData: RegisterData = { name, email, password };
       const response = await authService.register(registerData);
 
-      if (response && response.user && response.accessToken) {
-        dispatch(
-          setCredentials({
-            user: response.user,
-            accessToken: response.accessToken,
-            refreshToken: response.refreshToken || '',
-          })
-        );
-        // Navigation will be handled by AppNavigator automatically
+      if (response && response.success !== false) {
+        const data = response as any;
+        if (data.user && data.accessToken) {
+          dispatch(
+            setCredentials({
+              user: data.user,
+              accessToken: data.accessToken,
+              refreshToken: data.refreshToken || '',
+            })
+          );
+        } else {
+          // Backend requires email verification: no tokens returned. Go to OTP screen.
+          navigation.navigate('VerifyOtp', { email, isEmailVerification: true });
+        }
       } else {
-        throw new Error('Invalid response from server');
+        throw new Error((response as any)?.message || 'Invalid response from server');
       }
     } catch (err: any) {
       console.error('Registration error:', err);

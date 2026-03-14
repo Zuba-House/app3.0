@@ -34,6 +34,7 @@ import addressRoutes from './route/address.route.js';
 import notificationRoutes from './route/notification.route.js';
 import orderTrackingRoutes from './route/orderTracking.route.js';
 import logoRoutes from './route/logo.route.js';
+import searchRoutes from './route/search.route.js';
 
 dotenv.config();
 
@@ -119,6 +120,7 @@ app.get('/api/health', (req, res) => {
 // API Routes
 app.use('/api/user', userRoutes);
 app.use('/api/product', productRoutes);
+app.use('/api/search', searchRoutes);
 app.use('/api/category', categoryRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/order', orderRoutes);

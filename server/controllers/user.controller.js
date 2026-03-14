@@ -6,6 +6,7 @@ import sendEmailFun from '../config/sendEmail.js';
 import VerificationEmail from '../utils/verifyEmailTemplate.js';
 import generatedAccessToken from '../utils/generatedAccessToken.js';
 import genertedRefreshToken from '../utils/generatedRefreshToken.js';
+import { checkOtpRateLimit } from '../utils/rateLimitOtp.js';
 
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
@@ -35,8 +36,8 @@ export async function registerUserController(request, response) {
         user = await UserModel.findOne({ email: email });
 
         if (user) {
-            return response.json({
-                message: "User already Registered with this email",
+            return response.status(409).json({
+                message: "Account already exists",
                 error: true,
                 success: false
             })
@@ -109,20 +110,18 @@ export async function verifyEmailController(request, response) {
             return response.status(400).json({ error: true, success: false, message: "User not found" });
         }
 
-        const isCodeValid = user.otp === otp;
-        const isNotExpired = user.otpExpires > Date.now();
-
-        if (isCodeValid && isNotExpired) {
-            user.verify_email = true;
-            user.otp = null;
-            user.otpExpires = null;
-            await user.save();
-            return response.status(200).json({ error: false, success: true, message: "Email verified successfully" });
-        } else if (!isCodeValid) {
+        if (!user.otp || String(user.otp) !== String(otp)) {
             return response.status(400).json({ error: true, success: false, message: "Invalid OTP" });
-        } else {
+        }
+        const expiresAt = user.otpExpires ? new Date(user.otpExpires).getTime() : 0;
+        if (expiresAt < Date.now()) {
             return response.status(400).json({ error: true, success: false, message: "OTP expired" });
         }
+        user.verify_email = true;
+        user.otp = null;
+        user.otpExpires = null;
+        await user.save();
+        return response.status(200).json({ success: true, error: false, message: "Email verified successfully" });
 
     } catch (error) {
         return response.status(500).json({
@@ -217,10 +216,142 @@ export async function authWithGoogle(request, response) {
             success: false
         })
     }
-
-
 }
 
+/**
+ * Google OAuth: exchange authorization code for tokens (server-side).
+ * Mobile sends { code, redirect_uri }; backend uses client_secret and returns app tokens.
+ */
+export async function authWithGoogleCode(request, response) {
+    try {
+        const { code, redirect_uri } = request.body;
+        if (!code) {
+            return response.status(400).json({
+                message: "Authorization code is required",
+                error: true,
+                success: false
+            });
+        }
+
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+        if (!clientId || !clientSecret) {
+            return response.status(500).json({
+                message: "Google OAuth not configured",
+                error: true,
+                success: false
+            });
+        }
+
+        const redirectUri = redirect_uri || `https://auth.expo.io/@olivierndev/${process.env.EXPO_SLUG || 'zuba-mobile'}`;
+
+        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                code,
+                client_id: clientId,
+                client_secret: clientSecret,
+                redirect_uri: redirectUri,
+                grant_type: 'authorization_code',
+            }),
+        });
+
+        if (!tokenRes.ok) {
+            const errData = await tokenRes.json().catch(() => ({}));
+            return response.status(400).json({
+                message: errData.error_description || "Failed to exchange code with Google",
+                error: true,
+                success: false
+            });
+        }
+
+        const tokenData = await tokenRes.json();
+        const accessToken = tokenData.access_token;
+        if (!accessToken) {
+            return response.status(400).json({
+                message: "No access token from Google",
+                error: true,
+                success: false
+            });
+        }
+
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!userInfoRes.ok) {
+            return response.status(400).json({
+                message: "Failed to fetch Google profile",
+                error: true,
+                success: false
+            });
+        }
+        const userInfo = await userInfoRes.json();
+        const email = userInfo.email;
+        const name = userInfo.name || userInfo.given_name || '';
+        const avatar = userInfo.picture || '';
+
+        if (!email) {
+            return response.status(400).json({
+                message: "Google account has no email",
+                error: true,
+                success: false
+            });
+        }
+
+        let user = await UserModel.findOne({ email });
+        if (!user) {
+            user = await UserModel.create({
+                name,
+                email,
+                password: 'null',
+                avatar,
+                verify_email: true,
+                signUpWithGoogle: true,
+                role: 'USER',
+            });
+        } else {
+            user.avatar = avatar || user.avatar;
+            user.name = name || user.name;
+            user.last_login_date = new Date();
+            await user.save();
+        }
+
+        const accesstoken = await generatedAccessToken(user._id);
+        const refreshToken = await genertedRefreshToken(user._id);
+
+        const cookiesOption = {
+            httpOnly: true,
+            secure: true,
+            sameSite: "None"
+        };
+        response.cookie('accessToken', accesstoken, cookiesOption);
+        response.cookie('refreshToken', refreshToken, cookiesOption);
+
+        return response.json({
+            message: "Login successfully",
+            error: false,
+            success: true,
+            data: {
+                accesstoken,
+                refreshToken,
+                user: {
+                    _id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    avatar: user.avatar,
+                    role: user.role,
+                }
+            }
+        });
+    } catch (error) {
+        return response.status(500).json({
+            message: error.message || error,
+            error: true,
+            success: false
+        });
+    }
+}
 
 export async function loginUserController(request, response) {
     try {
@@ -482,6 +613,15 @@ export async function forgotPasswordController(request, response) {
     try {
         const { email } = request.body
 
+        const rateLimit = checkOtpRateLimit(email);
+        if (!rateLimit.allowed) {
+            return response.status(429).json({
+                message: `Too many OTP requests. Try again in ${rateLimit.retryAfter} seconds.`,
+                error: true,
+                success: false
+            })
+        }
+
         const user = await UserModel.findOne({ email: email })
 
         if (!user) {
@@ -556,29 +696,26 @@ export async function verifyForgotPasswordOtp(request, response) {
             })
         }
 
-        if (otp !== user.otp) {
+        if (!user.otp || String(user.otp) !== String(otp)) {
             return response.status(400).json({
-                message: "Invailid OTP",
+                message: "Invalid OTP",
                 error: true,
                 success: false
             })
         }
 
-
-        const currentTime = new Date().toISOString()
-
-        if (user.otpExpires < currentTime) {
+        const expiresAt = user.otpExpires ? new Date(user.otpExpires).getTime() : 0;
+        if (expiresAt < Date.now()) {
             return response.status(400).json({
-                message: "Otp is expired",
+                message: "OTP expired",
                 error: true,
                 success: false
             })
         }
 
-
-        user.otp = "";
-        user.otpExpires = "";
-
+        user.forgotPasswordVerifiedAt = new Date();
+        user.otp = null;
+        user.otpExpires = null;
         await user.save();
 
         return response.status(200).json({
@@ -597,7 +734,7 @@ export async function verifyForgotPasswordOtp(request, response) {
 }
 
 
-//reset password
+//reset password (forgot-password flow: email + newPassword + confirmPassword; or change-password: + oldPassword)
 export async function resetpassword(request, response) {
     try {
         const { email, oldPassword, newPassword, confirmPassword } = request.body;
@@ -618,18 +755,36 @@ export async function resetpassword(request, response) {
             })
         }
 
-
-        if (user?.signUpWithGoogle === false) {
+        const isForgotFlow = !oldPassword;
+        if (isForgotFlow) {
+            if (!user.forgotPasswordVerifiedAt) {
+                return response.status(400).json({
+                    message: "Please verify OTP first (forgot password flow).",
+                    error: true,
+                    success: false
+                });
+            }
+            const verifiedAt = new Date(user.forgotPasswordVerifiedAt).getTime();
+            const fifteenMin = 15 * 60 * 1000;
+            if (Date.now() - verifiedAt > fifteenMin) {
+                user.forgotPasswordVerifiedAt = null;
+                await user.save();
+                return response.status(400).json({
+                    message: "Reset link expired. Please request a new OTP.",
+                    error: true,
+                    success: false
+                });
+            }
+        } else if (user?.signUpWithGoogle === false) {
             const checkPassword = await bcryptjs.compare(oldPassword, user.password);
             if (!checkPassword) {
                 return response.status(400).json({
-                    message: "your old password is wrong",
+                    message: "Your old password is wrong",
                     error: true,
                     success: false,
                 })
             }
         }
-
 
         if (newPassword !== confirmPassword) {
             return response.status(400).json({
@@ -644,6 +799,7 @@ export async function resetpassword(request, response) {
 
         user.password = hashPassword;
         user.signUpWithGoogle = false;
+        if (isForgotFlow) user.forgotPasswordVerifiedAt = null;
         await user.save();
 
         return response.json({
@@ -718,10 +874,10 @@ export async function changePasswordController(request, response) {
 }
 
 
-//refresh token controler
+//refresh token controller (with rotation: new access + new refresh, old refresh invalidated)
 export async function refreshToken(request, response) {
     try {
-        const refreshToken = request.cookies.refreshToken || request?.headers?.authorization?.split(" ")[1]  /// [ Bearer token]
+        const refreshToken = request.cookies?.refreshToken || request?.headers?.authorization?.split(" ")[1];
 
         if (!refreshToken) {
             return response.status(401).json({
@@ -731,37 +887,53 @@ export async function refreshToken(request, response) {
             })
         }
 
-
-        const verifyToken = await jwt.verify(refreshToken, process.env.SECRET_KEY_REFRESH_TOKEN)
-        if (!verifyToken) {
+        const decoded = jwt.verify(refreshToken, process.env.SECRET_KEY_REFRESH_TOKEN);
+        const userId = decoded?.id || decoded?.userId || decoded?._id;
+        if (!userId) {
             return response.status(401).json({
-                message: "token is expired",
+                message: "Invalid token",
                 error: true,
                 success: false
             })
         }
 
-        const userId = verifyToken?._id;
-        const newAccessToken = await generatedAccessToken(userId)
+        const user = await UserModel.findById(userId).select('refresh_token');
+        if (user?.refresh_token && user.refresh_token !== refreshToken) {
+            return response.status(401).json({
+                message: "Refresh token invalidated",
+                error: true,
+                success: false
+            })
+        }
+
+        const newAccessToken = await generatedAccessToken(userId);
+        const newRefreshToken = await genertedRefreshToken(userId);
 
         const cookiesOption = {
             httpOnly: true,
             secure: true,
             sameSite: "None"
         }
-
-        response.cookie('accessToken', newAccessToken, cookiesOption)
+        response.cookie('accessToken', newAccessToken, cookiesOption);
+        response.cookie('refreshToken', newRefreshToken, cookiesOption);
 
         return response.json({
-            message: "New Access token generated",
+            message: "Tokens refreshed",
             error: false,
             success: true,
             data: {
-                accessToken: newAccessToken
+                accessToken: newAccessToken,
+                refreshToken: newRefreshToken
             }
         })
-
     } catch (error) {
+        if (error.name === 'TokenExpiredError' || error.name === 'JsonWebTokenError') {
+            return response.status(401).json({
+                message: "Token expired or invalid",
+                error: true,
+                success: false
+            })
+        }
         return response.status(500).json({
             message: error.message || error,
             error: true,

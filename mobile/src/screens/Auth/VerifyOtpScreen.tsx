@@ -20,7 +20,7 @@ import Colors from '../../constants/colors';
 const VerifyOtpScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { email } = route.params || {};
+  const { email, isEmailVerification } = route.params || {};
 
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,15 +42,26 @@ const VerifyOtpScreen: React.FC = () => {
     setError(null);
 
     try {
-      const response = await authService.verifyForgotPasswordOtp(email, otp);
-      if (response.success) {
-        setVerified(true);
-        // Navigate to reset password screen
-        setTimeout(() => {
-          navigation.navigate('ResetPassword', { email });
-        }, 1500);
+      if (isEmailVerification) {
+        const response = await authService.verifyEmail(email, otp);
+        if (response && (response as any).success !== false) {
+          setVerified(true);
+          setTimeout(() => {
+            navigation.replace('Login');
+          }, 1500);
+        } else {
+          setError((response as any)?.message || 'Invalid OTP');
+        }
       } else {
-        setError(response.message || 'Invalid OTP');
+        const response = await authService.verifyForgotPasswordOtp(email, otp);
+        if (response.success) {
+          setVerified(true);
+          setTimeout(() => {
+            navigation.navigate('ResetPassword', { email });
+          }, 1500);
+        } else {
+          setError(response.message || 'Invalid OTP');
+        }
       }
     } catch (err: any) {
       console.error('Verify OTP error:', err);
@@ -69,7 +80,9 @@ const VerifyOtpScreen: React.FC = () => {
         <View style={styles.content}>
           <Text style={styles.title}>Verify OTP</Text>
           <Text style={styles.subtitle}>
-            Enter the OTP sent to {email || 'your email'}
+            {isEmailVerification
+              ? `Enter the verification code sent to ${email || 'your email'}`
+              : `Enter the OTP sent to ${email || 'your email'}`}
           </Text>
 
           {error && (

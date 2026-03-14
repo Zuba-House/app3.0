@@ -10,7 +10,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { STORAGE_KEYS } from '../constants/config';
+import { STORAGE_KEYS, API_ENDPOINTS } from '../constants/config';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setCredentials } from '../store/slices/authSlice';
 import { setShippingLocation } from '../store/slices/shippingLocationSlice';
@@ -56,7 +56,7 @@ export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
   ForgotPassword: undefined;
-  VerifyOtp: { email: string };
+  VerifyOtp: { email: string; isEmailVerification?: boolean };
   ResetPassword: { email: string };
 };
 
@@ -298,47 +298,46 @@ const AppNavigator: React.FC = () => {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    // Check if user is logged in on app start (silently, don't block UI)
+    // Auth rehydration: restore session from AsyncStorage on app launch
     const checkAuth = async () => {
       try {
         const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+        const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
         const userJson = await AsyncStorage.getItem(STORAGE_KEYS.USER);
 
-        // Only set credentials if both token and user exist
-        if (token && userJson) {
-          try {
-            const user = JSON.parse(userJson) as User;
-            // Validate user object has required fields
-            if (user && user._id && user.email) {
-              dispatch(
-                setCredentials({
-                  user,
-                  accessToken: token,
-                  refreshToken: (await AsyncStorage.getItem(
-                    STORAGE_KEYS.REFRESH_TOKEN
-                  )) || '',
-                })
-              );
-              // Initialize analytics with user ID
-              analyticsService.initialize(user._id);
-            } else {
-              // Invalid user data, clear storage
-              await AsyncStorage.multiRemove([
-                STORAGE_KEYS.ACCESS_TOKEN,
-                STORAGE_KEYS.REFRESH_TOKEN,
-                STORAGE_KEYS.USER,
-              ]);
+        if (token) {
+          let user: User | null = null;
+          if (userJson) {
+            try {
+              const parsed = JSON.parse(userJson) as User;
+              if (parsed && parsed._id && parsed.email) user = parsed;
+            } catch {
+              // invalid JSON
             }
-          } catch (parseError) {
-            // Invalid JSON, clear storage
-            await AsyncStorage.multiRemove([
-              STORAGE_KEYS.ACCESS_TOKEN,
-              STORAGE_KEYS.REFRESH_TOKEN,
-              STORAGE_KEYS.USER,
-            ]);
+          }
+          if (!user) {
+            try {
+              const { fetchDataFromApi } = await import('../services/api');
+              const userResponse = await fetchDataFromApi<User>(API_ENDPOINTS.GET_CURRENT_USER);
+              if (userResponse.success && userResponse.data) {
+                user = userResponse.data;
+                await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+              }
+            } catch {
+              // token may be expired; keep storage, will 401 on first request and refresh
+            }
+          }
+          if (user) {
+            dispatch(
+              setCredentials({
+                user,
+                accessToken: token,
+                refreshToken: refreshToken || '',
+              })
+            );
+            analyticsService.initialize(user._id);
           }
         }
-        // No token = user can browse but not authenticated
       } catch (error) {
         console.error('Error checking auth:', error);
       } finally {

@@ -20,6 +20,9 @@ WebBrowser.maybeCompleteAuthSession();
 
 export interface GoogleAuthResult {
   success: boolean;
+  /** When using backend code exchange, only code + redirectUri are set */
+  code?: string;
+  redirectUri?: string;
   email?: string;
   name?: string;
   avatar?: string;
@@ -123,84 +126,12 @@ export const signInWithGoogle = async (): Promise<GoogleAuthResult> => {
         };
       }
 
-      // Exchange code for access token
-      // Note: This will fail without client_secret - backend should handle this
-      try {
-        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            code,
-            client_id: expoClientId,
-            grant_type: 'authorization_code',
-            redirect_uri: redirectUri,
-            // client_secret is required but should NOT be in mobile app
-            // Backend should handle this exchange
-          }),
-        });
-
-        if (!tokenResponse.ok) {
-          const errorData = await tokenResponse.json();
-          
-          // If we get an error about missing client_secret, provide helpful message
-          if (errorData.error === 'invalid_client' || 
-              errorData.error_description?.includes('client_secret') ||
-              errorData.error === 'invalid_request') {
-            return {
-              success: false,
-              error: 'Google OAuth requires backend configuration to exchange authorization code. Please contact support or use email/password login.',
-            };
-          }
-          
-          throw new Error(errorData.error_description || 'Failed to exchange code for token');
-        }
-
-        const tokenData = await tokenResponse.json();
-        const accessToken = tokenData.access_token;
-
-        if (!accessToken) {
-          throw new Error('No access token received from Google');
-        }
-
-        // Get user info from Google
-        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-
-        if (!userInfoResponse.ok) {
-          throw new Error('Failed to fetch user info from Google');
-        }
-
-        const userInfo = await userInfoResponse.json();
-
-        return {
-          success: true,
-          email: userInfo.email,
-          name: userInfo.name || userInfo.given_name || '',
-          avatar: userInfo.picture,
-          mobile: userInfo.phone_number || undefined,
-        };
-      } catch (exchangeError: any) {
-        console.error('Error exchanging code for user info:', exchangeError);
-        
-        // Provide helpful error message
-        if (exchangeError.message?.includes('client_secret') || 
-            exchangeError.message?.includes('backend configuration')) {
-          return {
-            success: false,
-            error: 'Google OAuth requires backend configuration. Please contact support or use email/password login.',
-          };
-        }
-        
-        return {
-          success: false,
-          error: exchangeError.message || 'Failed to complete Google login. Please try again or use email/password.',
-        };
-      }
+      // Return code to app; backend will exchange with client_secret and return app tokens.
+      return {
+        success: true,
+        code,
+        redirectUri,
+      };
     }
 
     if (result.type === 'cancel' || result.type === 'dismiss') {

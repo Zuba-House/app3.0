@@ -63,33 +63,51 @@ export async function reverseGeocode(
   }
 }
 
+const ADDRESS_CACHE_MAX = 50;
+const addressSearchCache = new Map<string, AddressSuggestion[]>();
+
 /**
  * Search addresses by query (for "Search address" autocomplete).
- * Uses backend API (same as web) when API_URL is set; fallback to Nominatim.
- * Only runs when user starts typing address (call with query length >= 3).
+ * Uses backend API (Google Places + Nominatim fallback); caches results for performance.
+ * Debounce 300ms at call site. Min query length 2.
  */
 export async function searchAddress(query: string): Promise<AddressSuggestion[]> {
-  if (!query || query.trim().length < 3) return [];
+  if (!query || query.trim().length < 2) return [];
   const q = query.trim();
+  const cached = addressSearchCache.get(q);
+  if (cached !== undefined) return cached;
+  let result: AddressSuggestion[] = [];
   try {
     if (API_URL && API_ENDPOINTS.ADDRESS_AUTOCOMPLETE) {
       const url = `${API_URL}${API_ENDPOINTS.ADDRESS_AUTOCOMPLETE}?q=${encodeURIComponent(q)}`;
       const res = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' } });
       const json = await res.json();
-      if (json?.success && Array.isArray(json.suggestions)) return json.suggestions;
+      if (json?.success && Array.isArray(json.suggestions)) {
+        result = json.suggestions;
+        if (addressSearchCache.size >= ADDRESS_CACHE_MAX) {
+          const first = addressSearchCache.keys().next().value;
+          if (first) addressSearchCache.delete(first);
+        }
+        addressSearchCache.set(q, result);
+        return result;
+      }
     }
   } catch {
     // fallback to Nominatim
   }
   try {
-    const url = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5`;
+    let searchQ = q;
+    if (/\bchem\b/i.test(q) && !/\bchemin\b/i.test(q)) {
+      searchQ = q.replace(/\bchem\b/gi, 'chemin');
+    }
+    const url = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(searchQ)}&format=json&addressdetails=1&limit=8`;
     const res = await fetch(url, {
       method: 'GET',
       headers: { Accept: 'application/json', 'User-Agent': USER_AGENT },
     });
     const data = await res.json();
     if (!Array.isArray(data)) return [];
-    return data.map((item: any) => {
+    result = data.map((item: any) => {
       const addr = item.address || {};
       const parsed = parseAddressFromNominatim(addr);
       return {
@@ -102,6 +120,12 @@ export async function searchAddress(query: string): Promise<AddressSuggestion[]>
         countryCode: parsed.countryCode || '',
       };
     });
+    if (addressSearchCache.size >= ADDRESS_CACHE_MAX) {
+      const first = addressSearchCache.keys().next().value;
+      if (first) addressSearchCache.delete(first);
+    }
+    addressSearchCache.set(q, result);
+    return result;
   } catch {
     return [];
   }

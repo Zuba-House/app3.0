@@ -16,6 +16,7 @@ export const Colors = {
   white: '#ffffff',        // White for cards/contrast
   border: '#e5e2db',       // Tertiary for borders
   shadow: 'rgba(11, 39, 53, 0.15)', // Primary with opacity for shadows
+  placeholder: 'rgba(11, 39, 53, 0.45)', // Input placeholder
 } as const;
 
 export default Colors;
