@@ -19,6 +19,7 @@ import { ActivityIndicator } from 'react-native-paper';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cartService } from '../../services/cart.service';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectCartItems, selectCartTotal, setCart, updateQuantity, removeItem } from '../../store/slices/cartSlice';
@@ -27,6 +28,7 @@ import { CartItem } from '../../types/cart.types';
 import Colors from '../../constants/colors';
 import { FREE_SHIPPING_THRESHOLD } from '../../constants/config';
 import { showError } from '../../utils/toast';
+import { STORAGE_KEYS } from '../../constants/config';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -44,11 +46,36 @@ const CartScreen: React.FC = () => {
       if (isAuthenticated) {
         loadCart();
       } else {
-        // Guest cart: Use Redux store (already loaded)
-        setLoading(false);
+        // Guest cart: restore persisted local cart
+        loadGuestCart();
       }
     }, [isAuthenticated])
   );
+
+  const loadGuestCart = async () => {
+    try {
+      setLoading(true);
+      const guestCart = await AsyncStorage.getItem(STORAGE_KEYS.CART);
+      if (guestCart) {
+        const items = JSON.parse(guestCart);
+        if (Array.isArray(items)) {
+          dispatch(setCart({ items }));
+        }
+      }
+    } catch {
+      showError('Failed to load guest cart');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      AsyncStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(cartItems)).catch(() => {
+        // Non-blocking persistence
+      });
+    }
+  }, [isAuthenticated, cartItems]);
 
   const loadCart = async () => {
     try {

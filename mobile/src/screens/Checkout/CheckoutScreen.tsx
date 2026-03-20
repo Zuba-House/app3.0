@@ -254,6 +254,8 @@ const CheckoutScreen: React.FC = () => {
   };
 
   const handlePlaceOrder = async () => {
+    if (processing) return;
+
     if (!selectedAddress || !selectedShipping) {
       Alert.alert('Error', 'Please complete all checkout steps');
       return;
@@ -294,10 +296,31 @@ const CheckoutScreen: React.FC = () => {
         if (addRes.success && addRes.data?._id) addressId = addRes.data._id;
       }
 
+      const idempotencyKey = `checkout_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      const normalizedProducts = cartItems.map((item: any) => ({
+        productId: item.productId || item.product?._id,
+        productTitle: item.productTitle || item.product?.name || 'Product',
+        quantity: item.quantity,
+        price: item.price,
+        subTotal: item.subtotal || item.price * item.quantity,
+        image: item.image || item.product?.images?.[0] || '',
+        productType: item.productType || (item.variationId ? 'variable' : 'simple'),
+        variationId: item.variationId || item.variation?._id || null,
+        variation: item.variation || null,
+      }));
+
       const orderData: CreateOrderData = {
         shippingAddressId: addressId,
         shippingMethodId: selectedShipping._id,
         paymentMethod: paymentMethod,
+        idempotencyKey,
+        products: normalizedProducts,
+        totalAmt: totals.total,
+        shippingCost: selectedShipping.price || 0,
+        shippingRate: selectedShipping,
+        shippingAddress: selectedAddress,
+        delivery_address: selectedAddress._id,
+        payment_status: paymentMethod === 'cod' ? 'pending' : 'pending',
         couponCode: appliedCoupon?.code || undefined,
         giftCardCode: appliedGiftCard?.code || undefined,
       };

@@ -1,6 +1,21 @@
 import CartProductModel from "../models/cartProduct.modal.js";
 import ProductModel from "../models/product.model.js";
 
+const buildCartIdentityQuery = (userId, item = {}) => {
+    const query = {
+        userId,
+        productId: item.productId
+    };
+
+    if (item.productType === 'variable' && item.variationId) {
+        query.variationId = item.variationId;
+    } else {
+        query.variationId = null;
+    }
+
+    return query;
+};
+
 // ========================================
 // ADD TO CART - Enhanced with variations and stock validation
 // ========================================
@@ -254,7 +269,35 @@ export const addToCartItemController = async (request, response) => {
             ram: ram || null
         });
 
-        const savedCart = await cartItem.save();
+        let savedCart;
+        try {
+            savedCart = await cartItem.save();
+        } catch (saveError) {
+            // Handle rare race condition where duplicate insert happens concurrently
+            if (saveError?.code === 11000) {
+                const racedItem = await CartProductModel.findOne(query);
+                if (racedItem) {
+                    const mergedQty = racedItem.quantity + normalizedQuantity;
+                    if (mergedQty > actualStock) {
+                        return response.status(400).json({
+                            error: true,
+                            success: false,
+                            message: `Only ${actualStock} items available in stock`
+                        });
+                    }
+                    racedItem.quantity = mergedQty;
+                    racedItem.subTotal = normalizedPrice * mergedQty;
+                    await racedItem.save();
+                    return response.status(200).json({
+                        error: false,
+                        success: true,
+                        message: "Cart updated successfully",
+                        data: racedItem
+                    });
+                }
+            }
+            throw saveError;
+        }
 
         return response.status(201).json({
             error: false,
@@ -543,6 +586,97 @@ export const emptyCartController = async (request, response) => {
             message: error.message || error,
             error: true,
             success: false
+        });
+    }
+};
+
+// ========================================
+// MERGE GUEST CART INTO USER CART
+// ========================================
+export const mergeGuestCartController = async (request, response) => {
+    try {
+        const userId = request.userId;
+        const { guestCart } = request.body;
+
+        if (!userId) {
+            return response.status(401).json({
+                error: true,
+                success: false,
+                message: "Unauthorized"
+            });
+        }
+
+        if (!Array.isArray(guestCart) || guestCart.length === 0) {
+            return response.status(200).json({
+                error: false,
+                success: true,
+                message: "No guest cart items to merge"
+            });
+        }
+
+        for (const guestItem of guestCart) {
+            if (!guestItem?.productId) {
+                continue;
+            }
+
+            const normalizedQty = Math.max(1, parseInt(guestItem.quantity) || 1);
+            const identityQuery = buildCartIdentityQuery(userId, guestItem);
+            const existing = await CartProductModel.findOne(identityQuery);
+
+            if (existing) {
+                existing.quantity += normalizedQty;
+                existing.subTotal = parseFloat(existing.price) * existing.quantity;
+                await existing.save();
+                continue;
+            }
+
+            const itemToCreate = {
+                productTitle: guestItem.productTitle || guestItem.product?.name || 'Product',
+                image: guestItem.image || guestItem.product?.images?.[0] || '',
+                rating: parseFloat(guestItem.rating || guestItem.product?.rating || 0),
+                price: parseFloat(guestItem.price || 0),
+                oldPrice: guestItem.oldPrice ? parseFloat(guestItem.oldPrice) : null,
+                quantity: normalizedQty,
+                subTotal: parseFloat(guestItem.price || 0) * normalizedQty,
+                productId: guestItem.productId,
+                userId,
+                countInStock: parseInt(guestItem.countInStock) || 0,
+                discount: parseFloat(guestItem.discount || 0),
+                brand: guestItem.brand || '',
+                productType: guestItem.productType || 'simple',
+                variationId: guestItem.variationId || null,
+                variation: guestItem.variation || null,
+                size: guestItem.size || null,
+                weight: guestItem.weight || null,
+                ram: guestItem.ram || null
+            };
+
+            try {
+                await CartProductModel.create(itemToCreate);
+            } catch (error) {
+                if (error?.code === 11000) {
+                    const raced = await CartProductModel.findOne(identityQuery);
+                    if (raced) {
+                        raced.quantity += normalizedQty;
+                        raced.subTotal = parseFloat(raced.price) * raced.quantity;
+                        await raced.save();
+                    }
+                } else {
+                    throw error;
+                }
+            }
+        }
+
+        return response.status(200).json({
+            error: false,
+            success: true,
+            message: "Guest cart merged successfully"
+        });
+    } catch (error) {
+        return response.status(500).json({
+            error: true,
+            success: false,
+            message: error.message || "Failed to merge guest cart"
         });
     }
 };

@@ -19,15 +19,30 @@ import {
 import { ApiResponse } from '../types/api.types';
 
 export const authService = {
+  getGuestCartForMerge: async (): Promise<any[]> => {
+    try {
+      const cartJson = await AsyncStorage.getItem(STORAGE_KEYS.CART);
+      if (!cartJson) return [];
+      const parsed = JSON.parse(cartJson);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  },
+
   /**
    * User login
    */
   login: async (
     credentials: LoginCredentials
   ): Promise<AuthResponse> => {
+    const guestCart = await authService.getGuestCartForMerge();
     const response = await postData<any>(
       API_ENDPOINTS.LOGIN,
-      credentials
+      {
+        ...credentials,
+        guestCart,
+      }
     );
 
     // Logging disabled for production - uncomment for debugging
@@ -64,6 +79,7 @@ export const authService = {
         
         if (userResponse.success && userResponse.data) {
           await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userResponse.data));
+          await AsyncStorage.removeItem(STORAGE_KEYS.CART);
           return {
             accessToken,
             refreshToken: refreshToken || '',
@@ -79,6 +95,7 @@ export const authService = {
       }
 
       // Return with tokens even if user fetch failed
+      await AsyncStorage.removeItem(STORAGE_KEYS.CART);
       return {
         accessToken,
         refreshToken: refreshToken || '',
@@ -307,6 +324,7 @@ export const authService = {
     avatar?: string;
     mobile?: string;
   }): Promise<AuthResponse> => {
+    const guestCart = await authService.getGuestCartForMerge();
     const response = await postData<any>(
       API_ENDPOINTS.GOOGLE_AUTH,
       {
@@ -316,6 +334,7 @@ export const authService = {
         mobile: googleData.mobile,
         password: '',
         role: 'USER',
+        guestCart,
       }
     );
 
@@ -337,6 +356,7 @@ export const authService = {
         const userResponse = await fetchDataFromApi<User>(API_ENDPOINTS.GET_CURRENT_USER);
         if (userResponse.success && userResponse.data) {
           await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userResponse.data));
+          await AsyncStorage.removeItem(STORAGE_KEYS.CART);
           return {
             accessToken,
             refreshToken: refreshToken || '',
@@ -347,6 +367,7 @@ export const authService = {
         console.error('Error fetching user after Google login:', userError);
       }
 
+      await AsyncStorage.removeItem(STORAGE_KEYS.CART);
       return {
         accessToken,
         refreshToken: refreshToken || '',

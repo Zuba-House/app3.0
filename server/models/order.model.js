@@ -200,6 +200,16 @@ const orderSchema = new mongoose.Schema({
         type : String,
         default : ""
     },
+    paymentState: {
+        type: String,
+        enum: ['pending', 'paid', 'failed'],
+        default: 'pending'
+    },
+    idempotencyKey: {
+        type: String,
+        default: null,
+        index: true
+    },
     order_status : {
         type : String,
         default : "confirm"
@@ -332,6 +342,8 @@ const orderSchema = new mongoose.Schema({
 }, {
     timestamps: true
 })
+
+orderSchema.index({ idempotencyKey: 1 }, { unique: true, sparse: true });
 
 const OrderModel = mongoose.model('order', orderSchema)
 

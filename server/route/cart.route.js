@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { addToCartItemController, deleteCartItemQtyController, emptyCartController, getCartItemController, updateCartItemQtyController } from "../controllers/cart.controller.js";
+import { addToCartItemController, deleteCartItemQtyController, emptyCartController, getCartItemController, mergeGuestCartController, updateCartItemQtyController } from "../controllers/cart.controller.js";
 import auth, { optionalAuth } from "../middlewares/auth.js";
 
 const cartRouter = Router();
@@ -19,6 +19,7 @@ cartRouter.get('/test', (req, res) => {
 cartRouter.post('/add', optionalAuth, addToCartItemController);
 cartRouter.get("/get", optionalAuth, getCartItemController);
 cartRouter.put('/update-qty', optionalAuth, updateCartItemQtyController);
+cartRouter.post('/merge', auth, mergeGuestCartController);
 cartRouter.delete('/delete-cart-item/:id', optionalAuth, deleteCartItemQtyController);
 cartRouter.delete('/emptyCart/:id', optionalAuth, emptyCartController);
 

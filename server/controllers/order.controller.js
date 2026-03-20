@@ -3,6 +3,7 @@ import ProductModel from '../models/product.model.js';
 import UserModel from '../models/user.model.js';
 import AddressModel from "../models/address.model.js";
 import VendorModel from '../models/vendor.model.js';
+import mongoose from "mongoose";
 // PayPal removed - using Stripe for payments
 // import paypal from "@paypal/checkout-server-sdk";
 import OrderConfirmationEmail from "../utils/orderEmailTemplate.js";
@@ -13,18 +14,10 @@ import { calculateOrderCommissions, creditVendorBalance } from "../utils/commiss
 import { sendVendorNewOrder } from "../utils/vendorEmails.js";
 
 export const createOrderController = async (request, response) => {
+    let session;
     try {
-        console.log('📦 Order creation request received:', {
-            hasUserId: !!request.body.userId,
-            isGuestOrder: !!request.body.guestCustomer,
-            productsCount: request.body.products?.length || 0,
-            paymentId: request.body.paymentId || 'N/A',
-            payment_status: request.body.payment_status || 'N/A'
-        });
-
-        // Validate required fields
-        if (!request.body.products || !Array.isArray(request.body.products) || request.body.products.length === 0) {
-            console.error('❌ Order creation failed: No products provided');
+        const products = Array.isArray(request.body.products) ? request.body.products : [];
+        if (products.length === 0) {
             return response.status(400).json({
                 error: true,
                 success: false,
@@ -32,118 +25,142 @@ export const createOrderController = async (request, response) => {
             });
         }
 
-        // Handle guest checkout
-        const isGuestOrder = request.body.isGuestOrder || (!request.body.userId && request.body.guestCustomer);
-        
-        // Validate guest customer data if it's a guest order
+        const isGuestOrder = request.body.isGuestOrder || (!request.userId && request.body.guestCustomer);
         if (isGuestOrder && !request.body.guestCustomer) {
-            console.error('❌ Order creation failed: Guest order requires guestCustomer data');
             return response.status(400).json({
                 error: true,
                 success: false,
                 message: 'Guest customer information is required'
             });
         }
-        
-        // Calculate total amount including shipping
-        const shippingCost = request.body.shippingCost || 0;
-        const productsTotal = request.body.products?.reduce((sum, item) => {
-            return sum + (parseFloat(item.price || item.subTotal || 0) * (item.quantity || 1));
-        }, 0) || 0;
-        const calculatedTotal = productsTotal + shippingCost;
-        // Use provided totalAmt if it exists and is valid, otherwise calculate it
-        const finalTotal = (request.body.totalAmt && request.body.totalAmt > 0) 
-            ? request.body.totalAmt 
-            : calculatedTotal;
-        
-        console.log('💰 Order creation - Amount calculation:', {
-            productsTotal,
-            shippingCost,
-            providedTotalAmt: request.body.totalAmt,
-            calculatedTotal,
-            finalTotal
-        });
 
-        // Update address with phone number if provided
-        if (request.body.phone && request.body.delivery_address) {
-            try {
-                const address = await AddressModel.findById(request.body.delivery_address);
-                if (address) {
-                    // Update phone in address contactInfo
-                    if (!address.contactInfo) {
-                        address.contactInfo = {};
-                    }
-                    address.contactInfo.phone = request.body.phone;
-                    await address.save();
-                    console.log('✅ Phone number updated in address:', request.body.delivery_address);
-                }
-            } catch (addressError) {
-                console.warn('⚠️ Could not update phone in address:', addressError.message);
-                // Continue with order creation even if address update fails
+        if (!request.body.shippingRate && !request.body.shippingMethodId) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: 'Shipping method is required'
+            });
+        }
+
+        // Strict shipping/address validation before creating order
+        const shippingAddressInput = request.body.shippingAddress || {};
+        const addressLine1 = shippingAddressInput.addressLine1 || shippingAddressInput.address?.addressLine1 || '';
+        const city = shippingAddressInput.city || shippingAddressInput.address?.city || '';
+        const country = shippingAddressInput.country || shippingAddressInput.address?.country || '';
+        const postalCode = shippingAddressInput.postalCode || shippingAddressInput.postal_code || shippingAddressInput.address?.postalCode || '';
+        if (!addressLine1 || !city || !country || !postalCode) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: 'Invalid address. Street, city, country and postal code are required.'
+            });
+        }
+
+        const idempotencyKey = request.body.idempotencyKey || null;
+        if (idempotencyKey) {
+            const existingOrder = await OrderModel.findOne({ idempotencyKey });
+            if (existingOrder) {
+                return response.status(200).json({
+                    error: false,
+                    success: true,
+                    message: "Order already processed",
+                    order: existingOrder,
+                    orderId: existingOrder._id
+                });
             }
         }
 
-        // Prepare shipping address for order
-        let orderShippingAddress = null;
-        if (request.body.shippingAddress) {
-            const addr = request.body.shippingAddress;
-            orderShippingAddress = {
-                addressLine1: addr.addressLine1 || addr.address?.addressLine1 || '',
-                addressLine2: addr.addressLine2 || addr.address?.addressLine2 || '',
-                city: addr.city || addr.address?.city || '',
-                province: addr.province || addr.address?.province || '',
-                provinceCode: addr.provinceCode || addr.province || addr.address?.provinceCode || '',
-                postalCode: addr.postalCode || addr.postal_code || addr.address?.postalCode || '',
-                postal_code: addr.postal_code || addr.postalCode || addr.address?.postalCode || '',
-                country: addr.country || addr.address?.country || '',
-                countryCode: addr.countryCode || addr.address?.countryCode || '',
-                coordinates: addr.coordinates || addr.googlePlaces?.coordinates || null
-            };
+        const shippingCost = request.body.shippingCost || 0;
+        const productsTotal = products.reduce((sum, item) => {
+            return sum + (parseFloat(item.price || item.subTotal || 0) * (item.quantity || 1));
+        }, 0);
+        const calculatedTotal = productsTotal + shippingCost;
+        const finalTotal = (request.body.totalAmt && request.body.totalAmt > 0)
+            ? request.body.totalAmt
+            : calculatedTotal;
+
+        const rawPaymentStatus = String(request.body.payment_status || '').toLowerCase();
+        const paymentState = rawPaymentStatus.includes('fail')
+            ? 'failed'
+            : (rawPaymentStatus.includes('paid') || rawPaymentStatus.includes('success') || rawPaymentStatus.includes('completed')
+                ? 'paid'
+                : 'pending');
+
+        session = await mongoose.startSession();
+        session.startTransaction();
+
+        // Re-check stock from DB right before creating order (race-condition safe path starts here)
+        for (const item of products) {
+            const quantity = Number(item.quantity || 0);
+            if (!item?.productId || quantity < 1) {
+                throw new Error('Invalid order item payload');
+            }
+
+            const product = await ProductModel.findById(item.productId).session(session);
+            if (!product) {
+                throw new Error(`Product not found for item ${item.productId}`);
+            }
+
+            if (item.productType === 'variable' && item.variationId) {
+                const variation = product.variations?.find(
+                    v => v._id && v._id.toString() === String(item.variationId)
+                );
+                if (!variation) {
+                    throw new Error(`Product variation not found for ${item.productTitle || item.productId}`);
+                }
+                if (!variation.endlessStock && Number(variation.stock || 0) < quantity) {
+                    throw new Error(`Insufficient stock for ${item.productTitle || item.productId}`);
+                }
+            } else {
+                const stock = Number(product.countInStock || product.inventory?.stock || 0);
+                const endlessStock = !!product.inventory?.endlessStock;
+                if (!endlessStock && stock < quantity) {
+                    throw new Error(`Insufficient stock for ${item.productTitle || item.productId}`);
+                }
+            }
         }
 
-        let order = new OrderModel({
-            userId: request.body.userId || null,
-            products: request.body.products,
+        const orderShippingAddress = {
+            addressLine1,
+            addressLine2: shippingAddressInput.addressLine2 || shippingAddressInput.address?.addressLine2 || '',
+            city,
+            province: shippingAddressInput.province || shippingAddressInput.address?.province || '',
+            provinceCode: shippingAddressInput.provinceCode || shippingAddressInput.province || shippingAddressInput.address?.provinceCode || '',
+            postalCode,
+            postal_code: shippingAddressInput.postal_code || postalCode,
+            country,
+            countryCode: shippingAddressInput.countryCode || shippingAddressInput.address?.countryCode || '',
+            coordinates: shippingAddressInput.coordinates || shippingAddressInput.googlePlaces?.coordinates || null
+        };
+
+        let order = await OrderModel.create([{
+            userId: request.userId || request.body.userId || null,
+            products,
             paymentId: request.body.paymentId,
-            payment_status: request.body.payment_status,
+            payment_status: request.body.payment_status || paymentState,
+            paymentState,
+            idempotencyKey,
             delivery_address: request.body.delivery_address,
-            totalAmt: finalTotal, // Ensure shipping is included
-            shippingCost: shippingCost,
+            totalAmt: finalTotal,
+            shippingCost,
             shippingRate: request.body.shippingRate || null,
             shippingAddress: orderShippingAddress,
             phone: request.body.phone || '',
-            // New customer info fields for better delivery
             customerName: request.body.customerName || '',
             apartmentNumber: request.body.apartmentNumber || '',
             deliveryNote: request.body.deliveryNote || '',
             date: request.body.date,
-            // Guest checkout fields
-            isGuestOrder: isGuestOrder,
+            isGuestOrder,
             guestCustomer: request.body.guestCustomer || null,
-            // Discount information
             discounts: request.body.discounts || null,
-            // Status tracking
             status: 'Received',
             statusHistory: [{
                 status: 'Received',
                 timestamp: new Date(),
                 updatedBy: request.userId || null
             }]
-        });
-
-        // Save order to database
-        try {
-            order = await order.save();
-            console.log('✅ Order saved successfully:', order._id);
-        } catch (saveError) {
-            console.error('❌ Failed to save order:', saveError);
-            return response.status(500).json({
-                error: true,
-                success: false,
-                message: 'Failed to save order to database',
-                details: process.env.NODE_ENV === 'development' ? saveError.message : undefined
-            });
-        }
+        }], { session });
+        order = order[0];
 
         // ========================================
         // CALCULATE VENDOR COMMISSIONS
@@ -207,85 +224,68 @@ export const createOrderController = async (request, response) => {
             // Don't fail order creation if commission calculation fails
         }
 
-        // Update inventory only for successful or COD orders
-        const paymentStatus = (request.body.payment_status || '').toUpperCase();
-        const shouldAffectInventory = paymentStatus !== 'FAILED';
+        // Only failed payments skip stock deduction.
+        const shouldAffectInventory = paymentState !== 'failed';
         
         if (shouldAffectInventory) {
-            for (let i = 0; i < request.body.products.length; i++) {
-                const orderProduct = request.body.products[i];
-                
-                // Get product from database
-                const product = await ProductModel.findById(orderProduct.productId);
-                
-                if (!product) {
-                    console.error(`Product not found: ${orderProduct.productId}`);
-                    continue;
+            for (let i = 0; i < products.length; i++) {
+                const orderProduct = products[i];
+                const qty = Number(orderProduct.quantity || 0);
+                if (qty < 1) {
+                    throw new Error(`Invalid quantity for ${orderProduct.productTitle || orderProduct.productId}`);
                 }
-                
-                // ========================================
-                // HANDLE VARIABLE PRODUCTS
-                // ========================================
+
                 if (orderProduct.productType === 'variable' && orderProduct.variationId) {
-                    // Find the specific variation
-                    const variationIndex = product.variations?.findIndex(
-                        v => v._id && v._id.toString() === orderProduct.variationId
+                    const updateResult = await ProductModel.updateOne(
+                        {
+                            _id: orderProduct.productId,
+                            'variations._id': orderProduct.variationId,
+                            'variations.stock': { $gte: qty }
+                        },
+                        {
+                            $inc: {
+                                'variations.$.stock': -qty,
+                                countInStock: -qty,
+                                sale: qty,
+                                totalSales: qty
+                            }
+                        },
+                        { session }
                     );
-                    
-                    if (variationIndex !== -1 && product.variations) {
-                        // Update variation stock
-                        const currentVariationStock = product.variations[variationIndex].stock || 0;
-                        const newVariationStock = Math.max(0, currentVariationStock - orderProduct.quantity);
-                        
-                        product.variations[variationIndex].stock = newVariationStock;
-                        
-                        // Update variation stock status
-                        if (newVariationStock <= 0) {
-                            product.variations[variationIndex].stockStatus = 'out_of_stock';
-                        }
-                        
-                        // Also update total product stock (sum of all variations)
-                        const totalStock = product.variations.reduce((sum, v) => sum + (v.stock || 0), 0);
-                        product.countInStock = totalStock;
-                        
-                        // Update product stock status
-                        if (totalStock <= 0) {
-                            product.stockStatus = 'out_of_stock';
-                        }
-                        
-                        console.log(`Updated variation stock: Product ${orderProduct.productId}, Variation ${orderProduct.variationId}, New stock: ${newVariationStock}`);
-                    } else {
-                        console.error(`Variation not found: ${orderProduct.variationId}`);
+
+                    if (updateResult.modifiedCount === 0) {
+                        throw new Error(`Insufficient stock for ${orderProduct.productTitle || orderProduct.productId}`);
+                    }
+                } else {
+                    const updateResult = await ProductModel.updateOne(
+                        {
+                            _id: orderProduct.productId,
+                            $or: [
+                                { 'inventory.endlessStock': true },
+                                { countInStock: { $gte: qty } },
+                                { 'inventory.stock': { $gte: qty } }
+                            ]
+                        },
+                        {
+                            $inc: {
+                                countInStock: -qty,
+                                sale: qty,
+                                totalSales: qty
+                            }
+                        },
+                        { session }
+                    );
+
+                    if (updateResult.modifiedCount === 0) {
+                        throw new Error(`Insufficient stock for ${orderProduct.productTitle || orderProduct.productId}`);
                     }
                 }
-                // ========================================
-                // HANDLE SIMPLE PRODUCTS
-                // ========================================
-                else {
-                    // Update product stock directly
-                    const currentStock = product.countInStock || 0;
-                    const newStock = Math.max(0, currentStock - orderProduct.quantity);
-                    
-                    product.countInStock = newStock;
-                    
-                    // Update stock status
-                    if (newStock <= 0) {
-                        product.stockStatus = 'out_of_stock';
-                    }
-                    
-                    console.log(`Updated product stock: Product ${orderProduct.productId}, New stock: ${newStock}`);
-                }
-                
-                // ========================================
-                // UPDATE SALES COUNT
-                // ========================================
-                product.sale = (product.sale || 0) + orderProduct.quantity;
-                product.totalSales = (product.totalSales || 0) + orderProduct.quantity;
-                
-                // Save product with updated stock
-                await product.save();
             }
         }
+
+        await session.commitTransaction();
+        session.endSession();
+        session = null;
 
         // Send email only for non-failed orders
         if (shouldAffectInventory) {
@@ -398,13 +398,23 @@ export const createOrderController = async (request, response) => {
         });
 
     } catch (error) {
+        if (session) {
+            await session.abortTransaction();
+            session.endSession();
+        }
         console.error('❌ Order creation error:', {
             message: error.message,
             stack: error.stack,
             body: request.body
         });
         
-        return response.status(500).json({
+        const clientError =
+            error.message?.includes('Insufficient stock') ||
+            error.message?.includes('Invalid order item') ||
+            error.message?.includes('Product not found') ||
+            error.message?.includes('variation not found');
+
+        return response.status(clientError ? 400 : 500).json({
             error: true,
             success: false,
             message: error.message || 'Failed to create order',

@@ -96,7 +96,10 @@ const cartProductSchema = new mongoose.Schema({
 // ========================================
 // INDEXES for better query performance
 // ========================================
-cartProductSchema.index({ userId: 1, productId: 1, variationId: 1 });
+cartProductSchema.index(
+    { userId: 1, productId: 1, variationId: 1 },
+    { unique: true }
+);
 cartProductSchema.index({ userId: 1 });
 
 // ========================================

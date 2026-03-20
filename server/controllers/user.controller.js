@@ -7,6 +7,7 @@ import VerificationEmail from '../utils/verifyEmailTemplate.js';
 import generatedAccessToken from '../utils/generatedAccessToken.js';
 import genertedRefreshToken from '../utils/generatedRefreshToken.js';
 import { checkOtpRateLimit } from '../utils/rateLimitOtp.js';
+import CartProductModel from '../models/cartProduct.modal.js';
 
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
@@ -18,6 +19,67 @@ cloudinary.config({
     api_secret: process.env.cloudinary_Config_api_secret,
     secure: true,
 });
+
+async function mergeGuestCartForUser(userId, guestCart = []) {
+    if (!Array.isArray(guestCart) || guestCart.length === 0) {
+        return;
+    }
+
+    for (const item of guestCart) {
+        if (!item?.productId) continue;
+
+        const query = {
+            userId: String(userId),
+            productId: item.productId,
+            variationId: item.variationId || null
+        };
+        const qtyToAdd = Math.max(1, parseInt(item.quantity) || 1);
+        const existing = await CartProductModel.findOne(query);
+
+        if (existing) {
+            existing.quantity += qtyToAdd;
+            existing.subTotal = parseFloat(existing.price) * existing.quantity;
+            await existing.save();
+            continue;
+        }
+
+        const payload = {
+            productTitle: item.productTitle || item.product?.name || 'Product',
+            image: item.image || item.product?.images?.[0] || '',
+            rating: parseFloat(item.rating || 0),
+            price: parseFloat(item.price || 0),
+            oldPrice: item.oldPrice ? parseFloat(item.oldPrice) : null,
+            quantity: qtyToAdd,
+            subTotal: parseFloat(item.price || 0) * qtyToAdd,
+            productId: item.productId,
+            countInStock: parseInt(item.countInStock) || 0,
+            userId: String(userId),
+            discount: parseFloat(item.discount || 0),
+            brand: item.brand || '',
+            productType: item.productType || 'simple',
+            variationId: item.variationId || null,
+            variation: item.variation || null,
+            size: item.size || null,
+            weight: item.weight || null,
+            ram: item.ram || null
+        };
+
+        try {
+            await CartProductModel.create(payload);
+        } catch (error) {
+            if (error?.code === 11000) {
+                const racedItem = await CartProductModel.findOne(query);
+                if (racedItem) {
+                    racedItem.quantity += qtyToAdd;
+                    racedItem.subTotal = parseFloat(racedItem.price) * racedItem.quantity;
+                    await racedItem.save();
+                }
+            } else {
+                throw error;
+            }
+        }
+    }
+}
 
 
 export async function registerUserController(request, response) {
@@ -134,7 +196,7 @@ export async function verifyEmailController(request, response) {
 
 
 export async function authWithGoogle(request, response) {
-    const { name, email, password, avatar, mobile, role } = request.body;
+    const { name, email, password, avatar, mobile, role, guestCart } = request.body;
 
     try {
         const existingUser = await UserModel.findOne({ email: email });
@@ -170,6 +232,8 @@ export async function authWithGoogle(request, response) {
             response.cookie('refreshToken', refreshToken, cookiesOption)
 
 
+            await mergeGuestCartForUser(user._id, guestCart);
+
             return response.json({
                 message: "Login successfully",
                 error: false,
@@ -197,6 +261,8 @@ export async function authWithGoogle(request, response) {
             response.cookie('accessToken', accesstoken, cookiesOption)
             response.cookie('refreshToken', refreshToken, cookiesOption)
 
+
+            await mergeGuestCartForUser(existingUser._id, guestCart);
 
             return response.json({
                 message: "Login successfully",
@@ -355,7 +421,7 @@ export async function authWithGoogleCode(request, response) {
 
 export async function loginUserController(request, response) {
     try {
-        const { email, password } = request.body;
+        const { email, password, guestCart } = request.body;
 
         const user = await UserModel.findOne({ email: email });
 
@@ -410,6 +476,8 @@ export async function loginUserController(request, response) {
         response.cookie('accessToken', accesstoken, cookiesOption)
         response.cookie('refreshToken', refreshToken, cookiesOption)
 
+
+        await mergeGuestCartForUser(user._id, guestCart);
 
         return response.json({
             message: "Login successfully",

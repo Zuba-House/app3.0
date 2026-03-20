@@ -18,6 +18,20 @@ export interface CreateOrderData {
   billingAddressId?: string;
   shippingMethodId: string;
   paymentMethod: string;
+  idempotencyKey?: string;
+  products?: any[];
+  totalAmt?: number;
+  shippingCost?: number;
+  shippingRate?: any;
+  shippingAddress?: any;
+  delivery_address?: string;
+  payment_status?: string;
+  isGuestOrder?: boolean;
+  guestCustomer?: {
+    name: string;
+    email: string;
+    phone: string;
+  };
   couponCode?: string;
   giftCardCode?: string;
   notes?: string;
