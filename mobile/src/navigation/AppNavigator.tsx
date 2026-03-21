@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { STORAGE_KEYS, API_ENDPOINTS } from '../constants/config';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setCredentials } from '../store/slices/authSlice';
+import { setCart } from '../store/slices/cartSlice';
 import { setShippingLocation } from '../store/slices/shippingLocationSlice';
 import { User } from '../types/user.types';
 import Colors from '../constants/colors';
@@ -20,6 +21,7 @@ import SplashScreen from '../components/SplashScreen';
 import { notificationService } from '../services/notification.service';
 import { analyticsService } from '../services/analytics.service';
 import { locationService } from '../services/location.service';
+import { cartService } from '../services/cart.service';
 
 // Screens
 import LoginScreen from '../screens/Auth/LoginScreen';
@@ -366,6 +368,39 @@ const AppNavigator: React.FC = () => {
     // Initialize analytics
     analyticsService.initialize();
   }, [dispatch]);
+
+  // Rehydrate cart globally so badge/count appears immediately after app restart.
+  useEffect(() => {
+    const hydrateCart = async () => {
+      try {
+        if (isAuthenticated) {
+          const response = await cartService.getCart();
+          if (response.success && response.data) {
+            dispatch(setCart(response.data));
+          } else {
+            dispatch(setCart({ items: [] }));
+          }
+          return;
+        }
+
+        const guestCart = await AsyncStorage.getItem(STORAGE_KEYS.CART);
+        if (guestCart) {
+          const parsed = JSON.parse(guestCart);
+          const items = Array.isArray(parsed) ? parsed : parsed?.items || [];
+          dispatch(setCart({ items }));
+        } else {
+          dispatch(setCart({ items: [] }));
+        }
+      } catch {
+        dispatch(setCart({ items: [] }));
+      }
+    };
+
+    // Wait for auth bootstrap to complete before hydrating cart.
+    if (!isLoading) {
+      hydrateCart();
+    }
+  }, [dispatch, isAuthenticated, isLoading]);
 
   // Load or auto-detect shipping location (non-blocking)
   useEffect(() => {

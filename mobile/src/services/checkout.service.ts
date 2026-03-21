@@ -237,13 +237,11 @@ export const checkoutService = {
     subtotal: number, 
     shippingCost: number, 
     couponDiscount: number = 0,
-    giftCardDiscount: number = 0,
-    taxRate: number = 0.13
+    giftCardDiscount: number = 0
   ) => {
     const totalDiscount = couponDiscount + giftCardDiscount;
-    const taxableAmount = Math.max(0, subtotal - totalDiscount);
-    const tax = taxableAmount * taxRate;
-    const total = Math.max(0, taxableAmount + tax + shippingCost);
+    const payableAmount = Math.max(0, subtotal - totalDiscount);
+    const total = Math.max(0, payableAmount + shippingCost);
 
     return {
       subtotal,
@@ -251,7 +249,6 @@ export const checkoutService = {
       couponDiscount,
       giftCardDiscount,
       discount: totalDiscount,
-      tax: Math.round(tax * 100) / 100,
       total: Math.round(total * 100) / 100,
     };
   },

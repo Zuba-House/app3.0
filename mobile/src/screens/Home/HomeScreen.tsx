@@ -914,7 +914,7 @@ const HomeScreen: React.FC = () => {
         {/* Flash Sale - TEMU Style */}
         {!selectedCategory && products.length > 0 && (
           <FlashSale 
-            products={products.slice(0, 8)} 
+            products={products} 
             title="Flash Sale"
           />
         )}

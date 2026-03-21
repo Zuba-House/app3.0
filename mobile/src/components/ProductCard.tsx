@@ -148,7 +148,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   }
 
   // Calculate stock status for promotional banner (Temu style)
-  const stockStatus = product.stock || 0;
+  const stockStatus = Number(product.stock ?? (product as any).countInStock ?? 0);
   const showPromoBanner = stockStatus > 0 && stockStatus <= 10;
   const promoText = stockStatus > 0 && stockStatus <= 10 
     ? `LAST ${stockStatus} AT PROMO PRICE`
@@ -207,6 +207,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <Text style={styles.promoText}>{promoText}</Text>
           </View>
         )}
+        {/* Out of Stock Ribbon */}
+        {stockStatus <= 0 && (
+          <View style={[styles.promoBanner, { backgroundColor: 'rgba(220,38,38,0.9)' }]}>
+            <Text style={[styles.promoText, { fontWeight: '800' }]}>OUT OF STOCK</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.content}>
@@ -244,10 +250,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
           
           {/* Add to Cart Button - Temu Style */}
           <TouchableOpacity 
-            style={styles.cartButton}
+            style={[styles.cartButton, stockStatus <= 0 && { opacity: 0.4 }]}
             onPress={(e) => {
               e.stopPropagation();
-              onAddToCart?.();
+              if (stockStatus > 0) {
+                onAddToCart?.();
+              }
             }}
             activeOpacity={0.7}
           >

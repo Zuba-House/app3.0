@@ -300,7 +300,7 @@ const CartScreen: React.FC = () => {
             <Text style={styles.totalLabel}>Subtotal ({cartItems.length} items)</Text>
             <Text style={styles.totalAmount}>${total.toFixed(2)}</Text>
           </View>
-          <Text style={styles.taxNote}>Taxes and shipping calculated at checkout</Text>
+          <Text style={styles.taxNote}>Shipping calculated at checkout</Text>
         </View>
         
         <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>

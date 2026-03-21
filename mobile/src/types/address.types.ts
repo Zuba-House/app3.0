@@ -47,7 +47,6 @@ export interface CheckoutData {
   paymentMethod: 'stripe' | 'paypal';
   subtotal: number;
   shippingCost: number;
-  tax: number;
   discount: number;
   total: number;
   couponCode?: string;

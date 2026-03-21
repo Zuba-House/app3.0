@@ -33,6 +33,51 @@ interface TimeLeft {
   seconds: number;
 }
 
+const getSaleInfo = (p: any) => {
+  const basePrice = Number(p?.price ?? 0);
+  const explicitSale = Number(p?.salePrice ?? 0);
+  const oldPrice = Number(p?.oldPrice ?? 0);
+  const explicitDiscount = Number(p?.discount ?? 0);
+
+  // Case 1: canonical backend shape
+  if (explicitSale > 0 && basePrice > explicitSale) {
+    return {
+      isOnSale: true,
+      displayPrice: explicitSale,
+      originalPrice: basePrice,
+      discountPercent: Math.round(((basePrice - explicitSale) / basePrice) * 100),
+    };
+  }
+
+  // Case 2: list item carries oldPrice + current price (common in mixed payloads)
+  if (oldPrice > 0 && basePrice > 0 && oldPrice > basePrice) {
+    return {
+      isOnSale: true,
+      displayPrice: basePrice,
+      originalPrice: oldPrice,
+      discountPercent: Math.round(((oldPrice - basePrice) / oldPrice) * 100),
+    };
+  }
+
+  // Case 3: explicit percentage discount provided by API
+  if (explicitDiscount > 0 && basePrice > 0) {
+    const original = basePrice / (1 - explicitDiscount / 100);
+    return {
+      isOnSale: true,
+      displayPrice: basePrice,
+      originalPrice: original,
+      discountPercent: Math.round(explicitDiscount),
+    };
+  }
+
+  return {
+    isOnSale: false,
+    displayPrice: basePrice,
+    originalPrice: null as number | null,
+    discountPercent: 0,
+  };
+};
+
 const FlashSaleTimer: React.FC<{ endTime: Date }> = ({ endTime }) => {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({ hours: 0, minutes: 0, seconds: 0 });
 
@@ -76,11 +121,13 @@ const FlashSaleTimer: React.FC<{ endTime: Date }> = ({ endTime }) => {
 
 const FlashSaleCard: React.FC<{ product: Product; index: number }> = ({ product, index }) => {
   const navigation = useNavigation<any>();
-  
-  // Calculate fake discount and sold percentage for demo
-  const discountPercent = Math.floor(Math.random() * 40) + 30; // 30-70%
+
+  // Real discount only: supports salePrice/oldPrice/discount payload shapes.
+  const saleInfo = getSaleInfo(product as any);
+  const displayPrice = saleInfo.displayPrice;
+  const discountPercent = saleInfo.discountPercent;
   const soldPercent = Math.floor(Math.random() * 60) + 30; // 30-90%
-  const originalPrice = product.price * (1 + discountPercent / 100);
+  const originalPrice = saleInfo.originalPrice;
 
   const handlePress = () => {
     navigation.navigate('ProductDetail', { productId: product._id });
@@ -96,9 +143,11 @@ const FlashSaleCard: React.FC<{ product: Product; index: number }> = ({ product,
       activeOpacity={0.8}
     >
       {/* Discount Badge */}
-      <View style={styles.discountBadge}>
-        <Text style={styles.discountText}>-{discountPercent}%</Text>
-      </View>
+      {discountPercent > 0 && (
+        <View style={styles.discountBadge}>
+          <Text style={styles.discountText}>-{discountPercent}%</Text>
+        </View>
+      )}
 
       {/* Product Image */}
       <View style={styles.imageContainer}>
@@ -118,8 +167,10 @@ const FlashSaleCard: React.FC<{ product: Product; index: number }> = ({ product,
 
       {/* Price Section */}
       <View style={styles.priceSection}>
-        <Text style={styles.salePrice}>${product.price.toFixed(2)}</Text>
-        <Text style={styles.originalPrice}>${originalPrice.toFixed(2)}</Text>
+        <Text style={styles.salePrice}>${displayPrice.toFixed(2)}</Text>
+        {originalPrice !== null && (
+          <Text style={styles.originalPrice}>${originalPrice.toFixed(2)}</Text>
+        )}
       </View>
 
       {/* Sold Progress Bar */}
@@ -147,9 +198,54 @@ const FlashSale: React.FC<FlashSaleProps> = ({
   title = "Flash Sale"
 }) => {
   if (!products || products.length === 0) return null;
+  const [cycleEnd, setCycleEnd] = useState<Date>(endTime);
+  const [cycleTick, setCycleTick] = useState(0);
+
+  // Only show truly discounted products in flash sale, sorted by highest discount first.
+  const saleProducts = products
+    .filter((p) => getSaleInfo(p as any).isOnSale)
+    .sort((a, b) => {
+      const aDisc = getSaleInfo(a as any).discountPercent;
+      const bDisc = getSaleInfo(b as any).discountPercent;
+      return bDisc - aDisc;
+    });
+
+  // If on-sale items are not enough, fill with mixed products for a richer section.
+  const restProducts = products.filter((p) => !saleProducts.find((s) => s._id === p._id));
+  const mixedPool = [...saleProducts, ...restProducts];
+  if (mixedPool.length === 0) return null;
+
+  const shuffle = <T,>(arr: T[]) => {
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  };
+
+  const displayProducts = shuffle(mixedPool).slice(0, 12);
+  const dataToRender = displayProducts.sort((a, b) => {
+    const aInfo = getSaleInfo(a as any);
+    const bInfo = getSaleInfo(b as any);
+    // Keep discounted items first while still mixed.
+    if (aInfo.isOnSale !== bInfo.isOnSale) return aInfo.isOnSale ? -1 : 1;
+    return bInfo.discountPercent - aInfo.discountPercent;
+  });
+
+  useEffect(() => {
+    const tick = setInterval(() => {
+      if (Date.now() >= cycleEnd.getTime()) {
+        // Rotate list and restart countdown window
+        setCycleTick((v) => v + 1);
+        setCycleEnd(new Date(Date.now() + 4 * 60 * 60 * 1000));
+      }
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [cycleEnd]);
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} key={`flash-cycle-${cycleTick}`}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.titleContainer}>
@@ -162,13 +258,13 @@ const FlashSale: React.FC<FlashSaleProps> = ({
         </View>
         <View style={styles.timerSection}>
           <Text style={styles.endsIn}>Ends in</Text>
-          <FlashSaleTimer endTime={endTime} />
+          <FlashSaleTimer endTime={cycleEnd} />
         </View>
       </View>
 
       {/* Products List */}
       <FlatList
-        data={products.slice(0, 8)}
+        data={dataToRender}
         renderItem={({ item, index }) => (
           <FlashSaleCard product={item} index={index} />
         )}

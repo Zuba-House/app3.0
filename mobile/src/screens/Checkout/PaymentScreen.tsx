@@ -25,13 +25,14 @@ import Colors from '../../constants/colors';
 interface PaymentScreenParams {
   orderId: string;
   amount: number;
+  paymentMethod?: 'stripe' | 'apple_pay' | 'google_pay';
   onSuccess?: () => void;
 }
 
 const PaymentScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { orderId, amount, onSuccess } = route.params as PaymentScreenParams;
+  const { orderId, amount, paymentMethod = 'stripe', onSuccess } = route.params as PaymentScreenParams;
 
   const [loading, setLoading] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
@@ -248,7 +249,11 @@ const PaymentScreen: React.FC = () => {
           
           <Text style={styles.title}>Complete Your Payment</Text>
           <Text style={styles.subtitle}>
-            You'll be redirected to Stripe's secure checkout page
+            {paymentMethod === 'apple_pay'
+              ? "You'll be redirected to Stripe checkout with Apple Pay enabled"
+              : paymentMethod === 'google_pay'
+              ? "You'll be redirected to Stripe checkout with Google Pay enabled"
+              : "You'll be redirected to Stripe's secure checkout page"}
           </Text>
 
           {/* Order Summary */}
@@ -276,7 +281,13 @@ const PaymentScreen: React.FC = () => {
               <>
                 <Ionicons name="lock-closed" size={20} color={Colors.white} />
                 <Text style={styles.payButtonText}>
-                  {waitingForPayment ? 'Check Payment Status' : 'Pay Now'}
+                  {waitingForPayment
+                    ? 'Check Payment Status'
+                    : paymentMethod === 'apple_pay'
+                    ? 'Pay with Apple Pay'
+                    : paymentMethod === 'google_pay'
+                    ? 'Pay with Google Pay'
+                    : 'Pay Now'}
                 </Text>
               </>
             )}
@@ -317,6 +328,12 @@ const PaymentScreen: React.FC = () => {
             </View>
             <View style={styles.methodBadge}>
               <Text style={styles.methodText}>AMEX</Text>
+            </View>
+            <View style={styles.methodBadge}>
+              <Text style={styles.methodText}>Apple Pay</Text>
+            </View>
+            <View style={styles.methodBadge}>
+              <Text style={styles.methodText}>Google Pay</Text>
             </View>
           </View>
         </View>
