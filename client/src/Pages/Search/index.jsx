@@ -13,6 +13,7 @@ import ProductLoadingGrid from "../../components/ProductLoading/productLoadingGr
 import { postData } from "../../utils/api";
 import { MyContext } from "../../App";
 import AlgoliaSearch from "../../components/SearchBar/AlgoliaSearch";
+import { useLocation } from "react-router-dom";
 
 const SearchPage = () => {
   const [itemView, setItemView] = useState("grid");
@@ -28,6 +29,7 @@ const SearchPage = () => {
   const [useAlgolia, setUseAlgolia] = useState(false);
 
   const context = useContext(MyContext);
+  const location = useLocation();
 
   // Check if Algolia is configured
   useEffect(() => {
@@ -46,7 +48,34 @@ const SearchPage = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [])
+  }, []);
+
+  useEffect(() => {
+    const loadSearchFromQuery = async () => {
+      const params = new URLSearchParams(location.search);
+      const query = (params.get("q") || "").trim();
+
+      if (!query || context?.searchData?.products?.length > 0) {
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const res = await postData(`/api/product/search/get`, {
+          page: 1,
+          limit: 3,
+          query
+        });
+        context?.setSearchData(res);
+      } catch (error) {
+        console.error("Failed to load search from URL query:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSearchFromQuery();
+  }, [location.search, context]);
 
 
   const open = Boolean(anchorEl);

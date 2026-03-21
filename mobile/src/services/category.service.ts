@@ -13,6 +13,7 @@ export interface Category {
   slug?: string;
   description?: string;
   image?: string;
+  images?: string[];
   icon?: string;
   parentId?: string;
   children?: Category[];
@@ -41,6 +42,10 @@ export const categoryService = {
             };
             if (cat.description) cleaned.description = String(cat.description);
             if (cat.image) cleaned.image = String(cat.image);
+            if (Array.isArray(cat.images) && cat.images.length > 0) {
+              cleaned.images = cat.images;
+              if (!cleaned.image) cleaned.image = String(cat.images[0]);
+            }
             if (cat.icon) cleaned.icon = String(cat.icon);
             // Explicitly do NOT copy any other properties
             return cleaned;

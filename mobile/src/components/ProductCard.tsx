@@ -64,6 +64,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
       if (!url) {
         return null;
       }
+
+      // Some legacy payloads send Mongo ObjectId instead of image URL/path.
+      // Avoid building invalid URLs like /<objectId> that always 404.
+      if (/^[a-fA-F0-9]{24}$/.test(url)) {
+        return null;
+      }
       
       // Cloudinary URLs are already absolute, return as is
       if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -175,8 +181,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
             contentFit="cover"
             placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
             transition={200}
-            onError={(error) => {
-              console.error('❌ Image load error for:', imageUrl, error);
+            onError={() => {
+              // Keep UI quiet for broken remote image URLs; fallback placeholder already handles it.
             }}
           />
         ) : (

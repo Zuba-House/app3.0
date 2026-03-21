@@ -73,3 +73,15 @@ export const getDashboard = async (req, res) => {
     });
   }
 };
+
+// Backward-compatible named exports expected by analytics routes
+export const getDashboardStats = getDashboard;
+export const getVisitorsByCountry = getDashboard;
+export const getVisitorsByDevice = getDashboard;
+export const getTopPages = getDashboard;
+export const getTopReferrers = getDashboard;
+export const getVisitorsOverTime = getDashboard;
+export const getBrowserStats = getDashboard;
+export const getRealTimeVisitors = getDashboard;
+export const getProductViews = getDashboard;
+export const getSearchQueries = getDashboard;

@@ -25,6 +25,7 @@ const WishlistScreen: React.FC = () => {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -47,6 +48,12 @@ const WishlistScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadWishlist();
+    setRefreshing(false);
   };
 
   if (!isAuthenticated) {
@@ -95,12 +102,16 @@ const WishlistScreen: React.FC = () => {
         renderItem={({ item }) => (
           <ProductCard
             product={item}
-            onPress={() => navigation.navigate('ProductDetail', { productId: item._id })}
+            onPress={() => navigation.navigate('ProductDetail', { productId: (item as any).productId || item._id })}
             onAddToCart={() => {}}
+            style={styles.productCard}
           />
         )}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item, index) => String((item as any).wishlistItemId || item._id || index)}
         numColumns={2}
+        columnWrapperStyle={styles.row}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -142,7 +153,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    padding: 8,
+    paddingHorizontal: 8,
+    paddingBottom: 24,
+    paddingTop: 8,
+    flexGrow: 1,
+  },
+  row: {
+    justifyContent: 'space-between',
+  },
+  productCard: {
+    width: '48%',
+    margin: 4,
   },
   emptyContainer: {
     flex: 1,

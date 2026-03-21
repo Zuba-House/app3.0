@@ -215,7 +215,30 @@ function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 w-full">
-      <CardElement className="p-3 border rounded" />
+      <div className="rounded-md border border-gray-200 bg-white p-3">
+        <p className="text-[13px] font-[600] text-gray-700 mb-2">Card details</p>
+        <CardElement
+          options={{
+            style: {
+              base: {
+                fontSize: "16px",
+                color: "#1f2937",
+                fontFamily: "Montserrat, sans-serif",
+                "::placeholder": {
+                  color: "#9ca3af",
+                },
+              },
+              invalid: {
+                color: "#dc2626",
+              },
+            },
+          }}
+          className="p-3 border rounded-md bg-white"
+        />
+        <p className="text-[12px] text-gray-500 mt-2">
+          Enter card number, expiry date, CVC, and postal code
+        </p>
+      </div>
       <button
         type="submit"
         disabled={!stripe || processing || !amount || amount <= 0}

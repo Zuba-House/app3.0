@@ -18,37 +18,40 @@ const Search = () => {
 
   const onChangeInput = (e) => {
     setSearchQuery(e.target.value);
-  }
+  };
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
       e.preventDefault();
       search();
     }
-  }
+  };
 
-  const search = () => {
-
-    setIsLoading(true)
+  const search = async () => {
+    const trimmedQuery = searchQuery.trim();
+    if (!trimmedQuery) {
+      return;
+    }
 
     const obj = {
       page: 1,
       limit: 3,
-      query: searchQuery
-    }
+      query: trimmedQuery
+    };
 
-    if (searchQuery !== "") {
-      postData(`/api/product/search/get`, obj).then((res) => {
-        context?.setSearchData(res);
-        setTimeout(() => {
-          setIsLoading(false);
-          context?.setOpenSearchPanel(false)
-          history("/search")
-        }, 1000);
-      })
+    try {
+      setIsLoading(true);
+      const res = await postData(`/api/product/search/get`, obj);
+      context?.setSearchData(res);
+      context?.setOpenSearchPanel(false);
+      history(`/search?q=${encodeURIComponent(trimmedQuery)}`);
+    } catch (error) {
+      console.error("Search failed:", error);
+      context?.alertBox?.("error", "Search failed. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
-
-  }
+  };
 
   return (
     <div className="searchBox w-[100%] h-[50px] bg-white rounded-xl relative p-2 border border-[#e5e2db] shadow-sm">
@@ -58,7 +61,7 @@ const Search = () => {
         className="w-full h-[35px] focus:outline-none bg-inherit p-2 text-[15px] text-[#0b2735] placeholder:text-[#0b2735] placeholder:opacity-50"
         value={searchQuery}
         onChange={onChangeInput}
-        onKeyPress={handleKeyPress}
+        onKeyDown={handleKeyDown}
       />
       <Button className="!absolute top-[8px] right-[5px] z-50 !w-[37px] !min-w-[37px] h-[37px] !rounded-full !text-[#0b2735] hover:!bg-[#efb291] hover:!text-[#0b2735] search-icon-btn transition-all" onClick={search}>
         {

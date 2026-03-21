@@ -631,8 +631,21 @@ const Checkout = () => {
                   {showStripeForm && (
                     <div
                       id="stripe-payment-box"
-                      className="w-full p-4 mt-2 bg-[#f9f9f9] border border-gray-200 rounded-md shadow-sm"
+                      className="w-full p-4 mt-2 bg-gradient-to-b from-[#fffaf7] to-white border border-[#f1d7c8] rounded-xl shadow-sm"
                     >
+                      <div className="mb-3">
+                        <h3 className="text-[15px] font-[700] text-gray-800">Enter Card Details</h3>
+                        <p className="text-[12px] text-gray-600 mt-1">
+                          Secure checkout powered by Stripe
+                        </p>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <span className="text-[11px] px-2 py-1 rounded-full bg-white border border-gray-200 text-gray-700">VISA</span>
+                          <span className="text-[11px] px-2 py-1 rounded-full bg-white border border-gray-200 text-gray-700">Mastercard</span>
+                          <span className="text-[11px] px-2 py-1 rounded-full bg-white border border-gray-200 text-gray-700">AMEX</span>
+                          <span className="text-[11px] px-2 py-1 rounded-full bg-green-50 border border-green-200 text-green-700">SSL Encrypted</span>
+                        </div>
+                      </div>
+
                       <StripeCheckout
                         amount={
                           (() => {
@@ -666,8 +679,8 @@ const Checkout = () => {
                         }}
                       />
 
-                      <p className="text-[13px] text-center mt-3 text-gray-600">
-                        💳 All payments are securely processed by Stripe.
+                      <p className="text-[12px] text-center mt-3 text-gray-600">
+                        By placing your order, your payment details are handled securely by Stripe.
                       </p>
                     </div>
                   )}
