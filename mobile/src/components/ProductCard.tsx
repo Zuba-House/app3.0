@@ -25,10 +25,27 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onAddToCart,
   style,
 }) => {
-  const displayPrice = product.salePrice || product.price;
-  const originalPrice = product.salePrice ? product.price : null;
-  const discount = product.salePrice
-    ? Math.round(((product.price - product.salePrice) / product.price) * 100)
+  // Resolve display price robustly:
+  // some variable products have parent price=0 and valid variation prices.
+  const parentSale = Number(product.salePrice ?? 0);
+  const parentPrice = Number(product.price ?? 0);
+  const variationPrices = Array.isArray(product.variations)
+    ? product.variations
+        .map((v: any) => Number(v?.salePrice ?? v?.price ?? 0))
+        .filter((p: number) => Number.isFinite(p) && p > 0)
+    : [];
+  const minVariationPrice = variationPrices.length > 0 ? Math.min(...variationPrices) : 0;
+
+  const displayPrice =
+    parentSale > 0 ? parentSale :
+    parentPrice > 0 ? parentPrice :
+    minVariationPrice;
+
+  const originalPrice =
+    parentSale > 0 && parentPrice > parentSale ? parentPrice : null;
+
+  const discount = originalPrice
+    ? Math.round(((originalPrice - displayPrice) / originalPrice) * 100)
     : 0;
 
   // Get image URL - handle different formats from backend (including Cloudinary)

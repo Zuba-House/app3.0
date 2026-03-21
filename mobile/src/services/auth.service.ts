@@ -114,52 +114,42 @@ export const authService = {
   /**
    * User registration
    */
-  register: async (data: RegisterData): Promise<AuthResponse> => {
-    const response = await postData<AuthResponse>(
+  register: async (data: RegisterData): Promise<any> => {
+    const response = await postData<any>(
       API_ENDPOINTS.REGISTER,
       data
     );
 
-    // Handle different response structures
-    let authData: AuthResponse;
-    
-    if (response.success && response.data) {
-      // Check if data is directly AuthResponse or nested
-      if (response.data.accessToken && response.data.user) {
-        authData = response.data as AuthResponse;
-      } else if ((response.data as any).accessToken) {
-        authData = response.data as AuthResponse;
-      } else {
-        // Try to extract from nested structure
-        const nested = response.data as any;
-        authData = {
-          accessToken: nested.accessToken || nested.token || '',
-          refreshToken: nested.refreshToken || nested.refresh || '',
-          user: nested.user || nested.data || nested,
+    if (response.success) {
+      const dataPayload = response.data || {};
+      const accessToken = dataPayload.accessToken || dataPayload.accesstoken;
+      const refreshToken = dataPayload.refreshToken || '';
+      const user = dataPayload.user;
+
+      // Some environments auto-login on register. Persist auth when returned.
+      if (accessToken && user) {
+        const authData: AuthResponse = {
+          accessToken,
+          refreshToken,
+          user,
         };
-      }
 
-      // Validate we have required fields
-      if (!authData.accessToken || !authData.user) {
-        throw new Error(response.message || 'Invalid registration response');
-      }
-
-      // Validate tokens exist before storing
-      if (!authData.accessToken || !authData.user) {
-        throw new Error(response.message || 'Invalid registration response');
-      }
-
-      // Store tokens and user (only if values are defined)
-      const itemsToStore: [string, string][] = [];
-      if (authData.accessToken) itemsToStore.push([STORAGE_KEYS.ACCESS_TOKEN, authData.accessToken]);
-      if (authData.refreshToken) itemsToStore.push([STORAGE_KEYS.REFRESH_TOKEN, authData.refreshToken]);
-      if (authData.user) itemsToStore.push([STORAGE_KEYS.USER, JSON.stringify(authData.user)]);
-
-      if (itemsToStore.length > 0) {
+        const itemsToStore: [string, string][] = [
+          [STORAGE_KEYS.ACCESS_TOKEN, accessToken],
+          [STORAGE_KEYS.REFRESH_TOKEN, refreshToken],
+          [STORAGE_KEYS.USER, JSON.stringify(user)],
+        ];
         await AsyncStorage.multiSet(itemsToStore);
+        return authData;
       }
 
-      return authData;
+      // Verification-required flow: registration succeeded but OTP/email verification is pending.
+      return {
+        success: true,
+        error: false,
+        message: response.message || 'Registration successful. Please verify your email.',
+        requiresEmailVerification: true,
+      };
     }
 
     // Handle error response from API

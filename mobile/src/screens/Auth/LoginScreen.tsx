@@ -35,6 +35,17 @@ const LoginScreen: React.FC = () => {
 
   const dispatch = useAppDispatch();
 
+  const closeAuthModal = () => {
+    const parentNav = (navigation as any).getParent?.();
+    if (parentNav?.canGoBack?.()) {
+      parentNav.goBack();
+      return;
+    }
+    if ((navigation as any).canGoBack?.()) {
+      (navigation as any).goBack();
+    }
+  };
+
   const handleLogin = async () => {
     if (!email || !password) {
       setError('Please fill in all fields');
@@ -94,7 +105,7 @@ const LoginScreen: React.FC = () => {
             })
           );
         }
-        // Navigation will be handled by AppNavigator automatically
+        closeAuthModal();
       } else {
         throw new Error('Invalid response from server - no access token');
       }
@@ -187,7 +198,7 @@ const LoginScreen: React.FC = () => {
             })
           );
         }
-        // Navigation will be handled by AppNavigator automatically
+        closeAuthModal();
       } else {
         throw new Error('Invalid response from server - no access token');
       }

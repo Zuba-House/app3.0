@@ -17,6 +17,32 @@ interface CartState {
   error: string | null;
 }
 
+const normalizeCartItems = (input: any): CartItem[] => {
+  if (!Array.isArray(input)) return [];
+  return input.map((item: any) => {
+    const price = Number(item?.price ?? 0);
+    const quantity = Number(item?.quantity ?? 1);
+    const subtotal = Number(item?.subtotal ?? item?.subTotal ?? price * quantity);
+    const productObj =
+      item?.product && typeof item.product === 'object'
+        ? item.product
+        : {
+            _id: String(item?.productId ?? ''),
+            name: String(item?.productTitle ?? 'Product'),
+            images: item?.image ? [item.image] : [],
+            featuredImage: item?.image || '',
+          };
+    return {
+      _id: String(item?._id ?? `${item?.productId ?? 'item'}_${Math.random()}`),
+      product: productObj,
+      variation: item?.variation,
+      quantity,
+      price,
+      subtotal,
+    } as CartItem;
+  });
+};
+
 const initialState: CartState = {
   items: [],
   subtotal: 0,
@@ -42,9 +68,12 @@ const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
-    setCart: (state, action: PayloadAction<Cart>) => {
-      state.items = action.payload.items;
-      const totals = calculateTotals(action.payload.items);
+    setCart: (state, action: PayloadAction<any>) => {
+      const payload = action.payload;
+      const rawItems = Array.isArray(payload) ? payload : payload?.items;
+      const items = normalizeCartItems(rawItems);
+      state.items = items;
+      const totals = calculateTotals(items);
       state.subtotal = totals.subtotal;
       state.tax = totals.tax;
       state.shipping = totals.shipping;

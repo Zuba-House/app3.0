@@ -517,7 +517,8 @@ const ProductDetailScreen: React.FC = () => {
           product._id,
           quantity,
           variationId,
-          variationData
+          variationData,
+          product
         );
 
         if (response.success) {
@@ -695,7 +696,7 @@ const ProductDetailScreen: React.FC = () => {
             return;
           }
           try {
-            await cartService.addToCart(item._id, 1);
+            await cartService.addToCart(item._id, 1, undefined, undefined, item);
             Alert.alert('Added', 'Product added to cart');
           } catch (error: any) {
             Alert.alert('Error', error.message || 'Failed to add to cart');
@@ -719,7 +720,7 @@ const ProductDetailScreen: React.FC = () => {
             return;
           }
           try {
-            await cartService.addToCart(item._id, 1);
+            await cartService.addToCart(item._id, 1, undefined, undefined, item);
             Alert.alert('Added', 'Product added to cart');
           } catch (error: any) {
             Alert.alert('Error', error.message || 'Failed to add to cart');

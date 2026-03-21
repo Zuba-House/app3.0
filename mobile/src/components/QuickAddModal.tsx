@@ -86,7 +86,8 @@ export default function QuickAddModal({ visible, product, onClose, onAdded }: Qu
           p._id,
           1,
           selectedVariation?._id,
-          selectedVariation
+          selectedVariation,
+          p
         );
         if (response.success) {
           const cartResponse = await cartService.getCart();

@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { addressService } from '../../services/address.service';
 import { checkoutService, CreateOrderData } from '../../services/checkout.service';
 import { cartService } from '../../services/cart.service';
+import { productService } from '../../services/product.service';
 import { Address, ShippingMethod } from '../../types/address.types';
 import { ApiResponse } from '../../types/api.types';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
@@ -54,6 +55,10 @@ const CheckoutScreen: React.FC = () => {
   const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<ShippingMethod | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'stripe'>('stripe');
+  // Guest checkout contact
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
 
   // Coupon & Gift Card state
   const [couponCode, setCouponCode] = useState('');
@@ -121,7 +126,13 @@ const CheckoutScreen: React.FC = () => {
         setAddresses(addressList);
         // Auto-select default address
         const defaultAddr = addressList.find((a) => a.isDefault) || addressList[0];
-        if (defaultAddr) setSelectedAddress(defaultAddr);
+        if (defaultAddr) {
+          setSelectedAddress(defaultAddr);
+          if (!isAuthenticated) {
+            setGuestName(defaultAddr.name || '');
+            setGuestPhone(defaultAddr.phone || '');
+          }
+        }
       }
 
       if (shippingRes.success && shippingRes.data) {
@@ -260,17 +271,51 @@ const CheckoutScreen: React.FC = () => {
       Alert.alert('Error', 'Please complete all checkout steps');
       return;
     }
-    if (!isAuthenticated) {
-      Alert.alert(
-        'Log in to place order',
-        'Please log in or create an account to place your order. You can use the buttons above.',
-      );
-      return;
-    }
+    // Guest checkout supported
 
     try {
       setProcessing(true);
       analyticsService.checkoutStart(totals.total, cartItems.length);
+
+      // Pre-validate stock before attempting order creation, to avoid backend rejection at final step.
+      const outOfStockTitles: string[] = [];
+      for (const item of cartItems as any[]) {
+        const productId = item.productId || item.product?._id;
+        if (!productId) continue;
+        try {
+          const productRes = await productService.getProductById(productId);
+          if (!productRes.success || !productRes.data) continue;
+          const p: any = productRes.data;
+          const qty = Number(item.quantity || 0);
+          let stock = Number(p?.inventory?.stock ?? p?.countInStock ?? p?.stock ?? 0);
+          const endless = !!p?.inventory?.endlessStock;
+          if (item.variationId && Array.isArray(p?.variations)) {
+            const v = p.variations.find((vv: any) => String(vv?._id) === String(item.variationId));
+            if (v) {
+              stock = Number(v?.stock ?? 0);
+              if (!!v?.endlessStock) {
+                stock = 999999;
+              }
+            }
+          } else if (endless) {
+            stock = 999999;
+          }
+          if (stock < qty) {
+            outOfStockTitles.push(item.productTitle || item.product?.name || 'Product');
+          }
+        } catch {
+          // Skip hard-failing on stock precheck network errors; backend still validates.
+        }
+      }
+
+      if (outOfStockTitles.length > 0) {
+        Alert.alert(
+          'Out of stock',
+          `Please remove unavailable item(s) from cart:\n\n${outOfStockTitles.join('\n')}`
+        );
+        setProcessing(false);
+        return;
+      }
 
       let addressId = selectedAddress._id;
       const isGuestAddress = !addressId || String(addressId).startsWith('guest-');
@@ -324,31 +369,72 @@ const CheckoutScreen: React.FC = () => {
         couponCode: appliedCoupon?.code || undefined,
         giftCardCode: appliedGiftCard?.code || undefined,
       };
-      const orderResponse = await checkoutService.createOrder(orderData);
+      let orderResponse: ApiResponse<any>;
+      if (isAuthenticated) {
+        orderResponse = await checkoutService.createOrder(orderData);
+      } else {
+        // Validate guest info
+        const gName = guestName?.trim() || selectedAddress?.name || '';
+        const gEmail = guestEmail?.trim();
+        const gPhone = guestPhone?.trim() || selectedAddress?.phone || '';
+        if (!gName || !gEmail || !gPhone) {
+          Alert.alert('Error', 'Please enter your name, email, and phone to place order.');
+          setProcessing(false);
+          return;
+        }
+        orderResponse = await checkoutService.createGuestOrder({
+          products: normalizedProducts as any,
+          shippingAddress: selectedAddress,
+          guestCustomer: { name: gName, email: gEmail, phone: gPhone },
+          totalAmt: totals.total,
+          shippingCost: selectedShipping.price || 0,
+          shippingRate: selectedShipping._id,
+        });
+      }
 
       if (orderResponse.success && orderResponse.data) {
         const orderId = orderResponse.data._id || orderResponse.data.orderId;
-        navigation.navigate('Payment', {
-          orderId,
-          amount: totals.total,
-          onSuccess: () => {
-            analyticsService.purchase(
-              orderId,
-              totals.total,
-              cartItems.map(item => ({
-                id: typeof item.product === 'object' ? item.product?._id : '',
-                name: typeof item.product === 'object' ? item.product?.name || 'Unknown' : 'Unknown',
-                price: item.price,
-                quantity: item.quantity,
-              }))
-            );
-            dispatch(clearCart());
-            navigation.navigate('OrderConfirmation', {
-              orderId,
-              total: totals.total,
-            });
-          },
-        });
+        if (isAuthenticated) {
+          // Real payment screen (can be sample too)
+          navigation.navigate('Payment', {
+            orderId,
+            amount: totals.total,
+            onSuccess: () => {
+              analyticsService.purchase(
+                orderId,
+                totals.total,
+                cartItems.map(item => ({
+                  id: typeof item.product === 'object' ? item.product?._id : '',
+                  name: typeof item.product === 'object' ? item.product?.name || 'Unknown' : 'Unknown',
+                  price: item.price,
+                  quantity: item.quantity,
+                }))
+              );
+              dispatch(clearCart());
+              navigation.navigate('OrderConfirmation', {
+                orderId,
+                total: totals.total,
+              });
+            },
+          });
+        } else {
+          // Sample order: skip Stripe, go straight to confirmation
+          analyticsService.purchase(
+            orderId,
+            totals.total,
+            cartItems.map(item => ({
+              id: typeof item.product === 'object' ? item.product?._id : '',
+              name: typeof item.product === 'object' ? item.product?.name || 'Unknown' : 'Unknown',
+              price: item.price,
+              quantity: item.quantity,
+            }))
+          );
+          dispatch(clearCart());
+          navigation.navigate('OrderConfirmation', {
+            orderId,
+            total: totals.total,
+          });
+        }
       } else {
         Alert.alert('Error', (orderResponse as any).message || 'Failed to create order');
       }
@@ -722,6 +808,38 @@ const CheckoutScreen: React.FC = () => {
           </View>
         )}
       </View>
+      {/* Guest contact info */}
+      {!isAuthenticated && (
+        <View style={styles.reviewSection}>
+          <Text style={styles.stepTitle}>Contact Information</Text>
+          <View style={{ gap: 10, marginTop: 8 }}>
+            <TextInput
+              style={styles.discountInput}
+              placeholder="Full Name"
+              value={guestName}
+              onChangeText={setGuestName}
+              placeholderTextColor={Colors.primary + '80'}
+            />
+            <TextInput
+              style={styles.discountInput}
+              placeholder="Email"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={guestEmail}
+              onChangeText={setGuestEmail}
+              placeholderTextColor={Colors.primary + '80'}
+            />
+            <TextInput
+              style={styles.discountInput}
+              placeholder="Phone"
+              keyboardType="phone-pad"
+              value={guestPhone}
+              onChangeText={setGuestPhone}
+              placeholderTextColor={Colors.primary + '80'}
+            />
+          </View>
+        </View>
+      )}
 
       {/* Shipping Method Summary */}
       <View style={styles.reviewSection}>

@@ -293,6 +293,15 @@ export default function SearchScreen() {
       setQuickAddProduct(product);
       return;
     }
+    // Block add if out of stock
+    const stock =
+      (product as any)?.inventory?.endlessStock
+        ? 999
+        : Number((product as any)?.inventory?.stock ?? (product as any)?.countInStock ?? (product as any)?.stock ?? 0);
+    if (stock <= 0) {
+      showError('This item is out of stock');
+      return;
+    }
     const price = product.salePrice ?? product.price ?? 0;
     if (!isAuthenticated) {
       const cartItem = {
@@ -307,7 +316,7 @@ export default function SearchScreen() {
       return;
     }
     try {
-      const res = await cartService.addToCart(product._id, 1);
+      const res = await cartService.addToCart(product._id, 1, undefined, undefined, product);
       if (res.success) {
         const cartRes = await cartService.getCart();
         if (cartRes.success && cartRes.data) dispatch(setCart(cartRes.data));
@@ -347,7 +356,7 @@ export default function SearchScreen() {
           const cartService = require('../../services/cart.service').cartService;
           const { setCart } = require('../../store/slices/cartSlice');
           const store = require('../../store/store').default;
-          cartService.addToCart(item._id, 1).then((res) => {
+          cartService.addToCart(item._id, 1, undefined, undefined, item).then((res) => {
             if (res.success) {
               cartService.getCart().then((cr) => { if (cr.success && cr.data) store.dispatch(setCart(cr.data)); });
               showError('Added to cart');
