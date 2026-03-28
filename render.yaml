@@ -7,5 +7,16 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 18.19.0
+      # Public Web client ID (same as mobile app.json extra.expoClientId)
+      - key: GOOGLE_CLIENT_ID
+        value: 435369151234-8e7sb5ferci9ti2472vdmf6ose5e6nss.apps.googleusercontent.com
+      # Set in Render Dashboard → Environment (never commit). If leaked, rotate in Google Cloud.
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # Must match Expo redirect https://auth.expo.io/@OWNER/SLUG
+      - key: EXPO_OWNER
+        value: olivierndev
+      - key: EXPO_SLUG
+        value: zuba-mobile
     plan: free
 

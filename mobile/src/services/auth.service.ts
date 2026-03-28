@@ -251,9 +251,11 @@ export const authService = {
    * Google OAuth: send authorization code to backend (secure; client_secret stays on server).
    */
   loginWithGoogleCode: async (code: string, redirectUri: string): Promise<AuthResponse> => {
+    const guestCart = await authService.getGuestCartForMerge();
     const response = await postData<any>(API_ENDPOINTS.GOOGLE_AUTH_CODE, {
       code,
       redirect_uri: redirectUri,
+      guestCart,
     });
 
     if (response.success && response.data) {

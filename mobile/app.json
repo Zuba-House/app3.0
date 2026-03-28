@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "Zuba",
+    "owner": "olivierndev",
     "slug": "zuba-mobile",
     "version": "1.0.0",
     "scheme": "zuba",
@@ -46,7 +47,7 @@
       "eas": {
         "projectId": "zuba-house-019"
       },
-      "expoClientId": "473177050132-1qblfnv4gap1gkpfq6mg4iu11lucp48u.apps.googleusercontent.com"
+      "expoClientId": "435369151234-8e7sb5ferci9ti2472vdmf6ose5e6nss.apps.googleusercontent.com"
     },
     "packagerOpts": {
       "config": "metro.config.js"

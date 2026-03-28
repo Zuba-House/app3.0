@@ -290,7 +290,7 @@ export async function authWithGoogle(request, response) {
  */
 export async function authWithGoogleCode(request, response) {
     try {
-        const { code, redirect_uri } = request.body;
+        const { code, redirect_uri, guestCart } = request.body;
         if (!code) {
             return response.status(400).json({
                 message: "Authorization code is required",
@@ -309,7 +309,11 @@ export async function authWithGoogleCode(request, response) {
             });
         }
 
-        const redirectUri = redirect_uri || `https://auth.expo.io/@olivierndev/${process.env.EXPO_SLUG || 'zuba-mobile'}`;
+        const defaultOwner = process.env.EXPO_OWNER || 'olivierndev';
+        const defaultSlug = process.env.EXPO_SLUG || 'zuba-mobile';
+        const redirectUri =
+            redirect_uri ||
+            `https://auth.expo.io/@${defaultOwner}/${defaultSlug}`;
 
         const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
@@ -393,6 +397,8 @@ export async function authWithGoogleCode(request, response) {
         };
         response.cookie('accessToken', accesstoken, cookiesOption);
         response.cookie('refreshToken', refreshToken, cookiesOption);
+
+        await mergeGuestCartForUser(user._id, guestCart);
 
         return response.json({
             message: "Login successfully",

@@ -3,8 +3,21 @@
  * Loads environment variables and provides app-wide constants
  */
 
-// API Configuration
-export const API_URL = process.env.API_URL || 'https://zuba-api.onrender.com';
+import Constants from 'expo-constants';
+
+function resolveApiBaseUrl(): string {
+  const trim = (u: string) => u.replace(/\/+$/, '');
+  const fromPublic = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (fromPublic) return trim(fromPublic);
+  const fromExtra = (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl?.trim();
+  if (fromExtra) return trim(fromExtra);
+  const legacy = process.env.API_URL?.trim();
+  if (legacy) return trim(legacy);
+  return 'https://zuba-api.onrender.com';
+}
+
+// API base (physical device must reach this host — use LAN IP or production URL, not localhost)
+export const API_URL = resolveApiBaseUrl();
 
 // Stripe Configuration
 export const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY || '';
