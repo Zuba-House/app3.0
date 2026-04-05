@@ -93,7 +93,7 @@ const CartPanel = (props) => {
 
         <div className="bottomInfo py-3 px-4 w-full border-t border-[rgba(0,0,0,0.1)] flex items-center justify-between flex-col">
           <div className="flex items-center justify-between w-full">
-            <span className="text-[14px] font-[600]">Total (tax excl.)</span>
+            <span className="text-[14px] font-[600]">Total</span>
             <span className="text-primary font-bold">
               {formatCurrency(
                 (context.cartData?.length !== 0 ?
