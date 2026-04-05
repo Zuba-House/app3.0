@@ -1,5 +1,8 @@
 import axios from "axios";
-const apiUrl = import.meta.env.VITE_API_URL;
+
+const rawBase =
+    import.meta.env.VITE_API_URL || "https://zuba-api.onrender.com";
+const apiUrl = String(rawBase).replace(/\/+$/, "");
 
 // Flag to prevent multiple simultaneous refresh attempts
 let isRefreshing = false;

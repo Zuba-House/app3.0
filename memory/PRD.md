@@ -42,7 +42,7 @@ Complete Phase 1 Critical Fixes for ~75% complete e-commerce platform:
 - Payment success/cancel redirect pages for mobile
 
 #### 2. Stripe Payment Integration - COMPLETED ✅
-- **Real Keys Configured**: `sk_test_51SVwLc...` / `pk_test_51SVwLc...`
+- **Keys**: Configure in hosting secrets (Render/env) — never commit real keys.
 - Checkout Session endpoint: `POST /api/stripe/create-checkout-session`
 - Status endpoint: `GET /api/stripe/checkout-status/:sessionId`
 - Webhook endpoint: `POST /api/stripe/webhook`
@@ -135,8 +135,8 @@ Complete Phase 1 Critical Fixes for ~75% complete e-commerce platform:
 ```
 PORT=5000
 MONGODB_URI=mongodb://localhost:27017/zubahouse
-STRIPE_SECRET_KEY=sk_test_51SVwLc...
-STRIPE_PUBLISHABLE_KEY=pk_test_51SVwLc...
+STRIPE_SECRET_KEY=(from Stripe Dashboard — test or live)
+STRIPE_PUBLISHABLE_KEY=(from Stripe Dashboard — test or live)
 ```
 
 ### Mobile (app.json)

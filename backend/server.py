@@ -14,11 +14,29 @@ import httpx
 
 app = FastAPI(title="Zuba House Mobile API")
 
-# CORS Configuration
+
+def _cors_settings():
+    """
+    Starlette forbids allow_origins=['*'] together with allow_credentials=True.
+    Default: wildcard origins without credentials (fine for Bearer tokens in headers).
+    Set CORS_ORIGINS to a comma-separated list to enable credentials for those origins.
+    Use CORS_ORIGINS=* for wildcard with credentials disabled (explicit).
+    """
+    raw = os.getenv("CORS_ORIGINS", "").strip()
+    if not raw or raw == "*":
+        return ["*"], False
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    if not origins:
+        return ["*"], False
+    return origins, True
+
+
+_cors_origins, _cors_credentials = _cors_settings()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

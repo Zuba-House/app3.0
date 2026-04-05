@@ -1,5 +1,8 @@
 import axios from "axios";
-const apiUrl = import.meta.env.VITE_API_URL;
+
+const rawBase =
+    import.meta.env.VITE_API_URL || "https://zuba-api.onrender.com";
+const apiUrl = String(rawBase).replace(/\/+$/, "");
 
 // Helper function to check if token error and clear session
 const handleAuthError = (status, data) => {
