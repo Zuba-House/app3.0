@@ -1,0 +1,14 @@
+{
+  "name": "zuba-house-apps",
+  "private": true,
+  "description": "Monorepo root. Expo app and app.json live in mobile/",
+  "scripts": {
+    "start": "npm --prefix mobile run start",
+    "mobile": "npm --prefix mobile run start",
+    "expo:start": "npm --prefix mobile run start",
+    "expo:clear": "npm --prefix mobile run start -- --clear",
+    "expo:clear:offline": "npm --prefix mobile run start -- --offline --clear",
+    "expo:offline": "npm --prefix mobile run start:offline",
+    "folder-sizes": "powershell -NoProfile -ExecutionPolicy Bypass -File \"./scripts/folder-sizes.ps1\""
+  }
+}

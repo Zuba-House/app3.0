@@ -11,7 +11,8 @@ import { postData } from './api';
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
     priority: Notifications.AndroidNotificationPriority.HIGH,
@@ -175,12 +176,10 @@ class NotificationService {
    * Remove notification listeners
    */
   removeListeners() {
-    if (this.notificationListener) {
-      Notifications.removeNotificationSubscription(this.notificationListener);
-    }
-    if (this.responseListener) {
-      Notifications.removeNotificationSubscription(this.responseListener);
-    }
+    this.notificationListener?.remove?.();
+    this.responseListener?.remove?.();
+    this.notificationListener = null;
+    this.responseListener = null;
   }
 
   /**

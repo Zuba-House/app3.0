@@ -31,6 +31,8 @@ const normalizeCartItems = (input: any): CartItem[] => {
             images: item?.image ? [item.image] : [],
             featuredImage: item?.image || '',
           };
+    const pid = item?.productId != null ? String(item.productId) : undefined;
+    const vid = item?.variationId != null ? String(item.variationId) : undefined;
     return {
       _id: String(item?._id ?? `${item?.productId ?? 'item'}_${Math.random()}`),
       product: productObj,
@@ -38,6 +40,9 @@ const normalizeCartItems = (input: any): CartItem[] => {
       quantity,
       price,
       subtotal,
+      productId: pid,
+      variationId: vid ?? null,
+      productTitle: item?.productTitle ? String(item.productTitle) : undefined,
     } as CartItem;
   });
 };

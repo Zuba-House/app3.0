@@ -161,10 +161,15 @@ const makeRequest = async <T = any>(
       throw new Error('Invalid response from server');
     }
 
-    // Check for error response BEFORE handling 401
-    // Only throw if error is explicitly true AND success is false
-    if (data && data.error === true && data.success === false) {
-      // This is an error response (e.g., email already exists)
+    // Do not treat JSON error bodies as fatal before 401 handling — many backends return
+    // 401 with { success: false, error: true, message: "Token expired" }; we must refresh first.
+    // Check for error response only when the HTTP status is not 401.
+    if (
+      response.status !== 401 &&
+      data &&
+      data.error === true &&
+      data.success === false
+    ) {
       throw new Error(data.message || 'Request failed');
     }
 

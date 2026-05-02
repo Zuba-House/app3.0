@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Product } from '../types/product.types';
 import { API_URL } from '../constants/config';
 import Colors from '../constants/colors';
+import { getProductStock, isProductOutOfStock } from '../utils/productStock';
 
 interface ProductCardProps {
   product: Product;
@@ -147,11 +148,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
     // });
   }
 
-  // Calculate stock status for promotional banner (Temu style)
-  const stockStatus = Number(product.stock ?? (product as any).countInStock ?? 0);
-  const showPromoBanner = stockStatus > 0 && stockStatus <= 10;
-  const promoText = stockStatus > 0 && stockStatus <= 10 
-    ? `LAST ${stockStatus} AT PROMO PRICE`
+  // Stock: same rules as web ProductItem — missing quantity ≠ out of stock
+  const outOfStock = isProductOutOfStock(product);
+  const numericStock = getProductStock(product);
+  const showPromoBanner =
+    !outOfStock &&
+    numericStock !== null &&
+    numericStock > 0 &&
+    numericStock <= 10;
+  const promoText = showPromoBanner
+    ? `LAST ${numericStock} AT PROMO PRICE`
     : null;
 
   // Calculate sold count for display
@@ -208,7 +214,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </View>
         )}
         {/* Out of Stock Ribbon */}
-        {stockStatus <= 0 && (
+        {outOfStock && (
           <View style={[styles.promoBanner, { backgroundColor: 'rgba(220,38,38,0.9)' }]}>
             <Text style={[styles.promoText, { fontWeight: '800' }]}>OUT OF STOCK</Text>
           </View>
@@ -250,10 +256,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
           
           {/* Add to Cart Button - Temu Style */}
           <TouchableOpacity 
-            style={[styles.cartButton, stockStatus <= 0 && { opacity: 0.4 }]}
+            style={[styles.cartButton, outOfStock && { opacity: 0.4 }]}
             onPress={(e) => {
               e.stopPropagation();
-              if (stockStatus > 0) {
+              if (!outOfStock) {
                 onAddToCart?.();
               }
             }}

@@ -14,6 +14,8 @@ export interface Address {
   state: string;
   postalCode: string;
   country: string;
+  /** ISO country code when known (e.g. CA, US) */
+  countryCode?: string;
   isDefault?: boolean;
   createdAt?: string;
   updatedAt?: string;

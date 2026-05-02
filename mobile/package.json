@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "start": "npx expo start",
+    "start:offline": "npx expo start --offline",
     "start:lan": "npx expo start --lan --clear",
     "start:tunnel": "npx expo start --tunnel --clear",
     "start:iphone": "powershell -ExecutionPolicy Bypass -File ./start-expo-iphone.ps1",

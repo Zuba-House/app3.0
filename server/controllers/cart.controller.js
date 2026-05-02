@@ -280,17 +280,26 @@ export const getCartItemController = async (request, response) => {
                     let stockChanged = false;
                     
                     if (product) {
-                        // For variable products, check variation stock
+                        // Resolve stock the same way as addToCartItemController (avoid stripping endless / DB mismatches)
                         if (item.productType === 'variable' && item.variationId) {
                             const variation = product.variations?.find(
-                                v => v._id && v._id.toString() === item.variationId
+                                v => v._id && v._id.toString() === item.variationId.toString()
                             );
                             if (variation) {
-                                currentStock = variation.stock || 0;
+                                if (variation.endlessStock) {
+                                    currentStock = 999999;
+                                } else {
+                                    currentStock = Number(variation.stock || 0);
+                                }
                             }
+                        } else if (product.inventory?.endlessStock) {
+                            currentStock = 999999;
                         } else {
-                            // For simple products, check product stock
-                            currentStock = product.countInStock || product.inventory?.stock || 0;
+                            currentStock = Number(
+                                product.countInStock ??
+                                product.inventory?.stock ??
+                                0
+                            );
                         }
                         
                         // Update cart item if stock changed

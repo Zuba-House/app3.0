@@ -3,7 +3,7 @@
  * Multi-step checkout flow with address, shipping, and payment
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator } from 'react-native-paper';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { addressService } from '../../services/address.service';
 import { checkoutService, CreateOrderData } from '../../services/checkout.service';
@@ -26,7 +26,7 @@ import { productService } from '../../services/product.service';
 import { Address, ShippingMethod } from '../../types/address.types';
 import { ApiResponse } from '../../types/api.types';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { selectCartItems, selectCartTotal, clearCart } from '../../store/slices/cartSlice';
+import { selectCartItems, selectCartTotal, clearCart, setCart } from '../../store/slices/cartSlice';
 import { selectIsAuthenticated, selectUser } from '../../store/slices/authSlice';
 import Colors from '../../constants/colors';
 import { getDeliveryEstimateForMethod } from '../../constants/shipping';
@@ -156,6 +156,22 @@ const CheckoutScreen: React.FC = () => {
     // Allow guest checkout - load data even if not authenticated
     loadInitialData();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAuthenticated) return;
+      let cancelled = false;
+      cartService.getCart().then((r) => {
+        if (cancelled) return;
+        if (r.success && Array.isArray(r.data)) {
+          dispatch(setCart(r.data));
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [isAuthenticated, dispatch])
+  );
 
   useEffect(() => {
     // Recalculate totals when shipping or discount changes
@@ -484,7 +500,7 @@ const CheckoutScreen: React.FC = () => {
         shippingRate: selectedShipping,
         shippingAddress: selectedAddress,
         delivery_address: selectedAddress._id,
-        payment_status: paymentMethod === 'cod' ? 'pending' : 'pending',
+        payment_status: 'pending',
         // Include guestCustomer fallback for compatibility when backend resolves request as guest.
         guestCustomer:
           fallbackGuestCustomer.name &&

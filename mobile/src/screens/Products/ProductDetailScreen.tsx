@@ -35,6 +35,11 @@ import { getEstDeliveryLabel } from '../../constants/shipping';
 import { addToRecentlyViewed } from '../../components/RecentlyViewed';
 import ProductCard from '../../components/ProductCard';
 import { analyticsService } from '../../services/analytics.service';
+import {
+  getProductStock,
+  isProductOutOfStock,
+  isVariationInStock,
+} from '../../utils/productStock';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IMAGE_HEIGHT = SCREEN_WIDTH; // Square images for better display
@@ -152,6 +157,15 @@ function getSizeGuideData(product: Product | null): SizeGuideData | null {
 // Helper function to clean product data
 const cleanProductData = (product: any): Product => {
   try {
+    const stockFromApi =
+      product.stock !== undefined && product.stock !== null
+        ? Number(product.stock)
+        : product.countInStock !== undefined && product.countInStock !== null
+          ? Number(product.countInStock)
+          : product.inventory?.stock !== undefined && product.inventory?.stock !== null
+            ? Number(product.inventory.stock)
+            : undefined;
+
     const cleaned: any = {
       _id: product._id,
       name: product.name || '',
@@ -159,11 +173,21 @@ const cleanProductData = (product: any): Product => {
       price: product.price || 0,
       salePrice: product.salePrice,
       images: product.images || [],
-      stock: product.stock || 0,
-      stockStatus: product.stockStatus || 'in_stock',
+      stock: stockFromApi !== undefined ? stockFromApi : 0,
+      stockStatus:
+        product.stockStatus ||
+        product.inventory?.stockStatus ||
+        'in_stock',
       status: product.status || 'published',
       productType: product.productType || 'simple',
     };
+
+    if (product.countInStock !== undefined && product.countInStock !== null) {
+      cleaned.countInStock = Number(product.countInStock);
+    }
+    if (product.inventory && typeof product.inventory === 'object') {
+      cleaned.inventory = product.inventory;
+    }
     
     if (product.category) {
       if (typeof product.category === 'object' && product.category !== null) {
@@ -191,18 +215,21 @@ const cleanProductData = (product: any): Product => {
     return cleaned as Product;
   } catch (error) {
     console.warn('Error cleaning product data:', error);
-    return {
+    const fallback: any = {
       _id: product._id || '',
       name: product.name || 'Unknown Product',
       description: product.description || '',
       price: product.price || 0,
       images: product.images || [],
-      stock: product.stock || 0,
-      stockStatus: 'in_stock',
+      stock: product.stock ?? product.countInStock ?? 0,
+      stockStatus: product.stockStatus || product.inventory?.stockStatus || 'in_stock',
       status: 'published',
       productType: 'simple',
       category: typeof product.category === 'string' ? product.category : (product.category?._id || ''),
-    } as Product;
+    };
+    if (product.countInStock != null) fallback.countInStock = Number(product.countInStock);
+    if (product.inventory) fallback.inventory = product.inventory;
+    return fallback as Product;
   }
 };
 
@@ -479,15 +506,20 @@ const ProductDetailScreen: React.FC = () => {
       return;
     }
 
-    // Validation: Check quantity doesn't exceed stock
-    if (quantity > currentStock) {
+    // Validation: Check quantity doesn't exceed stock (use max cap when counts are implicit)
+    const maxQty = isOutOfStock
+      ? 0
+      : currentStock > 0
+        ? currentStock
+        : 99;
+    if (quantity > maxQty) {
       Alert.alert(
         'Insufficient Stock',
-        `Only ${currentStock} item${currentStock > 1 ? 's' : ''} available. Please adjust quantity.`,
+        `Only ${maxQty} item${maxQty > 1 ? 's' : ''} available. Please adjust quantity.`,
         [
           {
             text: 'Set to Max',
-            onPress: () => setQuantity(currentStock),
+            onPress: () => setQuantity(maxQty),
           },
           { text: 'Cancel', style: 'cancel' },
         ]
@@ -525,7 +557,7 @@ const ProductDetailScreen: React.FC = () => {
           // Refresh cart from server to get latest state (newest first handled by backend or client sort if needed)
           try {
             const cartResponse = await cartService.getCart();
-            if (cartResponse.success && cartResponse.data) {
+            if (cartResponse.success && Array.isArray(cartResponse.data)) {
               dispatch(setCart(cartResponse.data));
             }
           } catch (cartError) {
@@ -550,7 +582,10 @@ const ProductDetailScreen: React.FC = () => {
           });
         } else {
           // Handle API error response
-          const errorMessage = response.message || response.error || 'Failed to add to cart';
+          const errorMessage =
+            (typeof response.message === 'string' && response.message) ||
+            (typeof response.error === 'string' && response.error) ||
+            'Failed to add to cart';
           
           // Check for specific error types
           if (errorMessage.toLowerCase().includes('stock') || errorMessage.toLowerCase().includes('available')) {
@@ -642,6 +677,11 @@ const ProductDetailScreen: React.FC = () => {
         if (response.success) {
           setIsWishlisted(true);
           Alert.alert('Saved', 'Product added to wishlist');
+        } else {
+          Alert.alert(
+            'Wishlist',
+            response.message || 'Could not add to wishlist. Try again.'
+          );
         }
       }
     } catch (error: any) {
@@ -758,24 +798,20 @@ const ProductDetailScreen: React.FC = () => {
 
   const imageUrls = getImageUrls();
   
-  // For variable products, use variation stock/price; otherwise use product stock/price
-  // If stock is undefined/null but stockStatus is 'in_stock', assume stock is available
-  const getProductStock = () => {
-    if (product.stock !== undefined && product.stock !== null) {
-      return product.stock;
-    }
-    // If stock is not set but status is in_stock, assume it's available
-    if (product.stockStatus === 'in_stock') {
-      return 999; // Large number to indicate available
-    }
-    return 0;
-  };
-  
-  const currentStock = product.productType === 'variable' && selectedVariation
-    ? (selectedVariation.stock !== undefined && selectedVariation.stock !== null 
-        ? selectedVariation.stock 
-        : getProductStock())
-    : getProductStock();
+  // Align with web listing logic: missing counts must not default to 0 (see ProductItem).
+  const rawBaseStock = getProductStock(product);
+  const baseStock = rawBaseStock === null ? 999 : rawBaseStock;
+
+  const currentStock =
+    product.productType === 'variable' && selectedVariation
+      ? (selectedVariation as any).endlessStock
+        ? 999
+        : selectedVariation.stock !== undefined && selectedVariation.stock !== null
+          ? Number(selectedVariation.stock)
+          : isVariationInStock(selectedVariation)
+            ? Math.max(baseStock, 1)
+            : 0
+      : baseStock;
   
   const displayPrice = selectedVariation?.salePrice || selectedVariation?.price || product.salePrice || product.price;
   const originalPrice = selectedVariation?.price || (product.salePrice ? product.price : null);
@@ -786,8 +822,20 @@ const ProductDetailScreen: React.FC = () => {
   const rating = product.rating || 0;
   const reviewCount = product.reviewCount || 0;
   const soldCount = Math.floor(reviewCount * 0.8);
-  const stockStatus = currentStock > 0 && currentStock <= 10;
-  const isOutOfStock = currentStock === 0;
+  const isOutOfStock =
+    product.productType === 'variable' &&
+    (product.variations?.length ?? 0) > 0
+      ? selectedVariation
+        ? !isVariationInStock(selectedVariation)
+        : isProductOutOfStock(product)
+      : isProductOutOfStock(product);
+
+  /** Cap qty UI + validation when stock is unknown but product is sellable */
+  const maxSelectableQty = isOutOfStock
+    ? 0
+    : currentStock > 0
+      ? currentStock
+      : 99;
   
   // Check if variable product needs variation selection
   // For variable products, we need all attributes selected
@@ -1275,25 +1323,22 @@ const ProductDetailScreen: React.FC = () => {
               <TouchableOpacity
                 style={[
                   styles.quantityButton,
-                  (quantity >= currentStock || currentStock === 0) && styles.quantityButtonDisabled,
+                  (quantity >= maxSelectableQty || maxSelectableQty === 0) && styles.quantityButtonDisabled,
                 ]}
                 onPress={() => {
-                  const maxQuantity = currentStock > 0 ? currentStock : 99;
+                  const maxQuantity = maxSelectableQty > 0 ? maxSelectableQty : 99;
                   const newQuantity = Math.min(maxQuantity, quantity + 1);
                   setQuantity(newQuantity);
-                  
-                  // Show warning if trying to exceed stock
-                  if (newQuantity >= currentStock && currentStock > 0) {
-                    // Visual feedback is enough, no alert needed
-                  }
                 }}
-                disabled={quantity >= currentStock || currentStock === 0 || addingToCart}
+                disabled={
+                  quantity >= maxSelectableQty || maxSelectableQty === 0 || addingToCart
+                }
               >
                 <Ionicons 
                   name="add" 
                   size={20} 
                   color={
-                    quantity >= currentStock || currentStock === 0 || addingToCart
+                    quantity >= maxSelectableQty || maxSelectableQty === 0 || addingToCart
                       ? Colors.border 
                       : Colors.primary
                   } 
@@ -1301,13 +1346,15 @@ const ProductDetailScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             <Text style={styles.stockText}>
-              {currentStock > 0 
-                ? `${currentStock} available${currentStock <= 10 ? ' - Limited stock!' : ''}` 
-                : 'Out of stock'}
+              {isOutOfStock
+                ? 'Out of stock'
+                : currentStock > 0
+                  ? `${currentStock} available${currentStock <= 10 ? ' - Limited stock!' : ''}`
+                  : 'In stock'}
             </Text>
-            {quantity > currentStock && currentStock > 0 && (
+            {quantity > maxSelectableQty && maxSelectableQty > 0 && (
               <Text style={styles.stockWarning}>
-                ⚠️ Maximum {currentStock} available
+                ⚠️ Maximum {maxSelectableQty} available
               </Text>
             )}
           </View>
@@ -2222,7 +2269,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.primary,
     lineHeight: 20,
-    opacity: 0.9,
+    opacity: 0.7,
   },
   writeReviewBtn: {
     flexDirection: 'row',
@@ -2426,11 +2473,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   soldText: {
-    fontSize: 14,
-    color: Colors.primary,
-    opacity: 0.7,
-  },
-  reviewText: {
     fontSize: 14,
     color: Colors.primary,
     opacity: 0.7,

@@ -14,7 +14,7 @@ import { STORAGE_KEYS, API_ENDPOINTS } from '../constants/config';
 import { getAccessToken, getRefreshToken } from '../utils/tokenStorage';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setCredentials } from '../store/slices/authSlice';
-import { setCart } from '../store/slices/cartSlice';
+import { setCart, selectCartItems } from '../store/slices/cartSlice';
 import { setShippingLocation } from '../store/slices/shippingLocationSlice';
 import { User } from '../types/user.types';
 import Colors from '../constants/colors';
@@ -304,7 +304,15 @@ const AppNavigator: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const cartItems = useAppSelector(selectCartItems);
   const dispatch = useAppDispatch();
+
+  // Guest cart: persist on every change so AsyncStorage always matches Redux (merge-on-login, Cart tab, cold start).
+  useEffect(() => {
+    if (isLoading) return;
+    if (isAuthenticated) return;
+    AsyncStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(cartItems)).catch(() => {});
+  }, [isLoading, isAuthenticated, cartItems]);
 
   useEffect(() => {
     // Auth rehydration: restore session from AsyncStorage on app launch
@@ -382,10 +390,8 @@ const AppNavigator: React.FC = () => {
       try {
         if (isAuthenticated) {
           const response = await cartService.getCart();
-          if (response.success && response.data) {
+          if (response.success && Array.isArray(response.data)) {
             dispatch(setCart(response.data));
-          } else {
-            dispatch(setCart({ items: [] }));
           }
           return;
         }
@@ -395,11 +401,10 @@ const AppNavigator: React.FC = () => {
           const parsed = JSON.parse(guestCart);
           const items = Array.isArray(parsed) ? parsed : parsed?.items || [];
           dispatch(setCart({ items }));
-        } else {
-          dispatch(setCart({ items: [] }));
         }
+        // If no persisted cart, leave Redux as-is (avoid clearing an in-memory guest cart when hydration re-runs).
       } catch {
-        dispatch(setCart({ items: [] }));
+        // Keep existing Redux cart on hydration failure (avoid wiping after transient API errors).
       }
     };
 

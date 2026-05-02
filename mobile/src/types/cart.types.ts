@@ -12,6 +12,10 @@ export interface CartItem {
   variation?: ProductVariation | string;
   price: number;
   subtotal: number;
+  /** Present on server cart rows — kept for checkout / order APIs */
+  productId?: string;
+  variationId?: string | null;
+  productTitle?: string;
 }
 
 export interface Cart {

@@ -91,7 +91,9 @@ export default function QuickAddModal({ visible, product, onClose, onAdded }: Qu
         );
         if (response.success) {
           const cartResponse = await cartService.getCart();
-          if (cartResponse.success && cartResponse.data) dispatch(setCart(cartResponse.data));
+          if (cartResponse.success && Array.isArray(cartResponse.data)) {
+            dispatch(setCart(cartResponse.data));
+          }
           onAdded?.();
           onClose();
         } else {

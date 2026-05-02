@@ -18,6 +18,17 @@ import {
   User,
 } from '../types/user.types';
 import { ApiResponse } from '../types/api.types';
+import { store } from '../store/store';
+
+/** Flush in-memory guest cart to AsyncStorage before login/register merge (AsyncStorage can lag behind Redux). */
+const persistGuestCartFromStore = async (): Promise<void> => {
+  try {
+    const items = store.getState().cart.items;
+    await AsyncStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(items));
+  } catch {
+    // non-blocking
+  }
+};
 
 export const authService = {
   getGuestCartForMerge: async (): Promise<any[]> => {
@@ -37,6 +48,7 @@ export const authService = {
   login: async (
     credentials: LoginCredentials
   ): Promise<AuthResponse> => {
+    await persistGuestCartFromStore();
     const guestCart = await authService.getGuestCartForMerge();
     const response = await postData<any>(
       API_ENDPOINTS.LOGIN,
@@ -237,6 +249,7 @@ export const authService = {
    * Google OAuth: send authorization code to backend (secure; client_secret stays on server).
    */
   loginWithGoogleCode: async (code: string, redirectUri: string): Promise<AuthResponse> => {
+    await persistGuestCartFromStore();
     const guestCart = await authService.getGuestCartForMerge();
     const response = await postData<any>(API_ENDPOINTS.GOOGLE_AUTH_CODE, {
       code,
@@ -302,6 +315,7 @@ export const authService = {
     avatar?: string;
     mobile?: string;
   }): Promise<AuthResponse> => {
+    await persistGuestCartFromStore();
     const guestCart = await authService.getGuestCartForMerge();
     const response = await postData<any>(
       API_ENDPOINTS.GOOGLE_AUTH,

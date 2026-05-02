@@ -26,9 +26,10 @@ import { selectCartItems, selectCartTotal, setCart, updateQuantity, removeItem }
 import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { CartItem } from '../../types/cart.types';
 import Colors from '../../constants/colors';
-import { FREE_SHIPPING_THRESHOLD } from '../../constants/config';
+import { FREE_SHIPPING_THRESHOLD, API_URL } from '../../constants/config';
 import { showError } from '../../utils/toast';
 import { STORAGE_KEYS } from '../../constants/config';
+import { store } from '../../store/store';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -56,10 +57,16 @@ const CartScreen: React.FC = () => {
     try {
       setLoading(true);
       const guestCart = await AsyncStorage.getItem(STORAGE_KEYS.CART);
+      const reduxCount = store.getState().cart.items.length;
       if (guestCart) {
         const items = JSON.parse(guestCart);
         if (Array.isArray(items)) {
-          dispatch(setCart({ items }));
+          if (items.length > 0) {
+            dispatch(setCart({ items }));
+          } else if (reduxCount === 0) {
+            dispatch(setCart({ items: [] }));
+          }
+          // Persisted [] while Redux still has lines — don't overwrite (race before AppNavigator persist runs).
         }
       }
     } catch {
@@ -81,7 +88,7 @@ const CartScreen: React.FC = () => {
     try {
       setLoading(true);
       const response = await cartService.getCart();
-      if (response.success && response.data) {
+      if (response.success && Array.isArray(response.data)) {
         dispatch(setCart(response.data));
       }
     } catch (error) {
@@ -149,12 +156,17 @@ const CartScreen: React.FC = () => {
       product?.images?.[0] ||
       (typeof item.product === 'object' && (item.product as any)?.image) ||
       (product as any)?.featuredImage ||
+      (item as any)?.image ||
       '';
     
     // Handle image object format
-    const imageUrl = typeof productImage === 'object' && productImage?.url 
-      ? productImage.url 
-      : productImage;
+    let imageUrl: string | undefined =
+      typeof productImage === 'object' && productImage && 'url' in productImage
+        ? (productImage as { url: string }).url
+        : (productImage as string | undefined);
+    if (typeof imageUrl === 'string' && imageUrl.startsWith('/') && !imageUrl.startsWith('//')) {
+      imageUrl = `${API_URL}${imageUrl}`;
+    }
 
     return (
       <View style={styles.cartItem}>
@@ -179,7 +191,7 @@ const CartScreen: React.FC = () => {
 
         <View style={styles.itemContent}>
           <Text style={styles.itemName} numberOfLines={2}>
-            {product?.name || 'Product'}
+            {product?.name || item.productTitle || 'Product'}
           </Text>
           
           <View style={styles.itemPriceRow}>

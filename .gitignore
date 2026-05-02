@@ -17,3 +17,15 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Build & caches (monorepo)
+# Note: do not ignore root `dist/` — some packages (e.g. frontend) track assets under dist/.
+coverage/
+.turbo/
+.cache/
+*.tsbuildinfo
+.expo/
+.expo-shared/
+
+# Metro / React Native
+.metro-health-check*

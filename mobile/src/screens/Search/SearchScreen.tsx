@@ -39,6 +39,7 @@ import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { setCart, addItem } from '../../store/slices/cartSlice';
 import { cartService } from '../../services/cart.service';
+import { isProductOutOfStock } from '../../utils/productStock';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CATEGORY_SIDEBAR_WIDTH = SCREEN_WIDTH < 375 ? 100 : SCREEN_WIDTH < 414 ? 110 : 120;
@@ -328,12 +329,7 @@ export default function SearchScreen() {
       setQuickAddProduct(product);
       return;
     }
-    // Block add if out of stock
-    const stock =
-      (product as any)?.inventory?.endlessStock
-        ? 999
-        : Number((product as any)?.inventory?.stock ?? (product as any)?.countInStock ?? (product as any)?.stock ?? 0);
-    if (stock <= 0) {
+    if (isProductOutOfStock(product)) {
       showError('This item is out of stock');
       return;
     }
@@ -354,7 +350,7 @@ export default function SearchScreen() {
       const res = await cartService.addToCart(product._id, 1, undefined, undefined, product);
       if (res.success) {
         const cartRes = await cartService.getCart();
-        if (cartRes.success && cartRes.data) dispatch(setCart(cartRes.data));
+        if (cartRes.success && Array.isArray(cartRes.data)) dispatch(setCart(cartRes.data));
         Alert.alert('', 'Added to cart');
       } else showError(res.message || 'Failed to add');
     } catch (e: any) {
@@ -396,7 +392,7 @@ export default function SearchScreen() {
             .then(async (res) => {
               if (res.success) {
                 const cr = await cartService.getCart();
-                if (cr.success && cr.data) dispatch(setCart(cr.data));
+                if (cr.success && Array.isArray(cr.data)) dispatch(setCart(cr.data));
                 showError('Added to cart');
               } else {
                 showError(res.message || 'Failed');
