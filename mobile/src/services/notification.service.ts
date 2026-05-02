@@ -270,7 +270,7 @@ export const handleNotificationNavigation = (
   switch (data.type) {
     case 'order_status':
       if (data.orderId) {
-        navigation.navigate('OrderDetails', { orderId: data.orderId });
+        navigation.navigate('OrderDetail', { orderId: data.orderId });
       } else {
         navigation.navigate('Orders');
       }

@@ -8,7 +8,7 @@ import { IoMdLogOut } from "react-icons/io";
 import { FaAngleDown } from "react-icons/fa6";
 import { Collapse } from "react-collapse";
 import { FaMoneyBillWave, FaChartLine, FaCog, FaStore } from "react-icons/fa";
-import { fetchDataFromApi } from "../../utils/api";
+import { postData } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
 
 const VendorSidebar = ({ isOpen, setIsOpen }) => {
@@ -28,7 +28,7 @@ const VendorSidebar = ({ isOpen, setIsOpen }) => {
     try {
       const token = localStorage.getItem('accessToken');
       if (token) {
-        await fetchDataFromApi(`/api/user/logout?token=${token}`, { withCredentials: true });
+        await postData(`/api/user/logout`, {});
       }
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");

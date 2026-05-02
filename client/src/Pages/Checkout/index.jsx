@@ -317,7 +317,7 @@ const Checkout = () => {
         
         // Clear cart in background (don't wait for it)
         try {
-          deleteData(`/api/cart/emptyCart/${user?._id}`).catch(err => {
+          deleteData(`/api/cart/emptyCart`).catch(err => {
             console.warn('⚠️ Cart clear failed (non-critical):', err);
           });
         } catch {

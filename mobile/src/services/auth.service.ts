@@ -10,6 +10,7 @@ import {
   editData,
 } from './api';
 import { API_ENDPOINTS, STORAGE_KEYS } from '../constants/config';
+import { setAuthTokens, clearAuthTokens, getAccessToken } from '../utils/tokenStorage';
 import {
   AuthResponse,
   LoginCredentials,
@@ -60,14 +61,7 @@ export const authService = {
         throw new Error(response.message || 'Invalid login response - no token');
       }
 
-      // Store tokens first
-      const itemsToStore: [string, string][] = [];
-      if (accessToken) itemsToStore.push([STORAGE_KEYS.ACCESS_TOKEN, accessToken]);
-      if (refreshToken) itemsToStore.push([STORAGE_KEYS.REFRESH_TOKEN, refreshToken]);
-
-      if (itemsToStore.length > 0) {
-        await AsyncStorage.multiSet(itemsToStore);
-      }
+      await setAuthTokens(accessToken, refreshToken || '');
 
       // Fetch user details separately (backend doesn't return user in login response)
       try {
@@ -134,12 +128,8 @@ export const authService = {
           user,
         };
 
-        const itemsToStore: [string, string][] = [
-          [STORAGE_KEYS.ACCESS_TOKEN, accessToken],
-          [STORAGE_KEYS.REFRESH_TOKEN, refreshToken],
-          [STORAGE_KEYS.USER, JSON.stringify(user)],
-        ];
-        await AsyncStorage.multiSet(itemsToStore);
+        await setAuthTokens(accessToken, refreshToken || '');
+        await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
         return authData;
       }
 
@@ -170,12 +160,8 @@ export const authService = {
     } catch (error) {
       console.error('Logout API error:', error);
     } finally {
-      // Always clear local storage
-      await AsyncStorage.multiRemove([
-        STORAGE_KEYS.ACCESS_TOKEN,
-        STORAGE_KEYS.REFRESH_TOKEN,
-        STORAGE_KEYS.USER,
-      ]);
+      await clearAuthTokens();
+      await AsyncStorage.removeItem(STORAGE_KEYS.USER);
     }
   },
 
@@ -220,7 +206,7 @@ export const authService = {
    */
   isAuthenticated: async (): Promise<boolean> => {
     try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const token = await getAccessToken();
       if (!token) return false;
 
       // Optionally validate token by calling getCurrentUser
@@ -339,10 +325,7 @@ export const authService = {
         throw new Error(response.message || 'Invalid Google auth response');
       }
 
-      await AsyncStorage.multiSet([
-        [STORAGE_KEYS.ACCESS_TOKEN, accessToken],
-        [STORAGE_KEYS.REFRESH_TOKEN, refreshToken || ''],
-      ]);
+      await setAuthTokens(accessToken, refreshToken || '');
 
       try {
         const userResponse = await fetchDataFromApi<User>(API_ENDPOINTS.GET_CURRENT_USER);

@@ -116,14 +116,16 @@ const Dashboard = () => {
     getTotalSalesByYear();
 
     fetchDataFromApi("/api/user/getAllUsers").then((res) => {
-      if (res?.error === false) {
-        setUsers(res?.users)
+      const payload = res?.data !== undefined ? res.data : res;
+      if (res?.success !== false && res?.error !== true) {
+        setUsers(payload?.users)
       }
     })
 
     fetchDataFromApi("/api/user/getAllReviews").then((res) => {
-      if (res?.error === false) {
-        setAllReviews(res?.reviews)
+      const payload = res?.data !== undefined ? res.data : res;
+      if (res?.success !== false && res?.error !== true) {
+        setAllReviews(payload?.reviews)
       }
     })
 
@@ -142,9 +144,10 @@ const Dashboard = () => {
 
   const getTotalUsersByYear = () => {
     fetchDataFromApi(`/api/order/users`).then((res) => {
+      const payload = res?.data !== undefined ? res.data : res;
       const users = [];
-      res?.TotalUsers?.length !== 0 &&
-        res?.TotalUsers?.map((item) => {
+      payload?.TotalUsers?.length !== 0 &&
+        payload?.TotalUsers?.map((item) => {
           users.push({
             name: item?.name,
             TotalUsers: parseInt(item?.TotalUsers),
@@ -161,9 +164,10 @@ const Dashboard = () => {
 
   const getTotalSalesByYear = () => {
     fetchDataFromApi(`/api/order/sales`).then((res) => {
+      const payload = res?.data !== undefined ? res.data : res;
       const sales = [];
-      res?.monthlySales?.length !== 0 &&
-        res?.monthlySales?.map((item) => {
+      payload?.monthlySales?.length !== 0 &&
+        payload?.monthlySales?.map((item) => {
           sales.push({
             name: item?.name,
             TotalSales: parseInt(item?.TotalSales),

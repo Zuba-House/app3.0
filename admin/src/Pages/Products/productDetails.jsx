@@ -33,9 +33,10 @@ const AdminReviewManagement = ({ productId }) => {
         setLoading(true);
         try {
             const res = await fetchDataFromApi(`/api/user/getProductReviewsAdmin/${productId}`);
-            if (res?.success) {
-                setReviews(res.reviews || []);
-                setStatusCounts(res.statusCounts || {});
+            const payload = res?.data !== undefined ? res.data : res;
+            if (res?.success !== false) {
+                setReviews(payload.reviews || []);
+                setStatusCounts(payload.statusCounts || {});
             }
         } catch (error) {
             console.error('Error loading reviews:', error);

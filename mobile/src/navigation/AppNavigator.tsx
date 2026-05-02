@@ -11,6 +11,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { STORAGE_KEYS, API_ENDPOINTS } from '../constants/config';
+import { getAccessToken, getRefreshToken } from '../utils/tokenStorage';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setCredentials } from '../store/slices/authSlice';
 import { setCart } from '../store/slices/cartSlice';
@@ -47,6 +48,7 @@ import ReturnPolicyScreen from '../screens/Support/ReturnPolicyScreen';
 import SafePaymentsPrivacyScreen from '../screens/Support/SafePaymentsPrivacyScreen';
 import AboutScreen from '../screens/About/AboutScreen';
 import NotificationsScreen from '../screens/Settings/NotificationsScreen';
+import OrderDetailScreen from '../screens/Orders/OrderDetailScreen';
 
 // Navigation Types
 export type RootStackParamList = {
@@ -288,6 +290,11 @@ const MainNavigator = () => {
         component={NotificationsScreen}
         options={{ headerShown: false }}
       />
+      <MainStack.Screen
+        name="OrderDetail"
+        component={OrderDetailScreen}
+        options={{ title: 'Order details', headerShown: true }}
+      />
     </MainStack.Navigator>
   );
 };
@@ -303,8 +310,8 @@ const AppNavigator: React.FC = () => {
     // Auth rehydration: restore session from AsyncStorage on app launch
     const checkAuth = async () => {
       try {
-        const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-        const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+        const token = await getAccessToken();
+        const refreshToken = await getRefreshToken();
         const userJson = await AsyncStorage.getItem(STORAGE_KEYS.USER);
 
         if (token) {

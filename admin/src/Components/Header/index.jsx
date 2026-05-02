@@ -14,7 +14,7 @@ import { FaRegUser } from "react-icons/fa6";
 import { IoMdLogOut } from "react-icons/io";
 import { MyContext } from "../../App";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { fetchDataFromApi } from "../../utils/api";
+import { fetchDataFromApi, postData } from "../../utils/api";
 import AddProductEnhanced from "../../Pages/Products/AddProductEnhanced";
 import AddHomeSlide from "../../Pages/HomeSliderBanners/addHomeSlide";
 import AddCategory from "../../Pages/Categegory/addCategory";
@@ -95,13 +95,16 @@ const Header = () => {
   const logout = () => {
     setAnchorMyAcc(null);
 
-    fetchDataFromApi(`/api/user/logout?token=${localStorage.getItem('accessToken')}`, { withCredentials: true }).then((res) => {
-      if (res?.error === false) {
+    postData(`/api/user/logout`, {}).then(() => {
         context.setIsLogin(false);
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         history("/login")
-      }
+    }).catch(() => {
+        context.setIsLogin(false);
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        history("/login")
     })
   }
 

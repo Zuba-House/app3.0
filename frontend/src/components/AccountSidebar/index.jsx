@@ -5,16 +5,17 @@ import { FaRegUser } from "react-icons/fa";
 import { IoBagCheckOutline } from "react-icons/io5";
 import { IoMdHeartEmpty } from "react-icons/io";
 import { IoIosLogOut } from "react-icons/io";
-import { NavLink } from "react-router";
+import { NavLink, useNavigate } from "react-router";
 import { MyContext } from "../../App";
 import CircularProgress from '@mui/material/CircularProgress';
-import { fetchDataFromApi, uploadImage } from "../../utils/api";
+import { fetchDataFromApi, uploadImage, postData } from "../../utils/api";
 import { LuMapPin } from "react-icons/lu";
 
 
 
 const AccountSidebar = () => {
 
+  const navigate = useNavigate();
   const [previews, setPreviews] = useState([]);
   const [uploading, setUploading] = useState(false);
 
@@ -79,18 +80,22 @@ const AccountSidebar = () => {
 
    const logout = () => {
 
-      fetchDataFromApi(`/api/user/logout?token=${localStorage.getItem('accessToken')}`, { withCredentials: true }).then((res) => {
-        if (res?.error === false) {
+      postData(`/api/user/logout`, {}).then(() => {
           context.setIsLogin(false);
           localStorage.removeItem("accessToken");
           localStorage.removeItem("refreshToken");
           context.setUserData(null);
           context?.setCartData([]);
           context?.setMyListData([]);
-          history("/");
-        }
-  
-  
+          navigate("/");
+      }).catch(() => {
+          context.setIsLogin(false);
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          context.setUserData(null);
+          context?.setCartData([]);
+          context?.setMyListData([]);
+          navigate("/");
       })
   
     }

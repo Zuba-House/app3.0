@@ -18,7 +18,7 @@ import MenuItem from "@mui/material/MenuItem";
 import { IoBagCheckOutline } from "react-icons/io5";
 import { IoMdHeartEmpty } from "react-icons/io";
 import { IoIosLogOut } from "react-icons/io";
-import { fetchDataFromApi } from "../../utils/api";
+import { fetchDataFromApi, postData } from "../../utils/api";
 import { LuMapPin } from "react-icons/lu";
 import { useEffect } from "react";
 import { HiOutlineMenu } from "react-icons/hi";
@@ -98,7 +98,7 @@ const Header = () => {
     };
 
     // Try to call logout API, but always clear local state regardless
-    fetchDataFromApi(`/api/user/logout?token=${localStorage.getItem('accessToken')}`, { withCredentials: true })
+    postData(`/api/user/logout`, {})
       .then((res) => {
         clearLocalState();
       })

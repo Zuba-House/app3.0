@@ -13,8 +13,18 @@ export const orderService = {
    * Get user's orders
    */
   getOrders: async (): Promise<ApiResponse<Order[]>> => {
-    const response = await fetchDataFromApi<Order[]>(API_ENDPOINTS.GET_ORDERS);
-    return response;
+    const response = await fetchDataFromApi<Order[]>(
+      `${API_ENDPOINTS.GET_ORDERS}?page=1&limit=50`
+    );
+    const payload = response.data as unknown;
+    let orders: Order[] = [];
+    if (Array.isArray(payload)) {
+      orders = payload as Order[];
+    } else if (payload && typeof payload === 'object' && 'orders' in (payload as object)) {
+      const o = (payload as { orders?: Order[] }).orders;
+      orders = Array.isArray(o) ? o : [];
+    }
+    return { ...response, data: orders };
   },
 
   /**
@@ -24,7 +34,12 @@ export const orderService = {
     const response = await fetchDataFromApi<Order>(
       `${API_ENDPOINTS.GET_ORDER}/${orderId}`
     );
-    return response;
+    const payload = response.data as unknown;
+    const order =
+      payload && typeof payload === 'object' && payload !== null && 'order' in payload
+        ? (payload as { order: Order }).order
+        : (payload as Order);
+    return { ...response, data: order };
   },
 
   /**

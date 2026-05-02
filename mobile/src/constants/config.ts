@@ -33,7 +33,7 @@ export const API_ENDPOINTS = {
   REGISTER: '/api/user/register',
   REFRESH_TOKEN: '/api/user/refresh-token',
   LOGOUT: '/api/user/logout',
-  GET_CURRENT_USER: '/api/user/user-details',
+  GET_CURRENT_USER: '/api/user/me',
   UPDATE_PROFILE: '/api/user/me',
   GOOGLE_AUTH: '/api/user/authWithGoogle',
   GOOGLE_AUTH_CODE: '/api/user/auth/google',
@@ -59,7 +59,7 @@ export const API_ENDPOINTS = {
   REMOVE_FROM_CART: '/api/cart',
 
   // Orders
-  GET_ORDERS: '/api/order/order-list',
+  GET_ORDERS: '/api/order/order-list/orders',
   GET_ORDER: '/api/order',
   CREATE_ORDER: '/api/order/create',
 

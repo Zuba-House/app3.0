@@ -6,6 +6,12 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL, STORAGE_KEYS } from '../constants/config';
+import {
+  getAccessToken,
+  getRefreshToken,
+  setAuthTokens,
+  clearAuthTokens,
+} from '../utils/tokenStorage';
 import { ApiResponse, ApiError } from '../types/api.types';
 
 // Request queue for token refresh
@@ -32,7 +38,7 @@ const makeRequest = async <T = any>(
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> => {
   try {
-    const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    const token = await getAccessToken();
     
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -187,17 +193,12 @@ const makeRequest = async <T = any>(
       isRefreshing = true;
 
       try {
-        const refreshToken = await AsyncStorage.getItem(
-          STORAGE_KEYS.REFRESH_TOKEN
-        );
+        const refreshToken = await getRefreshToken();
 
         if (!refreshToken) {
           // No refresh token, logout user
-          await AsyncStorage.multiRemove([
-            STORAGE_KEYS.ACCESS_TOKEN,
-            STORAGE_KEYS.REFRESH_TOKEN,
-            STORAGE_KEYS.USER,
-          ]);
+          await clearAuthTokens();
+          await AsyncStorage.removeItem(STORAGE_KEYS.USER);
           processQueue(new Error('No refresh token'), null);
           throw new Error('No refresh token');
         }
@@ -221,17 +222,8 @@ const makeRequest = async <T = any>(
 
         if (refreshData.success && refreshData.data?.accessToken) {
           const newAccessToken = refreshData.data.accessToken;
-          const newRefreshToken = refreshData.data.refreshToken;
-          await AsyncStorage.setItem(
-            STORAGE_KEYS.ACCESS_TOKEN,
-            newAccessToken
-          );
-          if (newRefreshToken) {
-            await AsyncStorage.setItem(
-              STORAGE_KEYS.REFRESH_TOKEN,
-              newRefreshToken
-            );
-          }
+          const newRefreshToken = refreshData.data.refreshToken || '';
+          await setAuthTokens(newAccessToken, newRefreshToken);
 
           processQueue(null, newAccessToken);
           isRefreshing = false;
@@ -250,11 +242,8 @@ const makeRequest = async <T = any>(
         // Refresh failed, logout user
         processQueue(refreshError, null);
         isRefreshing = false;
-        await AsyncStorage.multiRemove([
-          STORAGE_KEYS.ACCESS_TOKEN,
-          STORAGE_KEYS.REFRESH_TOKEN,
-          STORAGE_KEYS.USER,
-        ]);
+        await clearAuthTokens();
+        await AsyncStorage.removeItem(STORAGE_KEYS.USER);
         throw refreshError;
       }
     }
@@ -478,7 +467,7 @@ export const deleteData = async <T = any>(
 // File upload
 export const uploadImage = async (file: any): Promise<ApiResponse> => {
   try {
-    const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    const token = await getAccessToken();
     
     const formData = new FormData();
     formData.append('image', file);

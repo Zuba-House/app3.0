@@ -65,46 +65,91 @@ export interface GiftCardValidation {
   error?: string;
 }
 
+const MOCK_SHIPPING_METHODS: ShippingMethod[] = [
+  {
+    _id: 'standard',
+    name: 'Zuba House Regular',
+    description: 'Regular delivery',
+    price: 4.99,
+    estimatedDays: '1-5 business days',
+    carrier: 'Zuba House',
+  },
+  {
+    _id: 'express',
+    name: 'Zuba House Express',
+    description: 'Faster delivery',
+    price: 9.99,
+    estimatedDays: '1-3 business days',
+    carrier: 'Zuba House',
+  },
+  {
+    _id: 'overnight',
+    name: 'Zuba House Express (Overnight)',
+    description: 'Next business day',
+    price: 19.99,
+    estimatedDays: '1 business day',
+    carrier: 'Zuba House',
+  },
+];
+
+function mapRatesPayload(raw: { standard?: any; express?: any }): ShippingMethod[] {
+  const methods: ShippingMethod[] = [];
+  if (raw?.standard) {
+    methods.push({
+      _id: 'standard',
+      name: 'Zuba House Regular',
+      description: raw.standard.delivery || raw.standard.estimatedDelivery || 'Regular delivery',
+      price: Number(raw.standard.cost) || 4.99,
+      estimatedDays: raw.standard.delivery || raw.standard.estimatedDelivery || '1-5 business days',
+      carrier: 'Zuba House',
+    });
+  }
+  if (raw?.express) {
+    methods.push({
+      _id: 'express',
+      name: 'Zuba House Express',
+      description: raw.express.delivery || raw.express.estimatedDelivery || 'Faster delivery',
+      price: Number(raw.express.cost) || 9.99,
+      estimatedDays: raw.express.delivery || raw.express.estimatedDelivery || '1-3 business days',
+      carrier: 'Zuba House',
+    });
+  }
+  return methods;
+}
+
 export const checkoutService = {
   /**
-   * Get shipping rates/methods
+   * Get shipping rates/methods (POST /api/shipping/rates)
    */
-  getShippingRates: async (): Promise<ApiResponse<ShippingMethod[]>> => {
+  getShippingRates: async (
+    cartItems: any[] = [],
+    shippingAddress?: Record<string, any> | null
+  ): Promise<ApiResponse<ShippingMethod[]>> => {
+    const fallback = (): ApiResponse<ShippingMethod[]> => ({
+      success: true,
+      error: false,
+      data: MOCK_SHIPPING_METHODS,
+    });
+
+    if (!cartItems?.length || !shippingAddress || typeof shippingAddress !== 'object') {
+      return fallback();
+    }
+
     try {
-      const response = await fetchDataFromApi<ShippingMethod[]>(API_ENDPOINTS.GET_SHIPPING_RATES);
-      return response;
-    } catch (error) {
-      // Return mock shipping methods if API fails
-      return {
-        success: true,
-        error: false,
-        data: [
-          {
-            _id: 'standard',
-            name: 'Zuba House Regular',
-            description: 'Regular delivery',
-            price: 4.99,
-            estimatedDays: '1-5 business days',
-            carrier: 'Zuba House',
-          },
-          {
-            _id: 'express',
-            name: 'Zuba House Express',
-            description: 'Faster delivery',
-            price: 9.99,
-            estimatedDays: '1-3 business days',
-            carrier: 'Zuba House',
-          },
-          {
-            _id: 'overnight',
-            name: 'Zuba House Express (Overnight)',
-            description: 'Next business day',
-            price: 19.99,
-            estimatedDays: '1 business day',
-            carrier: 'Zuba House',
-          },
-        ],
-      };
+      const response = await postData<{ standard?: any; express?: any }>(API_ENDPOINTS.GET_SHIPPING_RATES, {
+        cartItems,
+        shippingAddress,
+      });
+      const raw = response.data as { standard?: any; express?: any } | undefined;
+      if (response.success && raw?.standard && raw?.express) {
+        const methods = mapRatesPayload(raw);
+        if (methods.length > 0) {
+          return { ...response, data: methods };
+        }
+      }
+      return fallback();
+    } catch {
+      return fallback();
     }
   },
 

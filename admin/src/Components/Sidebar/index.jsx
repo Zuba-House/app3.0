@@ -1,6 +1,6 @@
 import { Button } from "@mui/material";
 import React, { useContext, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { RxDashboard } from "react-icons/rx";
 import { FaRegImage } from "react-icons/fa";
 import { FiUsers } from "react-icons/fi";
@@ -22,6 +22,7 @@ import { MdLocalOffer } from "react-icons/md";
 
 
 const Sidebar = () => {
+  const navigate = useNavigate();
   const [submenuIndex, setSubmenuIndex] = useState(null);
   const isOpenSubMenu = (index) => {
     if (submenuIndex === index) {
@@ -38,13 +39,16 @@ const Sidebar = () => {
     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
     setSubmenuIndex(null)
 
-    fetchDataFromApi(`/api/user/logout?token=${localStorage.getItem('accessToken')}`, { withCredentials: true }).then((res) => {
-      if (res?.error === false) {
+    postData(`/api/user/logout`, {}).then(() => {
         context.setIsLogin(false);
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
-        history("/login")
-      }
+        navigate("/login")
+    }).catch(() => {
+        context.setIsLogin(false);
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        navigate("/login")
     })
   }
 

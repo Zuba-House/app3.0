@@ -3,6 +3,7 @@ import axios from "axios";
 const rawBase =
     import.meta.env.VITE_API_URL || "https://zuba-api.onrender.com";
 const apiUrl = String(rawBase).replace(/\/+$/, "");
+axios.defaults.withCredentials = true;
 
 // Flag to prevent multiple simultaneous refresh attempts
 let isRefreshing = false;
@@ -107,6 +108,7 @@ export const postData = async (url, formData) => {
         
         const response = await fetch(apiUrl + url, {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('accessToken')}`, // Include your API key in the Authorization header
                 'Content-Type': 'application/json', // Adjust the content type as needed

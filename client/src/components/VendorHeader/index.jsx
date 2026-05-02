@@ -7,7 +7,7 @@ import { RiMenu2Line } from "react-icons/ri";
 import { FaRegUser } from "react-icons/fa6";
 import { IoMdLogOut } from "react-icons/io";
 import { useNavigate } from "react-router-dom";
-import { fetchDataFromApi } from "../../utils/api";
+import { fetchDataFromApi, postData } from "../../utils/api";
 
 const VendorHeader = ({ isSidebarOpen, setIsSidebarOpen }) => {
   const [anchorMyAcc, setAnchorMyAcc] = useState(null);
@@ -47,7 +47,7 @@ const VendorHeader = ({ isSidebarOpen, setIsSidebarOpen }) => {
     try {
       const token = localStorage.getItem('accessToken');
       if (token) {
-        await fetchDataFromApi(`/api/user/logout?token=${token}`, { withCredentials: true });
+        await postData(`/api/user/logout`, {});
       }
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");

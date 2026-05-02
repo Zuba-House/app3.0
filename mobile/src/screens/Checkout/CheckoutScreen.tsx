@@ -189,11 +189,9 @@ const CheckoutScreen: React.FC = () => {
         ? await addressService.getAddresses()
         : { success: true, data: [] };
       
-      // Shipping rates are available for everyone
-      const shippingRes = await checkoutService.getShippingRates();
-
+      let addressList: Address[] = [];
       if (addressRes.success && addressRes.data) {
-        const addressList = Array.isArray(addressRes.data) ? addressRes.data : [];
+        addressList = Array.isArray(addressRes.data) ? addressRes.data : [];
         setAddresses(addressList);
         // Auto-select default address
         const defaultAddr = addressList.find((a) => a.isDefault) || addressList[0];
@@ -205,6 +203,26 @@ const CheckoutScreen: React.FC = () => {
           }
         }
       }
+
+      const cartPayload = cartItems.map((item: any) => ({
+        productId: item.productId || item.product?._id || item._id,
+        quantity: item.quantity || 1,
+        product: item.product,
+      }));
+      const addrForRates =
+        addressList.find((a) => a.isDefault) ||
+        addressList[0] ||
+        (shippingLocation.countryCode
+          ? {
+              addressLine1: '—',
+              city: shippingLocation.city || '—',
+              postalCode: '00000',
+              country: shippingLocation.countryName || shippingLocation.countryCode,
+              countryCode: shippingLocation.countryCode,
+            }
+          : null);
+
+      const shippingRes = await checkoutService.getShippingRates(cartPayload, addrForRates);
 
       if (shippingRes.success && shippingRes.data) {
         const methods = Array.isArray(shippingRes.data) ? shippingRes.data : [];

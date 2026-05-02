@@ -3,6 +3,7 @@ import axios from "axios";
 const rawBase =
     import.meta.env.VITE_API_URL || "https://zuba-api.onrender.com";
 const apiUrl = String(rawBase).replace(/\/+$/, "");
+axios.defaults.withCredentials = true;
 
 // Helper function to check if token error and clear session
 const handleAuthError = (status, data) => {
@@ -24,6 +25,7 @@ export const postData = async (url, formData) => {
         
         const response = await fetch(apiUrl + url, {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Authorization': token ? `Bearer ${token}` : '', // Include token only if exists
                 'Content-Type': 'application/json',
