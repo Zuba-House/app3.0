@@ -10,7 +10,10 @@
     "assetBundlePatterns": [
       "**/*"
     ],
-    "plugins": [],
+    "plugins": [
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -26,7 +29,9 @@
         "backgroundColor": "#e5e2db"
       },
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -48,10 +53,6 @@
         "projectId": "zuba-house-019"
       },
       "expoClientId": "435369151234-8e7sb5ferci9ti2472vdmf6ose5e6nss.apps.googleusercontent.com"
-    },
-    "packagerOpts": {
-      "config": "metro.config.js"
     }
   }
 }
-
