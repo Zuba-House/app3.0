@@ -15,10 +15,9 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { selectUser, selectIsAuthenticated, logout } from '../../store/slices/authSlice';
-import { authService } from '../../services/auth.service';
+import { useAuthState } from '../../core/auth/authGuards';
 import Colors from '../../constants/colors';
+import { useAuthGate } from '../../core/auth/authGate';
 
 interface MenuItem {
   icon: string;
@@ -31,9 +30,9 @@ interface MenuItem {
 
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const dispatch = useAppDispatch();
-  const user = useAppSelector(selectUser);
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { user, authStatus, logout } = useAuthState();
+  const isAuthenticated = authStatus === 'authenticated';
+  const { openAuth } = useAuthGate();
 
   const handleLogout = () => {
     Alert.alert(
@@ -46,11 +45,9 @@ const ProfileScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await authService.logout();
-              dispatch(logout());
+              await logout();
             } catch (error) {
               console.error('Logout error:', error);
-              dispatch(logout());
             }
           },
         },
@@ -154,7 +151,7 @@ const ProfileScreen: React.FC = () => {
         <View style={styles.authButtons}>
           <TouchableOpacity
             style={styles.loginButton}
-            onPress={() => navigation.navigate('Auth', { screen: 'Login' })}
+            onPress={() => openAuth()}
           >
             <Ionicons name="log-in-outline" size={20} color={Colors.white} />
             <Text style={styles.loginButtonText}>Sign In</Text>
@@ -162,7 +159,7 @@ const ProfileScreen: React.FC = () => {
 
           <TouchableOpacity
             style={styles.registerButton}
-            onPress={() => navigation.navigate('Auth', { screen: 'Register' })}
+            onPress={() => openAuth()}
           >
             <Text style={styles.registerButtonText}>Create Account</Text>
           </TouchableOpacity>

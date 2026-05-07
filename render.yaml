@@ -13,10 +13,8 @@ services:
       # Set in Render Dashboard → Environment (never commit). If leaked, rotate in Google Cloud.
       - key: GOOGLE_CLIENT_SECRET
         sync: false
-      # Must match Expo redirect https://auth.expo.io/@OWNER/SLUG
-      - key: EXPO_OWNER
-        value: olivierndev
-      - key: EXPO_SLUG
-        value: zuba-mobile
+      # Fallback redirect_uri for Google token exchange (must match app: zuba://redirect)
+      - key: GOOGLE_OAUTH_REDIRECT_URI
+        value: "zuba://redirect"
     plan: free
 

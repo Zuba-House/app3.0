@@ -11,37 +11,40 @@ import {
   FlatList,
   TouchableOpacity,
 } from 'react-native';
-import { ActivityIndicator, Button } from 'react-native-paper';
+import { ActivityIndicator } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import { useAppSelector } from '../../store/hooks';
-import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { wishlistService } from '../../services/wishlist.service';
 import { Product } from '../../types/product.types';
 import ProductCard from '../../components/ProductCard';
 import Colors from '../../constants/colors';
+import { useAuthState } from '../../core/auth/authGuards';
+import { useAuthGate } from '../../core/auth/authGate';
 
 const WishlistScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { authStatus } = useAuthState();
+  const isAuthenticated = authStatus === 'authenticated';
+  const { openAuth } = useAuthGate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      loadWishlist();
-    } else {
-      setLoading(false);
-    }
+    loadWishlist();
   }, [isAuthenticated]);
 
   const loadWishlist = async () => {
     try {
       setLoading(true);
-      const response = await wishlistService.getWishlist();
-      if (response.success && response.data) {
-        const productArray = Array.isArray(response.data) ? response.data : [];
-        setProducts(productArray);
+      if (isAuthenticated) {
+        const response = await wishlistService.getWishlist();
+        if (response.success && response.data) {
+          const productArray = Array.isArray(response.data) ? response.data : [];
+          setProducts(productArray);
+        }
+      } else {
+        const local = await wishlistService.getLocalWishlist();
+        setProducts(local);
       }
     } catch (error) {
       console.error('Wishlist error:', error);
@@ -55,27 +58,6 @@ const WishlistScreen: React.FC = () => {
     await loadWishlist();
     setRefreshing(false);
   };
-
-  if (!isAuthenticated) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Wishlist</Text>
-        </View>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>❤️</Text>
-          <Text style={styles.emptyText}>Please login to view your wishlist</Text>
-          <Button
-            mode="contained"
-            onPress={() => navigation.navigate('Auth', { screen: 'Login' })}
-            style={styles.loginButton}
-          >
-            Login
-          </Button>
-        </View>
-      </View>
-    );
-  }
 
   if (loading) {
     return (
@@ -96,6 +78,13 @@ const WishlistScreen: React.FC = () => {
         <Text style={styles.headerTitle}>Wishlist</Text>
         <Text style={styles.headerSubtitle}>{products.length} items</Text>
       </View>
+      {!isAuthenticated && (
+        <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
+          <TouchableOpacity style={{ backgroundColor: Colors.white, borderRadius: 10, padding: 12 }} onPress={() => openAuth({ target: { screen: 'MainTabs', params: { screen: 'Wishlist' } } })}>
+            <Text style={{ color: Colors.primary, fontWeight: '600' }}>Sign in to sync your wishlist across devices</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <FlatList
         data={products}
@@ -187,10 +176,6 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     opacity: 0.7,
     textAlign: 'center',
-  },
-  loginButton: {
-    marginTop: 20,
-    backgroundColor: Colors.secondary,
   },
 });
 

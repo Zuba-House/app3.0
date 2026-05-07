@@ -27,8 +27,8 @@ import { searchAddress, fetchAddressDetails, AddressSuggestion } from '../../ser
 import { parsePhone as parsePhoneApi } from '../../services/phoneAutocomplete.service';
 import { Address } from '../../types/address.types';
 import Colors from '../../constants/colors';
-import { useAppSelector } from '../../store/hooks';
-import { selectIsAuthenticated } from '../../store/slices/authSlice';
+import { useAuthState } from '../../core/auth/authGuards';
+import { useAuthGate } from '../../core/auth/authGate';
 import {
   COUNTRIES,
   getCountryFlag,
@@ -48,9 +48,18 @@ const DEBOUNCE_MS = 300;
 const AddAddressScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { authStatus } = useAuthState();
+  const isAuthenticated = authStatus === 'authenticated';
+  const { openAuth } = useAuthGate();
   const { onSave, editAddress, isGuestCheckout } = (route.params || {}) as AddAddressParams;
   const isGuest = isGuestCheckout === true || !isAuthenticated;
+
+  useEffect(() => {
+    if (!isAuthenticated && !isGuestCheckout) {
+      openAuth({ target: { screen: 'AddAddress' } });
+      navigation.goBack();
+    }
+  }, [isAuthenticated, isGuestCheckout, navigation, openAuth]);
 
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

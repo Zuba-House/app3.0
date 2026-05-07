@@ -8,6 +8,13 @@ const parseNumber = (value, fallback) => {
 };
 
 const normalize = (value) => (typeof value === 'string' ? value.trim() : value);
+const splitCsv = (value) =>
+  typeof value === 'string'
+    ? value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
 
 export const env = {
   port: parseNumber(process.env.PORT, 5000),
@@ -46,6 +53,13 @@ export const env = {
   googleVisionApiKey: normalize(process.env.GOOGLE_VISION_API_KEY || process.env.GOOGLE_CLOUD_VISION_API_KEY),
   googleClientId: normalize(process.env.GOOGLE_CLIENT_ID),
   googleClientSecret: normalize(process.env.GOOGLE_CLIENT_SECRET),
+  /** Optional native OAuth client IDs (PKCE-only exchange; no secret). Allowlist for google_client_id body. */
+  googleIosClientId: normalize(process.env.GOOGLE_IOS_CLIENT_ID),
+  googleAndroidClientId: normalize(process.env.GOOGLE_ANDROID_CLIENT_ID),
+  /** Fallback redirect if client omits redirect_uri — must match native app scheme (e.g. zuba://redirect). */
+  googleOAuthRedirectUri: normalize(process.env.GOOGLE_OAUTH_REDIRECT_URI) || 'zuba://redirect',
+  /** Allow-list of redirects for dev, EAS, and store builds (comma-separated). */
+  googleOAuthRedirectUris: splitCsv(process.env.GOOGLE_OAUTH_REDIRECT_URIS || 'zuba://redirect,com.zubahouse.customer:/oauthredirect'),
   expoOwner: normalize(process.env.EXPO_OWNER) || 'olivierndev',
   expoSlug: normalize(process.env.EXPO_SLUG) || 'zuba-mobile',
 
@@ -111,6 +125,10 @@ export const allKnownEnvKeys = [
   'GOOGLE_CLOUD_VISION_API_KEY',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
+  'GOOGLE_IOS_CLIENT_ID',
+  'GOOGLE_ANDROID_CLIENT_ID',
+  'GOOGLE_OAUTH_REDIRECT_URI',
+  'GOOGLE_OAUTH_REDIRECT_URIS',
   'EXPO_OWNER',
   'EXPO_SLUG',
   'STRIPE_SECRET_KEY',

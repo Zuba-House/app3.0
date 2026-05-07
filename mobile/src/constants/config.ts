@@ -4,6 +4,7 @@
  */
 
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 function resolveApiBaseUrl(): string {
   const trim = (u: string) => u.replace(/\/+$/, '');
@@ -106,6 +107,7 @@ export const STORAGE_KEYS = {
   REFRESH_TOKEN: 'refreshToken',
   USER: 'user',
   CART: 'cart',
+  WISHLIST_LOCAL: 'wishlist_local',
   RECENT_SEARCHES: 'recentSearches',
   SHIPPING_LOCATION: 'shippingLocation',
 } as const;
@@ -133,4 +135,44 @@ export const ERROR_MESSAGES = {
   INVALID_CREDENTIALS: 'Invalid email or password',
   EMAIL_EXISTS: 'Email already exists',
 } as const;
+
+const appExtra = (Constants.expoConfig?.extra as {
+  expoClientId?: string;
+  googleWebClientId?: string;
+  googleIosClientId?: string;
+  googleAndroidClientId?: string;
+  googleOAuthRedirectUri?: string;
+  googleOAuthRedirectPath?: string;
+} | undefined) || {};
+
+export const GOOGLE_AUTH_CONFIG = {
+  expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || appExtra.expoClientId || '',
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || appExtra.googleWebClientId || '',
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || appExtra.googleIosClientId || '',
+  androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || appExtra.googleAndroidClientId || '',
+  redirectUri: process.env.EXPO_PUBLIC_GOOGLE_REDIRECT_URI || appExtra.googleOAuthRedirectUri || '',
+  redirectPath: appExtra.googleOAuthRedirectPath || 'redirect',
+} as const;
+
+export function getGoogleClientIdForPlatform(): string {
+  if (Platform.OS === 'ios') return GOOGLE_AUTH_CONFIG.iosClientId;
+  if (Platform.OS === 'android') return GOOGLE_AUTH_CONFIG.androidClientId;
+  return GOOGLE_AUTH_CONFIG.webClientId;
+}
+
+export function getGoogleConfigIssues(): string[] {
+  const issues: string[] = [];
+  const clientId = getGoogleClientIdForPlatform();
+  if (!clientId) {
+    issues.push(`Missing Google OAuth client id for ${Platform.OS}`);
+  }
+  if (!GOOGLE_AUTH_CONFIG.webClientId) {
+    issues.push('Missing Google web client id for OAuth consent compatibility');
+  }
+  const ids = [GOOGLE_AUTH_CONFIG.webClientId, GOOGLE_AUTH_CONFIG.iosClientId, GOOGLE_AUTH_CONFIG.androidClientId].filter(Boolean);
+  if (ids.length > 1 && new Set(ids).size === 1) {
+    issues.push('Google OAuth client ids are identical across platforms. Use distinct web/iOS/android clients.');
+  }
+  return issues;
+}
 

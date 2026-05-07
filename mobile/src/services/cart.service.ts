@@ -10,18 +10,29 @@ import {
   deleteData,
 } from './api';
 import { API_ENDPOINTS } from '../constants/config';
-import { Cart, CartItem } from '../types/cart.types';
+import { Cart } from '../types/cart.types';
 import { ApiResponse } from '../types/api.types';
 import { productService } from './product.service';
 import { Product } from '../types/product.types';
+
+type CartApiPayload = unknown;
+
+const extractCartItems = (payload: CartApiPayload): any[] => {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === 'object' && Array.isArray((payload as any).items)) {
+    return (payload as any).items;
+  }
+  return [];
+};
 
 export const cartService = {
   /**
    * Get user's cart
    */
-  getCart: async (): Promise<ApiResponse<Cart>> => {
-    const response = await fetchDataFromApi<Cart>(API_ENDPOINTS.GET_CART);
-    return response;
+  getCart: async (): Promise<ApiResponse<any[]>> => {
+    const response = await fetchDataFromApi<CartApiPayload>(API_ENDPOINTS.GET_CART);
+    const items = extractCartItems(response.data);
+    return { ...response, data: items };
   },
 
   /**
@@ -150,8 +161,8 @@ export const cartService = {
   clearCart: async (): Promise<ApiResponse> => {
     // Get all cart items first, then delete each
     const cartResponse = await cartService.getCart();
-    if (cartResponse.success && cartResponse.data?.items) {
-      const deletePromises = cartResponse.data.items.map((item) =>
+    if (cartResponse.success && Array.isArray(cartResponse.data)) {
+      const deletePromises = cartResponse.data.map((item) =>
         cartService.removeFromCart(item._id)
       );
       await Promise.all(deletePromises);

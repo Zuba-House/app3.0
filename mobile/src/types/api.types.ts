@@ -3,12 +3,12 @@
  * Matches the backend API response format
  */
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   error: boolean;
   data?: T;
   message?: string;
-  details?: any;
+  details?: unknown;
 }
 
 export interface ApiError {

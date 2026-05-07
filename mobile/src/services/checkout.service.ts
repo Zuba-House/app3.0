@@ -235,7 +235,12 @@ export const checkoutService = {
     amountTotal: number;
     currency: string;
   }>> => {
-    const response = await fetchDataFromApi(`${API_ENDPOINTS.GET_CHECKOUT_STATUS}/${sessionId}`);
+    const response = await fetchDataFromApi<{
+      status: string;
+      paymentStatus: string;
+      amountTotal: number;
+      currency: string;
+    }>(`${API_ENDPOINTS.GET_CHECKOUT_STATUS}/${sessionId}`);
     return response;
   },
 

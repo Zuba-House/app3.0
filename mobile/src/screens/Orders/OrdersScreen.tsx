@@ -11,12 +11,12 @@ import {
   FlatList,
   TouchableOpacity,
 } from 'react-native';
-import { ActivityIndicator, Button } from 'react-native-paper';
+import { ActivityIndicator } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import { useAppSelector } from '../../store/hooks';
-import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { orderService } from '../../services/order.service';
 import Colors from '../../constants/colors';
+import { useAuthState } from '../../core/auth/authGuards';
+import { useAuthGate } from '../../core/auth/authGate';
 
 interface Order {
   _id: string;
@@ -29,16 +29,19 @@ interface Order {
 
 const OrdersScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { authStatus } = useAuthState();
+  const isAuthenticated = authStatus === 'authenticated';
+  const { openAuth } = useAuthGate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      loadOrders();
-    } else {
+    if (!isAuthenticated) {
       setLoading(false);
+      setOrders([]);
+      return;
     }
+    loadOrders();
   }, [isAuthenticated]);
 
   const loadOrders = async () => {
@@ -69,27 +72,6 @@ const OrdersScreen: React.FC = () => {
     }
   };
 
-  if (!isAuthenticated) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Orders</Text>
-        </View>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>📦</Text>
-          <Text style={styles.emptyText}>Please login to view your orders</Text>
-          <Button
-            mode="contained"
-            onPress={() => navigation.navigate('Auth', { screen: 'Login' })}
-            style={styles.loginButton}
-          >
-            Login
-          </Button>
-        </View>
-      </View>
-    );
-  }
-
   if (loading) {
     return (
       <View style={styles.container}>
@@ -98,6 +80,24 @@ const OrdersScreen: React.FC = () => {
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.secondary} />
+        </View>
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Orders</Text>
+        </View>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>📦</Text>
+          <Text style={styles.emptyText}>Track orders after sign in</Text>
+          <Text style={styles.emptySubtext}>Your checkout and order history stay in one place.</Text>
+          <TouchableOpacity style={styles.orderCard} onPress={() => openAuth({ target: { screen: 'MainTabs', params: { screen: 'Orders' } } })}>
+            <Text style={styles.orderNumber}>Sign in to view orders</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -257,10 +257,6 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     opacity: 0.7,
     textAlign: 'center',
-  },
-  loginButton: {
-    marginTop: 20,
-    backgroundColor: Colors.secondary,
   },
 });
 

@@ -1,35 +1,9 @@
-/**
- * App Navigator
- * Main navigation structure
- */
-
-import React, { useEffect, useState } from 'react';
-import { View, Text } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { STORAGE_KEYS, API_ENDPOINTS } from '../constants/config';
-import { getAccessToken, getRefreshToken } from '../utils/tokenStorage';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { setCredentials } from '../store/slices/authSlice';
-import { setCart, selectCartItems } from '../store/slices/cartSlice';
-import { setShippingLocation } from '../store/slices/shippingLocationSlice';
-import { User } from '../types/user.types';
 import Colors from '../constants/colors';
-import SplashScreen from '../components/SplashScreen';
-import { notificationService } from '../services/notification.service';
-import { analyticsService } from '../services/analytics.service';
-import { locationService } from '../services/location.service';
-import { cartService } from '../services/cart.service';
 
-// Screens
-import LoginScreen from '../screens/Auth/LoginScreen';
-import RegisterScreen from '../screens/Auth/RegisterScreen';
-import ForgotPasswordScreen from '../screens/Auth/ForgotPasswordScreen';
-import VerifyOtpScreen from '../screens/Auth/VerifyOtpScreen';
-import ResetPasswordScreen from '../screens/Auth/ResetPasswordScreen';
 import HomeScreen from '../screens/Home/HomeScreen';
 import SearchScreen from '../screens/Search/SearchScreen';
 import WishlistScreen from '../screens/Wishlist/WishlistScreen';
@@ -49,20 +23,6 @@ import SafePaymentsPrivacyScreen from '../screens/Support/SafePaymentsPrivacyScr
 import AboutScreen from '../screens/About/AboutScreen';
 import NotificationsScreen from '../screens/Settings/NotificationsScreen';
 import OrderDetailScreen from '../screens/Orders/OrderDetailScreen';
-
-// Navigation Types
-export type RootStackParamList = {
-  Auth: { screen?: 'Login' | 'Register' } | undefined;
-  Main: undefined;
-};
-
-export type AuthStackParamList = {
-  Login: undefined;
-  Register: undefined;
-  ForgotPassword: undefined;
-  VerifyOtp: { email: string; isEmailVerification?: boolean };
-  ResetPassword: { email: string };
-};
 
 export type MainTabParamList = {
   Home: undefined;
@@ -90,27 +50,8 @@ export type MainStackParamList = {
   Notifications: undefined;
 };
 
-const RootStack = createNativeStackNavigator<RootStackParamList>();
-const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const MainStack = createNativeStackNavigator<MainStackParamList>();
-
-// Auth Navigator
-const AuthNavigator = () => {
-  return (
-    <AuthStack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <AuthStack.Screen name="Login" component={LoginScreen} />
-      <AuthStack.Screen name="Register" component={RegisterScreen} />
-      <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-      <AuthStack.Screen name="VerifyOtp" component={VerifyOtpScreen} />
-      <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-    </AuthStack.Navigator>
-  );
-};
 
 // Tab Navigator
 const TabNavigator = () => {
@@ -170,7 +111,7 @@ const TabNavigator = () => {
           ),
         }}
       />
-      <Tab.Screen 
+      <Tab.Screen
         name="Wishlist" 
         component={WishlistScreen}
         options={{
@@ -183,7 +124,7 @@ const TabNavigator = () => {
           ),
         }}
       />
-      <Tab.Screen 
+      <Tab.Screen
         name="Orders" 
         component={OrdersScreen}
         options={{
@@ -214,7 +155,7 @@ const TabNavigator = () => {
 };
 
 // Main Navigator (Tabs + Product Detail + Checkout)
-const MainNavigator = () => {
+const AppNavigator = () => {
   return (
     <MainStack.Navigator>
       <MainStack.Screen
@@ -296,186 +237,6 @@ const MainNavigator = () => {
         options={{ title: 'Order details', headerShown: true }}
       />
     </MainStack.Navigator>
-  );
-};
-
-// Root Navigator
-const AppNavigator: React.FC = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [showSplash, setShowSplash] = useState(true);
-  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
-  const cartItems = useAppSelector(selectCartItems);
-  const dispatch = useAppDispatch();
-
-  // Guest cart: persist on every change so AsyncStorage always matches Redux (merge-on-login, Cart tab, cold start).
-  useEffect(() => {
-    if (isLoading) return;
-    if (isAuthenticated) return;
-    AsyncStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(cartItems)).catch(() => {});
-  }, [isLoading, isAuthenticated, cartItems]);
-
-  useEffect(() => {
-    // Auth rehydration: restore session from AsyncStorage on app launch
-    const checkAuth = async () => {
-      try {
-        const token = await getAccessToken();
-        const refreshToken = await getRefreshToken();
-        const userJson = await AsyncStorage.getItem(STORAGE_KEYS.USER);
-
-        if (token) {
-          let user: User | null = null;
-          if (userJson) {
-            try {
-              const parsed = JSON.parse(userJson) as User;
-              if (parsed && parsed._id && parsed.email) user = parsed;
-            } catch {
-              // invalid JSON
-            }
-          }
-          if (!user) {
-            try {
-              const { fetchDataFromApi } = await import('../services/api');
-              const userResponse = await fetchDataFromApi<User>(API_ENDPOINTS.GET_CURRENT_USER);
-              if (userResponse.success && userResponse.data) {
-                user = userResponse.data;
-                await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-              }
-            } catch {
-              // token may be expired; keep storage, will 401 on first request and refresh
-            }
-          }
-          if (user) {
-            dispatch(
-              setCredentials({
-                user,
-                accessToken: token,
-                refreshToken: refreshToken || '',
-              })
-            );
-            analyticsService.initialize(user._id);
-          }
-        }
-      } catch (error) {
-        console.error('Error checking auth:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuth();
-    
-    // Initialize push notifications (silently - errors are handled in service)
-    const initNotifications = async () => {
-      try {
-        const token = await notificationService.initialize();
-        if (token) {
-          // Token registered - will be sent to backend on login
-        }
-        // If no token, that's fine - notifications are optional
-      } catch (error) {
-        // Errors are already handled gracefully in notificationService
-        // No need to log or show to user
-      }
-    };
-    
-    initNotifications();
-    
-    // Initialize analytics
-    analyticsService.initialize();
-  }, [dispatch]);
-
-  // Rehydrate cart globally so badge/count appears immediately after app restart.
-  useEffect(() => {
-    const hydrateCart = async () => {
-      try {
-        if (isAuthenticated) {
-          const response = await cartService.getCart();
-          if (response.success && Array.isArray(response.data)) {
-            dispatch(setCart(response.data));
-          }
-          return;
-        }
-
-        const guestCart = await AsyncStorage.getItem(STORAGE_KEYS.CART);
-        if (guestCart) {
-          const parsed = JSON.parse(guestCart);
-          const items = Array.isArray(parsed) ? parsed : parsed?.items || [];
-          dispatch(setCart({ items }));
-        }
-        // If no persisted cart, leave Redux as-is (avoid clearing an in-memory guest cart when hydration re-runs).
-      } catch {
-        // Keep existing Redux cart on hydration failure (avoid wiping after transient API errors).
-      }
-    };
-
-    // Wait for auth bootstrap to complete before hydrating cart.
-    if (!isLoading) {
-      hydrateCart();
-    }
-  }, [dispatch, isAuthenticated, isLoading]);
-
-  // Load or auto-detect shipping location (non-blocking)
-  useEffect(() => {
-    const initShippingLocation = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEYS.SHIPPING_LOCATION);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed?.countryCode) {
-            dispatch(setShippingLocation(parsed));
-            return;
-          }
-        }
-        const loc = await locationService.getLocationFromIP();
-        if (loc) {
-          const state = {
-            countryCode: loc.countryCode,
-            countryName: loc.countryName,
-            region: loc.region ?? null,
-            city: loc.city ?? null,
-          };
-          dispatch(setShippingLocation(state));
-          await AsyncStorage.setItem(STORAGE_KEYS.SHIPPING_LOCATION, JSON.stringify(state));
-        }
-      } catch {
-        // ignore
-      }
-    };
-    initShippingLocation();
-  }, [dispatch]);
-
-  // Show beautiful animated splash screen
-  if (showSplash) {
-    return (
-      <SplashScreen
-        onFinish={() => setShowSplash(false)}
-        duration={2500}
-      />
-    );
-  }
-
-  if (isLoading) {
-    // Brief loading state after splash
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold', color: Colors.primary }}>Zuba House</Text>
-      </View>
-    );
-  }
-
-  return (
-    <NavigationContainer>
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {/* Always show Main (Home) first - Better UX, allow browsing without login */}
-        <RootStack.Screen name="Main" component={MainNavigator} />
-        {/* Auth screens accessible as modal when user wants to login/register */}
-        <RootStack.Screen 
-          name="Auth" 
-          component={AuthNavigator}
-          options={{ presentation: 'modal' }}
-        />
-      </RootStack.Navigator>
-    </NavigationContainer>
   );
 };
 

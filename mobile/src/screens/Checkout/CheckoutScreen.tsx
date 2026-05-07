@@ -27,11 +27,12 @@ import { Address, ShippingMethod } from '../../types/address.types';
 import { ApiResponse } from '../../types/api.types';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectCartItems, selectCartTotal, clearCart, setCart } from '../../store/slices/cartSlice';
-import { selectIsAuthenticated, selectUser } from '../../store/slices/authSlice';
 import Colors from '../../constants/colors';
 import { getDeliveryEstimateForMethod } from '../../constants/shipping';
 import { analyticsService } from '../../services/analytics.service';
 import { showError } from '../../utils/toast';
+import { useAuthState } from '../../core/auth/authGuards';
+import { useAuthGate } from '../../core/auth/authGate';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SAVED_CARDS_STORAGE_KEY = 'checkout_saved_cards_v1';
@@ -44,8 +45,9 @@ const CheckoutScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const cartItems = useAppSelector(selectCartItems);
   const cartTotal = useAppSelector(selectCartTotal);
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const user = useAppSelector(selectUser);
+  const { authStatus, user } = useAuthState();
+  const isAuthenticated = authStatus === 'authenticated';
+  const { openAuth } = useAuthGate();
   const shippingLocation = useAppSelector((state) => state.shippingLocation);
 
   // Checkout state
@@ -397,13 +399,18 @@ const CheckoutScreen: React.FC = () => {
           if (!productRes.success || !productRes.data) continue;
           const p: any = productRes.data;
           const qty = Number(item.quantity || 0);
+          const resolvedVariationId = item.variationId || item.variation?._id || null;
+          const isVariableLine =
+            (item.productType === 'variable' || p?.productType === 'variable') &&
+            Array.isArray(p?.variations) &&
+            p.variations.length > 0;
           const productStockStatus = String(
             p?.inventory?.stockStatus || p?.stockStatus || ''
           ).toLowerCase();
 
           // Variation-level stock/status check if variation selected
-          if (item.variationId && Array.isArray(p?.variations)) {
-            const v = p.variations.find((vv: any) => String(vv?._id) === String(item.variationId));
+          if (isVariableLine && resolvedVariationId) {
+            const v = p.variations.find((vv: any) => String(vv?._id) === String(resolvedVariationId));
             if (v) {
               const vStatus = String(v?.stockStatus || '').toLowerCase();
               if (vStatus === 'out_of_stock') {
@@ -417,6 +424,21 @@ const CheckoutScreen: React.FC = () => {
                   continue;
                 }
               }
+            }
+          } else if (isVariableLine) {
+            // Variable product without explicit variation id:
+            // allow checkout when at least one variation is currently purchasable.
+            const hasSellableVariation = p.variations.some((v: any) => {
+              if (!v) return false;
+              const vStatus = String(v?.stockStatus || '').toLowerCase();
+              if (vStatus === 'out_of_stock') return false;
+              if (v?.endlessStock) return true;
+              const vStockRaw = v?.stock;
+              return vStockRaw !== undefined && vStockRaw !== null ? Number(vStockRaw) >= qty : false;
+            });
+            if (!hasSellableVariation) {
+              outOfStockTitles.push(item.productTitle || item.product?.name || 'Product');
+              continue;
             }
           } else {
             // Simple product stock/status check
@@ -576,11 +598,18 @@ const CheckoutScreen: React.FC = () => {
                   quantity: item.quantity,
                 }))
               );
-              dispatch(clearCart());
-              navigation.navigate('OrderConfirmation', {
-                orderId,
-                total: totals.total,
-              });
+              cartService
+                .clearCart()
+                .catch(() => {
+                  // Non-blocking: always clear local cart for UI consistency.
+                })
+                .finally(() => {
+                  dispatch(clearCart());
+                  navigation.navigate('OrderConfirmation', {
+                    orderId,
+                    total: totals.total,
+                  });
+                });
             },
           });
         } else {
@@ -1324,6 +1353,18 @@ const CheckoutScreen: React.FC = () => {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.secondary} />
         <Text style={styles.loadingText}>Loading checkout...</Text>
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.stepTitle}>Sign in required</Text>
+        <Text style={styles.stepSubtitle}>Please sign in to continue to checkout.</Text>
+        <TouchableOpacity style={styles.actionButton} onPress={() => openAuth({ target: { screen: 'Checkout' } })}>
+          <Text style={styles.actionButtonText}>Sign in to continue</Text>
+        </TouchableOpacity>
       </View>
     );
   }

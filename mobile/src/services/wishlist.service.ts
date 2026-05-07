@@ -8,6 +8,8 @@ import { API_ENDPOINTS } from '../constants/config';
 import { Product } from '../types/product.types';
 import { ApiResponse } from '../types/api.types';
 import { productService } from './product.service';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '../constants/config';
 
 const isLikelyMongoId = (value?: string): boolean => {
   if (!value || typeof value !== 'string') return false;
@@ -99,6 +101,44 @@ export const wishlistService = {
       `${API_ENDPOINTS.REMOVE_FROM_WISHLIST}/${wishlistItemId}`
     );
     return response;
+  },
+
+  getLocalWishlist: async (): Promise<Product[]> => {
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEYS.WISHLIST_LOCAL);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  },
+
+  addToLocalWishlist: async (product: Product): Promise<void> => {
+    const list = await wishlistService.getLocalWishlist();
+    const exists = list.some((item) => item._id === product._id);
+    if (exists) return;
+    const next = [product, ...list];
+    await AsyncStorage.setItem(STORAGE_KEYS.WISHLIST_LOCAL, JSON.stringify(next));
+  },
+
+  removeFromLocalWishlist: async (productId: string): Promise<void> => {
+    const list = await wishlistService.getLocalWishlist();
+    const next = list.filter((item) => item._id !== productId);
+    await AsyncStorage.setItem(STORAGE_KEYS.WISHLIST_LOCAL, JSON.stringify(next));
+  },
+
+  mergeLocalWishlistToCloud: async (): Promise<void> => {
+    const local = await wishlistService.getLocalWishlist();
+    if (local.length === 0) return;
+    for (const product of local) {
+      try {
+        await wishlistService.addToWishlist(product);
+      } catch {
+        // ignore per-item failure
+      }
+    }
+    await AsyncStorage.removeItem(STORAGE_KEYS.WISHLIST_LOCAL);
   },
 };
 

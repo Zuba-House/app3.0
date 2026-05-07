@@ -36,10 +36,10 @@ import { STORAGE_KEYS } from '../../constants/config';
 import { analyticsService } from '../../services/analytics.service';
 import { showError } from '../../utils/toast';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { setCart, addItem } from '../../store/slices/cartSlice';
 import { cartService } from '../../services/cart.service';
 import { isProductOutOfStock } from '../../utils/productStock';
+import { useAuthState } from '../../core/auth/authGuards';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CATEGORY_SIDEBAR_WIDTH = SCREEN_WIDTH < 375 ? 100 : SCREEN_WIDTH < 414 ? 110 : 120;
@@ -78,7 +78,8 @@ function getCategoryIconName(name: string): string {
 export default function SearchScreen() {
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { authStatus } = useAuthState();
+  const isAuthenticated = authStatus === 'authenticated';
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -350,7 +351,7 @@ export default function SearchScreen() {
       const res = await cartService.addToCart(product._id, 1, undefined, undefined, product);
       if (res.success) {
         const cartRes = await cartService.getCart();
-        if (cartRes.success && Array.isArray(cartRes.data)) dispatch(setCart(cartRes.data));
+        if (cartRes.success) dispatch(setCart(cartRes.data));
         Alert.alert('', 'Added to cart');
       } else showError(res.message || 'Failed to add');
     } catch (e: any) {
@@ -392,7 +393,7 @@ export default function SearchScreen() {
             .then(async (res) => {
               if (res.success) {
                 const cr = await cartService.getCart();
-                if (cr.success && Array.isArray(cr.data)) dispatch(setCart(cr.data));
+                if (cr.success) dispatch(setCart(cr.data));
                 showError('Added to cart');
               } else {
                 showError(res.message || 'Failed');

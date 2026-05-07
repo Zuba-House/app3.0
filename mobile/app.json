@@ -49,10 +49,17 @@
     },
     "extra": {
       "apiUrl": "https://zuba-api.onrender.com",
+      "googleOAuthRedirectPath": "redirect",
+      "googleOAuthRedirectUri": "zuba://redirect",
+      "expoOwner": "olivierndev",
+      "expoSlug": "zuba-mobile",
       "eas": {
         "projectId": "zuba-house-019"
       },
-      "expoClientId": "435369151234-8e7sb5ferci9ti2472vdmf6ose5e6nss.apps.googleusercontent.com"
+      "expoClientId": "435369151234-8e7sb5ferci9ti2472vdmf6ose5e6nss.apps.googleusercontent.com",
+      "googleWebClientId": "435369151234-8e7sb5ferci9ti2472vdmf6ose5e6nss.apps.googleusercontent.com",
+      "googleIosClientId": "435369151234-8e7sb5ferci9ti2472vdmf6ose5e6nss.apps.googleusercontent.com",
+      "googleAndroidClientId": "435369151234-8e7sb5ferci9ti2472vdmf6ose5e6nss.apps.googleusercontent.com"
     }
   }
 }

@@ -32,7 +32,12 @@ const normalizeCartItems = (input: any): CartItem[] => {
             featuredImage: item?.image || '',
           };
     const pid = item?.productId != null ? String(item.productId) : undefined;
-    const vid = item?.variationId != null ? String(item.variationId) : undefined;
+    const vid =
+      item?.variationId != null
+        ? String(item.variationId)
+        : item?.variation?._id != null
+          ? String(item.variation._id)
+          : undefined;
     return {
       _id: String(item?._id ?? `${item?.productId ?? 'item'}_${Math.random()}`),
       product: productObj,

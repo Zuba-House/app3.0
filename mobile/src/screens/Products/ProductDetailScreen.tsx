@@ -27,7 +27,6 @@ import { cartService } from '../../services/cart.service';
 import { wishlistService } from '../../services/wishlist.service';
 import { Product } from '../../types/product.types';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { setCart, addItem } from '../../store/slices/cartSlice';
 import Colors from '../../constants/colors';
 import { FREE_SHIPPING_THRESHOLD } from '../../constants/config';
@@ -40,6 +39,7 @@ import {
   isProductOutOfStock,
   isVariationInStock,
 } from '../../utils/productStock';
+import { useAuthState } from '../../core/auth/authGuards';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IMAGE_HEIGHT = SCREEN_WIDTH; // Square images for better display
@@ -237,7 +237,8 @@ const ProductDetailScreen: React.FC = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { authStatus } = useAuthState();
+  const isAuthenticated = authStatus === 'authenticated';
   const shippingLocation = useAppSelector((state) => state.shippingLocation);
   const productId = route.params?.productId;
 
@@ -654,22 +655,23 @@ const ProductDetailScreen: React.FC = () => {
   };
 
   const handleToggleWishlist = async () => {
-    if (!isAuthenticated) {
-      Alert.alert('Login Required', 'Please login to save items to wishlist', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Login',
-          onPress: () => navigation.navigate('Auth', { screen: 'Login' }),
-        },
-      ]);
-      return;
-    }
-
     if (!product) return;
 
     try {
+      if (!isAuthenticated) {
+        if (isWishlisted) {
+          await wishlistService.removeFromLocalWishlist(product._id);
+          setIsWishlisted(false);
+          Alert.alert('Removed', 'Product removed from local wishlist');
+        } else {
+          await wishlistService.addToLocalWishlist(product);
+          setIsWishlisted(true);
+          Alert.alert('Saved', 'Product added to local wishlist');
+        }
+        return;
+      }
+
       if (isWishlisted) {
-        // Remove from wishlist (would need wishlist item ID)
         setIsWishlisted(false);
         Alert.alert('Removed', 'Product removed from wishlist');
       } else {
@@ -678,10 +680,7 @@ const ProductDetailScreen: React.FC = () => {
           setIsWishlisted(true);
           Alert.alert('Saved', 'Product added to wishlist');
         } else {
-          Alert.alert(
-            'Wishlist',
-            response.message || 'Could not add to wishlist. Try again.'
-          );
+          Alert.alert('Wishlist', response.message || 'Could not add to wishlist. Try again.');
         }
       }
     } catch (error: any) {

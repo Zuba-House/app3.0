@@ -305,37 +305,66 @@ export async function authWithGoogle(request, response) {
 
 /**
  * Google OAuth: exchange authorization code for tokens (server-side).
- * Mobile sends { code, redirect_uri }; backend uses client_secret and returns app tokens.
+ * Body: code, redirect_uri, code_verifier, google_client_id (optional; defaults to GOOGLE_CLIENT_ID).
+ * Web client: uses client_secret. iOS/Android OAuth clients: PKCE only (no secret).
  */
 export async function authWithGoogleCode(request, response) {
     try {
-        const { code, redirect_uri, guestCart } = request.body;
+        const { code, redirect_uri, code_verifier, guestCart, google_client_id } = request.body;
         if (!code) {
             return sendError(response, 400, "Authorization code is required");
         }
-
-        const clientId = env.googleClientId;
-        const clientSecret = env.googleClientSecret;
-        if (!clientId || !clientSecret) {
-            return sendError(response, 500, "Google OAuth not configured");
+        if (!code_verifier || typeof code_verifier !== "string") {
+            return sendError(response, 400, "code_verifier is required (PKCE)");
         }
 
-        const defaultOwner = env.expoOwner || 'olivierndev';
-        const defaultSlug = env.expoSlug || 'zuba-mobile';
-        const redirectUri =
-            redirect_uri ||
-            `https://auth.expo.io/@${defaultOwner}/${defaultSlug}`;
+        const fallbackRedirect = env.googleOAuthRedirectUri;
+        const redirectUri = (typeof redirect_uri === "string" && redirect_uri.trim()) || fallbackRedirect;
+        const allowedRedirectUris = Array.isArray(env.googleOAuthRedirectUris) && env.googleOAuthRedirectUris.length > 0
+            ? env.googleOAuthRedirectUris
+            : [fallbackRedirect];
+        if (!allowedRedirectUris.includes(redirectUri)) {
+            return sendError(response, 400, "redirect_uri is not allow-listed for Google OAuth exchange");
+        }
+
+        const resolvedClientId =
+            typeof google_client_id === "string" && google_client_id.trim()
+                ? google_client_id.trim()
+                : env.googleClientId;
+
+        const allowedIds = [
+            env.googleClientId,
+            env.googleIosClientId,
+            env.googleAndroidClientId,
+        ].filter(Boolean);
+
+        if (!resolvedClientId || !allowedIds.includes(resolvedClientId)) {
+            return sendError(response, 400, "Invalid or unknown google_client_id");
+        }
+
+        const useWebSecret =
+            resolvedClientId === env.googleClientId &&
+            env.googleClientSecret;
+
+        if (resolvedClientId === env.googleClientId && !env.googleClientSecret) {
+            return sendError(response, 500, "GOOGLE_CLIENT_SECRET required for web client exchange");
+        }
+
+        const tokenParams = new URLSearchParams({
+            code,
+            client_id: resolvedClientId,
+            redirect_uri: redirectUri,
+            grant_type: "authorization_code",
+            code_verifier,
+        });
+        if (useWebSecret) {
+            tokenParams.append("client_secret", env.googleClientSecret);
+        }
 
         const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                code,
-                client_id: clientId,
-                client_secret: clientSecret,
-                redirect_uri: redirectUri,
-                grant_type: 'authorization_code',
-            }),
+            body: tokenParams,
         });
 
         if (!tokenRes.ok) {

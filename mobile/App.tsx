@@ -7,8 +7,9 @@ import React from 'react';
 import { Provider as ReduxProvider } from 'react-redux';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { store } from './src/store/store';
-import AppNavigator from './src/navigation/AppNavigator';
+import RootNavigator from './src/navigation/RootNavigator';
 import Colors from './src/constants/colors';
+import { AuthProvider } from './src/core/auth/authGuards';
 
 // Custom theme for React Native Paper
 const theme = {
@@ -31,7 +32,9 @@ const App: React.FC = () => {
   return (
     <ReduxProvider store={store}>
       <PaperProvider theme={theme}>
-        <AppNavigator />
+        <AuthProvider>
+          <RootNavigator />
+        </AuthProvider>
       </PaperProvider>
     </ReduxProvider>
   );

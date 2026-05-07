@@ -23,20 +23,23 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cartService } from '../../services/cart.service';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectCartItems, selectCartTotal, setCart, updateQuantity, removeItem } from '../../store/slices/cartSlice';
-import { selectIsAuthenticated } from '../../store/slices/authSlice';
 import { CartItem } from '../../types/cart.types';
 import Colors from '../../constants/colors';
 import { FREE_SHIPPING_THRESHOLD, API_URL } from '../../constants/config';
 import { showError } from '../../utils/toast';
 import { STORAGE_KEYS } from '../../constants/config';
 import { store } from '../../store/store';
+import { useAuthState } from '../../core/auth/authGuards';
+import { useAuthGate } from '../../core/auth/authGate';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const CartScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { authStatus } = useAuthState();
+  const isAuthenticated = authStatus === 'authenticated';
+  const { openAuth } = useAuthGate();
   const cartItems = useAppSelector(selectCartItems);
   const total = useAppSelector(selectCartTotal);
   const [loading, setLoading] = useState(true);
@@ -145,6 +148,10 @@ const CartScreen: React.FC = () => {
   const handleCheckout = () => {
     if (cartItems.length === 0) {
       Alert.alert('Empty Cart', 'Your cart is empty');
+      return;
+    }
+    if (!isAuthenticated) {
+      openAuth({ target: { screen: 'Checkout' } });
       return;
     }
     navigation.navigate('Checkout');

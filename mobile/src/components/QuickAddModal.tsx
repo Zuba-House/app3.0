@@ -19,11 +19,11 @@ import { Image } from 'expo-image';
 import { Product } from '../types/product.types';
 import { productService } from '../services/product.service';
 import { cartService } from '../services/cart.service';
-import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { selectIsAuthenticated } from '../store/slices/authSlice';
+import { useAppDispatch } from '../store/hooks';
 import { setCart, addItem } from '../store/slices/cartSlice';
 import Colors from '../constants/colors';
 import { API_URL } from '../constants/config';
+import { useAuthState } from '../core/auth/authGuards';
 
 interface QuickAddModalProps {
   visible: boolean;
@@ -34,7 +34,8 @@ interface QuickAddModalProps {
 
 export default function QuickAddModal({ visible, product, onClose, onAdded }: QuickAddModalProps) {
   const dispatch = useAppDispatch();
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { authStatus } = useAuthState();
+  const isAuthenticated = authStatus === 'authenticated';
   const [fullProduct, setFullProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
