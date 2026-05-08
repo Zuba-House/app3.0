@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { authFeatureApi } from '../auth.api';
+import { toUserFriendlyAuthError } from '../auth.errors';
 import { validateForgotPassword } from '../auth.validators';
 
 export function useForgotPassword() {
@@ -18,7 +19,7 @@ export function useForgotPassword() {
       const result = await authFeatureApi.forgotPassword({ email: email.trim().toLowerCase() });
       return result.success;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start reset flow');
+      setError(toUserFriendlyAuthError(err, 'Failed to start reset flow'));
       return false;
     } finally {
       setSubmitting(false);

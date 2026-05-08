@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuthState } from '../../../core/auth/authGuards';
 import { toLoginPayload } from '../auth.mappers';
+import { toUserFriendlyAuthError } from '../auth.errors';
 import { validateLogin } from '../auth.validators';
 import { LoginDTO } from '../types';
 
@@ -21,7 +22,7 @@ export function useLogin() {
       await login(toLoginPayload(input));
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to sign in');
+      setError(toUserFriendlyAuthError(err, 'Unable to sign in'));
       return false;
     } finally {
       setSubmitting(false);

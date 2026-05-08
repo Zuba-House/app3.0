@@ -167,12 +167,19 @@ export const authManager = {
   async fetchCurrentUser(accessTokenOverride?: string): Promise<UserDTO> {
     const accessToken = accessTokenOverride || authSession.getAccessToken();
     if (!accessToken) throw new Error('No access token');
-    const response = await fetch(`${API_URL}${API_ENDPOINTS.GET_CURRENT_USER}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    };
+    let response = await fetch(`${API_URL}${API_ENDPOINTS.GET_CURRENT_USER}`, {
+      headers,
     });
+    // Backward-compatible fallback for older deployed backends.
+    if (response.status === 404) {
+      response = await fetch(`${API_URL}/api/user/user-details`, {
+        headers,
+      });
+    }
     const result = await parseResponse<UserDTO>(response);
     if (!result.data) throw new Error('User payload missing');
     await authStorage.setUserCache(result.data);
