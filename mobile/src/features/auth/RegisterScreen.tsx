@@ -4,30 +4,23 @@ import { Button, TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../../constants/colors';
 import { useRegister } from './hooks/useRegister';
-import { useGoogleAuth } from './hooks/useGoogleAuth';
-import GoogleAuthButton from './components/GoogleAuthButton';
 
 const RegisterScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { submit, submitting, error } = useRegister();
-  const { signInWithGoogle, googleLoading, googleError, googleReady, googleConfigIssues } = useGoogleAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const primaryError = error || googleError;
+  const primaryError = error;
 
   const onSubmit = async () => {
     const ok = await submit({ name, email, password });
-    if (ok && navigation.canGoBack()) {
-      navigation.goBack();
-    }
-  };
-
-  const onGoogle = async () => {
-    const ok = await signInWithGoogle();
-    if (ok && navigation.canGoBack()) {
-      navigation.goBack();
+    if (ok) {
+      navigation.navigate('VerifyOtp', {
+        email: email.trim().toLowerCase(),
+        purpose: 'verifyEmail',
+      });
     }
   };
 
@@ -39,7 +32,6 @@ const RegisterScreen: React.FC = () => {
             <Text style={styles.title}>Create account</Text>
             <Text style={styles.subtitle}>Sign up in seconds and keep your shopping session in sync.</Text>
             {primaryError ? <Text style={styles.error}>{primaryError}</Text> : null}
-            {googleConfigIssues.length > 0 ? <Text style={styles.info}>Google Sign-In is currently unavailable in this runtime. You can continue with email.</Text> : null}
             <TextInput label="Name" mode="outlined" value={name} onChangeText={setName} />
             <TextInput label="Email" mode="outlined" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
             <TextInput
@@ -51,10 +43,9 @@ const RegisterScreen: React.FC = () => {
               style={styles.input}
               right={<TextInput.Icon icon={showPassword ? 'eye-off' : 'eye'} onPress={() => setShowPassword((prev) => !prev)} />}
             />
-            <Button mode="contained" onPress={onSubmit} loading={submitting} disabled={googleLoading} style={styles.primaryBtn} contentStyle={styles.primaryBtnContent} labelStyle={styles.primaryBtnLabel}>
+            <Button mode="contained" onPress={onSubmit} loading={submitting} style={styles.primaryBtn} contentStyle={styles.primaryBtnContent} labelStyle={styles.primaryBtnLabel}>
               Continue
             </Button>
-            <GoogleAuthButton onPress={onGoogle} loading={googleLoading} disabled={!googleReady || submitting} />
             <Button mode="text" onPress={() => navigation.navigate('Login')} style={styles.link} labelStyle={styles.linkLabel}>
               Already have an account
             </Button>
@@ -81,7 +72,6 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, lineHeight: 20, color: '#4A5A66', marginBottom: 10, textAlign: 'center' },
   input: { marginBottom: 4 },
   error: { color: '#d32f2f' },
-  info: { color: '#a16207', fontSize: 13 },
   primaryBtn: { marginTop: 2, borderRadius: 14 },
   primaryBtnContent: { minHeight: 52 },
   primaryBtnLabel: { color: '#FFFFFF', fontWeight: '700' },

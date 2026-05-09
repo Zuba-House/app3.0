@@ -2,6 +2,7 @@ import { Router } from "express";
 import auth, { optionalAuth } from "../middlewares/auth.js";
 import { adminOnly } from "../middlewares/adminOnly.js";
 import { 
+    confirmOrderPaymentController,
     createOrderController, 
     deleteOrder, 
     getOrderByIdController,
@@ -17,6 +18,7 @@ const orderRouter = Router();
 
 // Guest checkout - use optionalAuth (allows both guests and logged-in users)
 orderRouter.post('/create', optionalAuth, createOrderController)
+orderRouter.post('/confirm-payment/:id', optionalAuth, confirmOrderPaymentController)
 orderRouter.get("/order-list", auth, getOrderDetailsController)
 orderRouter.put('/order-status/:id', auth, adminOnly, updateOrderStatusController)
 orderRouter.get('/count', auth, getTotalOrdersCountController)

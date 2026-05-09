@@ -7,4 +7,3 @@ export * from './hooks/useRegister';
 export * from './hooks/useForgotPassword';
 export * from './hooks/useResetPassword';
 export * from './hooks/useVerifyOtp';
-export * from './hooks/useGoogleAuth';

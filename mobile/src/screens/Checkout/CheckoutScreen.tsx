@@ -20,7 +20,7 @@ import { ActivityIndicator } from 'react-native-paper';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { addressService } from '../../services/address.service';
-import { checkoutService, CreateOrderData } from '../../services/checkout.service';
+import { checkoutService } from '../../services/checkout.service';
 import { cartService } from '../../services/cart.service';
 import { productService } from '../../services/product.service';
 import { Address, ShippingMethod } from '../../types/address.types';
@@ -33,10 +33,16 @@ import { analyticsService } from '../../services/analytics.service';
 import { showError } from '../../utils/toast';
 import { useAuthState } from '../../core/auth/authGuards';
 import { useAuthGate } from '../../core/auth/authGate';
+import { authManager } from '../../core/auth/authManager';
+import { buildCheckoutPayload } from '../../features/checkout/utils/buildCheckoutPayload';
+import { createCheckoutOrder } from '../../features/checkout/api/createOrder';
+import { checkoutStore } from '../../features/checkout/store/checkoutStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SAVED_CARDS_STORAGE_KEY = 'checkout_saved_cards_v1';
 const SELECTED_PAYMENT_STORAGE_KEY = 'checkout_selected_payment_v1';
+const DELIVERY_NOTE_STORAGE_KEY = 'checkout_delivery_note_v1';
+const ORDER_SOURCE_TAG = 'zuba_mobile_app';
 
 type CheckoutStep = 'address' | 'shipping' | 'payment' | 'review';
 
@@ -112,10 +118,30 @@ const CheckoutScreen: React.FC = () => {
   useEffect(() => {
     AsyncStorage.setItem(SELECTED_PAYMENT_STORAGE_KEY, selectedPaymentId).catch(() => {});
   }, [selectedPaymentId]);
-  // Guest checkout contact
-  const [guestName, setGuestName] = useState('');
-  const [guestEmail, setGuestEmail] = useState('');
-  const [guestPhone, setGuestPhone] = useState('');
+  const [deliveryNote, setDeliveryNote] = useState('');
+  const [savedDeliveryNote, setSavedDeliveryNote] = useState('');
+
+  useEffect(() => {
+    const loadSavedDeliveryNote = async () => {
+      try {
+        const saved = await AsyncStorage.getItem(DELIVERY_NOTE_STORAGE_KEY);
+        if (saved) {
+          setSavedDeliveryNote(saved);
+          setDeliveryNote(saved);
+        }
+      } catch {
+        // ignore restore error
+      }
+    };
+    loadSavedDeliveryNote();
+  }, []);
+
+  useEffect(() => {
+    const trimmed = deliveryNote.trim();
+    if (!trimmed) return;
+    setSavedDeliveryNote(trimmed);
+    AsyncStorage.setItem(DELIVERY_NOTE_STORAGE_KEY, trimmed).catch(() => {});
+  }, [deliveryNote]);
 
   // Coupon & Gift Card state
   const [couponCode, setCouponCode] = useState('');
@@ -138,21 +164,79 @@ const CheckoutScreen: React.FC = () => {
   });
 
   const getEffectiveContact = () => {
+    const addr: any = selectedAddress as any;
+    const fullNameFromContactInfo = [
+      addr?.contactInfo?.firstName,
+      addr?.contactInfo?.lastName,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
     const effectiveName =
-      (guestName?.trim() ||
-        selectedAddress?.name ||
+      (addr?.name ||
+        fullNameFromContactInfo ||
+        addr?.contactName ||
         (user as any)?.name ||
-        '') as string;
-    const effectiveEmail = (guestEmail?.trim() || (user as any)?.email || '') as string;
+        'Customer') as string;
+    const effectiveEmail = ((user as any)?.email || `${String((user as any)?._id || 'customer')}@zubahouse.local`) as string;
     const effectivePhone =
-      (guestPhone?.trim() || selectedAddress?.phone || '') as string;
+      (
+        addr?.phone ||
+        addr?.mobile ||
+        addr?.contactInfo?.phone ||
+        addr?.contact?.phone ||
+        addr?.phoneNumber ||
+        (user as any)?.mobile ||
+        (user as any)?.phone ||
+        ''
+      ) as string;
     return { effectiveName, effectiveEmail, effectivePhone };
   };
 
-  const isValidEmail = (email: string) =>
-    !!email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const isValidPhone = (phone: string) =>
-    !!phone && phone.replace(/\D/g, '').length >= 7;
+  useEffect(() => {
+    checkoutStore.setState({ mode: isAuthenticated ? 'authenticated' : 'guest' });
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    const phone = String((selectedAddress as any)?.phone || (selectedAddress as any)?.mobile || (user as any)?.phone || (user as any)?.mobile || '');
+    checkoutStore.setState({
+      address: selectedAddress,
+      shippingMethod: selectedShipping,
+      deliveryNote,
+      paymentMethod,
+      customer: {
+        name: String((selectedAddress as any)?.name || (user as any)?.name || 'Customer'),
+        email: String((user as any)?.email || ''),
+        phone,
+      },
+    });
+  }, [selectedAddress, selectedShipping, deliveryNote, paymentMethod, user]);
+
+  const toUserFriendlyOrderError = (message: string) => {
+    const text = String(message || '').toLowerCase();
+    if (text.includes('isguestorder') && text.includes('cast to boolean failed')) {
+      return 'Your session state was inconsistent during checkout. Please try again now.';
+    }
+    if (text.includes('guestcustomer') || text.includes('order validation failed')) {
+      return 'Please complete your contact information (name, email, and phone) before placing the order.';
+    }
+    if (text.includes('session expired')) {
+      return 'Your session expired. Please sign in again and retry checkout.';
+    }
+    if (text.includes('timed out') || text.includes('network')) {
+      return 'Network issue during checkout. Please check connection and try again.';
+    }
+    if (text.includes('shipping method is required')) {
+      return 'Please choose a shipping method.';
+    }
+    if (text.includes('invalid address')) {
+      return 'Please complete your shipping address before placing the order.';
+    }
+    if (text.includes('insufficient stock')) {
+      return 'One or more items are out of stock. Please update your cart and try again.';
+    }
+    return message || 'We could not place your order right now. Please try again.';
+  };
 
   useEffect(() => {
     // Allow guest checkout - load data even if not authenticated
@@ -215,10 +299,6 @@ const CheckoutScreen: React.FC = () => {
         const defaultAddr = addressList.find((a) => a.isDefault) || addressList[0];
         if (defaultAddr) {
           setSelectedAddress(defaultAddr);
-          if (!isAuthenticated) {
-            setGuestName(defaultAddr.name || '');
-            setGuestPhone(defaultAddr.phone || '');
-          }
         }
       }
 
@@ -493,91 +573,53 @@ const CheckoutScreen: React.FC = () => {
         if (addRes.success && addRes.data?._id) addressId = addRes.data._id;
       }
 
-      const idempotencyKey = `checkout_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-      const fallbackGuestCustomer = {
-        name: (guestName?.trim() || selectedAddress?.name || user?.name || '').trim(),
-        email: (guestEmail?.trim() || (user as any)?.email || '').trim(),
-        phone: (guestPhone?.trim() || selectedAddress?.phone || '').trim(),
-      };
-      const normalizedProducts = cartItems.map((item: any) => ({
-        productId: item.productId || item.product?._id,
-        productTitle: item.productTitle || item.product?.name || 'Product',
-        quantity: item.quantity,
-        price: item.price,
-        subTotal: item.subtotal || item.price * item.quantity,
-        image: item.image || item.product?.images?.[0] || '',
-        productType: item.productType || (item.variationId ? 'variable' : 'simple'),
-        variationId: item.variationId || item.variation?._id || null,
-        variation: item.variation || null,
-      }));
-
-      const orderData: CreateOrderData = {
-        shippingAddressId: addressId,
-        shippingMethodId: selectedShipping._id,
-        paymentMethod: paymentMethod,
-        idempotencyKey,
-        products: normalizedProducts,
-        totalAmt: totals.total,
-        shippingCost: selectedShipping.price || 0,
-        shippingRate: selectedShipping,
-        shippingAddress: selectedAddress,
-        delivery_address: selectedAddress._id,
-        payment_status: 'pending',
-        // Include guestCustomer fallback for compatibility when backend resolves request as guest.
-        guestCustomer:
-          fallbackGuestCustomer.name &&
-          fallbackGuestCustomer.email &&
-          fallbackGuestCustomer.phone
-            ? fallbackGuestCustomer
-            : undefined,
-        couponCode: appliedCoupon?.code || undefined,
-        giftCardCode: appliedGiftCard?.code || undefined,
-      };
-      let orderResponse: ApiResponse<any>;
-      if (isAuthenticated) {
-        orderResponse = await checkoutService.createOrder(orderData);
-      } else {
-        // Validate guest info
-        const gName = guestName?.trim() || selectedAddress?.name || '';
-        const gEmail = guestEmail?.trim();
-        const gPhone = guestPhone?.trim() || selectedAddress?.phone || '';
-        if (!gName || !gEmail || !gPhone) {
-          Alert.alert('Error', 'Please enter your name, email, and phone to place order.');
+      const accessToken = authManager.getAccessToken();
+      if (isAuthenticated && !accessToken) {
+        const refreshed = await authManager.refreshSession();
+        if (!refreshed) {
+          Alert.alert('Session Expired', 'Please sign in again before placing your order.');
           setProcessing(false);
+          openAuth({ target: { screen: 'Checkout' } });
           return;
         }
-        orderResponse = await checkoutService.createGuestOrder({
-          products: normalizedProducts as any,
-          shippingAddress: selectedAddress,
-          guestCustomer: { name: gName, email: gEmail, phone: gPhone },
-          totalAmt: totals.total,
-          shippingCost: selectedShipping.price || 0,
-          shippingRate: selectedShipping._id,
+      }
+
+      const idempotencyKey = `checkout_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      const checkoutSnapshot = checkoutStore.getState();
+      const payloadResult = buildCheckoutPayload({
+        mode: checkoutSnapshot.mode,
+        user,
+        selectedAddress: { ...(checkoutSnapshot.address || selectedAddress), _id: addressId },
+        selectedShipping: checkoutSnapshot.shippingMethod || selectedShipping,
+        cartItems,
+        totalAmt: totals.total,
+        shippingCost: (checkoutSnapshot.shippingMethod || selectedShipping)?.price || 0,
+        idempotencyKey,
+        paymentMethod: checkoutSnapshot.paymentMethod || paymentMethod,
+        couponCode: appliedCoupon?.code,
+        giftCardCode: appliedGiftCard?.code,
+        deliveryNote: checkoutSnapshot.deliveryNote || deliveryNote,
+        sourceTag: ORDER_SOURCE_TAG,
+      });
+
+      if (!payloadResult.ok) {
+        Alert.alert('Checkout Info Needed', payloadResult.errors[0]?.message || 'Please review checkout details.');
+        setProcessing(false);
+        return;
+      }
+
+      if (__DEV__) {
+        console.info('[Checkout][submit]', {
+          authStatus,
+          isAuthenticated,
+          hasAccessToken: Boolean(authManager.getAccessToken()),
+          mode: payloadResult.data.diagnostics.mode,
+          payloadDiagnostics: payloadResult.data.diagnostics,
+          hasDeliveryNote: Boolean(deliveryNote.trim()),
         });
       }
 
-      // Fallback: if authenticated flow fails with guestCustomer validation, retry as guest payload.
-      if (
-        (!orderResponse.success || !orderResponse.data) &&
-        isAuthenticated &&
-        typeof (orderResponse as any)?.message === 'string' &&
-        (orderResponse as any).message.includes('guestCustomer')
-      ) {
-        if (
-          fallbackGuestCustomer.name &&
-          fallbackGuestCustomer.email &&
-          fallbackGuestCustomer.phone
-        ) {
-          orderResponse = await checkoutService.createGuestOrder({
-            products: normalizedProducts as any,
-            shippingAddress: selectedAddress,
-            guestCustomer: fallbackGuestCustomer,
-            totalAmt: totals.total,
-            shippingCost: selectedShipping.price || 0,
-            shippingRate: selectedShipping._id,
-          });
-        }
-      }
+      const orderResponse: ApiResponse<any> = await createCheckoutOrder(payloadResult.data.payload);
 
       if (orderResponse.success && orderResponse.data) {
         const orderId = orderResponse.data._id || orderResponse.data.orderId;
@@ -631,10 +673,10 @@ const CheckoutScreen: React.FC = () => {
           });
         }
       } else {
-        Alert.alert('Error', (orderResponse as any).message || 'Failed to create order');
+        Alert.alert('Order Not Placed', toUserFriendlyOrderError((orderResponse as any).message || ''));
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to place order');
+      Alert.alert('Order Not Placed', toUserFriendlyOrderError(error.message || ''));
     } finally {
       setProcessing(false);
     }
@@ -1179,15 +1221,6 @@ const CheckoutScreen: React.FC = () => {
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Order Review</Text>
 
-      {(!isAuthenticated || !(user as any)?.email || !(user as any)?.name) && (
-        <View style={styles.authBlock}>
-          <Text style={styles.authBlockTitle}>Contact Information</Text>
-          <Text style={{ color: Colors.primary, opacity: 0.7, marginTop: 4 }}>
-            Enter your contact so we can confirm your order.
-          </Text>
-        </View>
-      )}
-
       {/* Shipping Address Summary */}
       <View style={styles.reviewSection}>
         <View style={styles.reviewHeader}>
@@ -1206,59 +1239,34 @@ const CheckoutScreen: React.FC = () => {
           </View>
         )}
       </View>
-      {/* Contact info (guest or missing profile fields) */}
-      {(!isAuthenticated || !(user as any)?.email || !(user as any)?.name) && (
-        <View style={styles.reviewSection}>
-          <Text style={styles.stepTitle}>Contact Information</Text>
-          <View style={{ gap: 10, marginTop: 8 }}>
-            <TextInput
-              style={styles.discountInput}
-              placeholder="Full Name"
-              value={guestName}
-              onChangeText={setGuestName}
-              placeholderTextColor={Colors.primary + '80'}
-            />
-            <TextInput
-              style={styles.discountInput}
-              placeholder="Email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={guestEmail}
-              onChangeText={setGuestEmail}
-              placeholderTextColor={Colors.primary + '80'}
-            />
-            <TextInput
-              style={styles.discountInput}
-              placeholder="Phone"
-              keyboardType="phone-pad"
-              value={guestPhone}
-              onChangeText={setGuestPhone}
-              placeholderTextColor={Colors.primary + '80'}
-            />
-            {/* Inline validation hints */}
-            {(() => {
-              const { effectiveName, effectiveEmail, effectivePhone } = getEffectiveContact();
-              const nameOk = !!effectiveName;
-              const emailOk = isValidEmail(effectiveEmail);
-              const phoneOk = isValidPhone(effectivePhone);
-              if (nameOk && emailOk && phoneOk) return null;
-              return (
-                <View style={{ marginTop: 6 }}>
-                  {!nameOk && (
-                    <Text style={styles.validationText}>Full name is required.</Text>
-                  )}
-                  {!emailOk && (
-                    <Text style={styles.validationText}>Valid email is required.</Text>
-                  )}
-                  {!phoneOk && (
-                    <Text style={styles.validationText}>Valid phone is required.</Text>
-                  )}
-                </View>
-              );
-            })()}
-          </View>
+      <View style={styles.reviewSection}>
+        <Text style={styles.reviewLabel}>Delivery Note (Optional)</Text>
+        <View style={{ marginTop: 8 }}>
+          <TextInput
+            style={styles.discountInput}
+            placeholder="Add delivery instructions (optional)"
+            value={deliveryNote}
+            onChangeText={setDeliveryNote}
+            placeholderTextColor={Colors.primary + '80'}
+          />
         </View>
-      )}
+        <View style={styles.noteActionsRow}>
+          <TouchableOpacity
+            style={styles.noteActionButton}
+            onPress={() => setDeliveryNote(savedDeliveryNote)}
+            disabled={!savedDeliveryNote}
+          >
+            <Text style={[styles.noteActionText, !savedDeliveryNote && styles.noteActionTextDisabled]}>Use saved note</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.noteActionButton}
+            onPress={() => setDeliveryNote('')}
+            disabled={!deliveryNote}
+          >
+            <Text style={[styles.noteActionText, !deliveryNote && styles.noteActionTextDisabled]}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Shipping Method Summary */}
       <View style={styles.reviewSection}>
@@ -1395,20 +1403,14 @@ const CheckoutScreen: React.FC = () => {
       {/* Footer Action Button */}
       <View style={styles.footer}>
         {(() => {
-          const { effectiveName, effectiveEmail, effectivePhone } = getEffectiveContact();
-          const contactValid = !!effectiveName && isValidEmail(effectiveEmail) && isValidPhone(effectivePhone);
-          const shouldBlock =
-            currentStep === 'review' &&
-            (!isAuthenticated || !(user as any)?.email || !(user as any)?.name) &&
-            !contactValid;
           return (
         <TouchableOpacity
             style={[
               styles.actionButton,
-              (processing || shouldBlock) && styles.actionButtonDisabled,
+              processing && styles.actionButtonDisabled,
             ]}
             onPress={currentStep === 'review' ? handlePlaceOrder : handleNextStep}
-            disabled={processing || shouldBlock}
+            disabled={processing}
         >
           {processing ? (
             <ActivityIndicator size="small" color={Colors.white} />
@@ -2180,6 +2182,27 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     padding: 4,
+  },
+  noteActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  noteActionButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.tertiary,
+  },
+  noteActionText: {
+    color: Colors.primary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  noteActionTextDisabled: {
+    opacity: 0.45,
   },
 });
 

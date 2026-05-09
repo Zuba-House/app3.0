@@ -14,17 +14,111 @@ import { calculateOrderCommissions, creditVendorBalance } from "../utils/commiss
 import { sendVendorNewOrder } from "../utils/vendorEmails.js";
 import { sendError, sendSuccess } from "../utils/response.js";
 
+async function sendOrderEmails(order, source = 'unknown') {
+    let userEmail = null;
+    let userName = null;
+    let userInfo = null;
+
+    if (order.userId) {
+        const user = await UserModel.findById(order.userId);
+        if (user?.email) {
+            userEmail = user.email;
+            userName = user.name;
+            userInfo = {
+                name: user.name,
+                email: user.email,
+                mobile: user.mobile,
+                phone: user.mobile
+            };
+        }
+    } else if (order.guestCustomer?.email) {
+        userEmail = order.guestCustomer.email;
+        userName = order.guestCustomer.name;
+        userInfo = {
+            name: order.guestCustomer.name,
+            email: order.guestCustomer.email,
+            phone: order.guestCustomer.phone
+        };
+    }
+
+    if (userEmail) {
+        try {
+            await sendEmailFun({
+                sendTo: [userEmail],
+                subject: "Order Confirmation - Zuba House",
+                text: "",
+                html: OrderConfirmationEmail(userName || 'Customer', order)
+            });
+        } catch (emailError) {
+            console.error('❌ Failed to send customer confirmation email:', emailError?.message || emailError);
+        }
+    }
+
+    try {
+        const adminEmail = process.env.ADMIN_EMAIL || 'sales@zubahouse.com';
+        let shippingAddress = null;
+        if (order.shippingAddress) {
+            shippingAddress = order.shippingAddress;
+        } else if (order.delivery_address) {
+            try {
+                shippingAddress = await AddressModel.findById(order.delivery_address);
+            } catch {
+                shippingAddress = null;
+            }
+        }
+        const sourceTag = source === 'zuba_mobile_app' ? '[APP ORDER] ' : '';
+        await sendEmailFun({
+            sendTo: [adminEmail],
+            subject: `${sourceTag}New Order #${order._id} - ${userName || 'Guest Customer'}`,
+            text: "",
+            html: AdminOrderNotificationEmail(order, userInfo, shippingAddress)
+        });
+    } catch (adminEmailError) {
+        console.error('❌ Error sending admin notification email:', adminEmailError?.message || adminEmailError);
+    }
+}
+
 export const createOrderController = async (request, response) => {
     let session;
     try {
+        const hasAuthenticatedUser = Boolean(request.userId);
+        const explicitGuestFlag = request.body?.isGuestOrder;
+        const explicitAuthenticatedIntent = explicitGuestFlag === false;
+        const explicitGuestIntent = explicitGuestFlag === true;
+
+        if (explicitAuthenticatedIntent && !hasAuthenticatedUser) {
+            return sendError(response, 401, 'Session expired. Please sign in again before checkout');
+        }
+
+        // Deterministic branch selection:
+        // - explicit isGuestOrder=false => authenticated only
+        // - explicit isGuestOrder=true  => guest only
+        // - unspecified => infer by resolved auth
+        const isGuestOrder = explicitGuestIntent ? true : explicitAuthenticatedIntent ? false : !hasAuthenticatedUser;
+
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('[OrderCreate][auth-resolution]', {
+                userId: request.userId || null,
+                authTokenPresent: Boolean(request.authTokenPresent),
+                authResolved: Boolean(request.authResolved),
+                explicitGuestFlag,
+                resolvedBranch: isGuestOrder ? 'guest' : 'authenticated',
+            });
+        }
+
         const products = Array.isArray(request.body.products) ? request.body.products : [];
         if (products.length === 0) {
             return sendError(response, 400, 'Products are required to create an order');
         }
 
-        const isGuestOrder = request.body.isGuestOrder || (!request.userId && request.body.guestCustomer);
-        if (isGuestOrder && !request.body.guestCustomer) {
-            return sendError(response, 400, 'Guest customer information is required');
+        if (isGuestOrder) {
+            const guest = request.body.guestCustomer || {};
+            const guestName = String(guest.name || '').trim();
+            const guestEmail = String(guest.email || '').trim();
+            const guestPhone = String(guest.phone || '').trim();
+            if (!guestName || !guestEmail || !guestPhone) {
+                return sendError(response, 400, 'Guest customer information is required (name, email, phone)');
+            }
         }
 
         if (!request.body.shippingRate && !request.body.shippingMethodId) {
@@ -116,7 +210,7 @@ export const createOrderController = async (request, response) => {
         };
 
         let order = await OrderModel.create([{
-            userId: request.userId || request.body.userId || null,
+            userId: request.userId || null,
             products,
             paymentId: request.body.paymentId,
             payment_status: request.body.payment_status || paymentState,
@@ -133,7 +227,7 @@ export const createOrderController = async (request, response) => {
             deliveryNote: request.body.deliveryNote || '',
             date: request.body.date,
             isGuestOrder,
-            guestCustomer: request.body.guestCustomer || null,
+            guestCustomer: isGuestOrder ? request.body.guestCustomer : null,
             discounts: request.body.discounts || null,
             status: 'Received',
             statusHistory: [{
@@ -269,98 +363,10 @@ export const createOrderController = async (request, response) => {
         session.endSession();
         session = null;
 
-        // Send email only for non-failed orders
-        if (shouldAffectInventory) {
-            // Get user email - either from logged-in user or guest customer
-            let userEmail = null;
-            let userName = null;
-            let userInfo = null;
-            
-            if (request.body.userId) {
-                const user = await UserModel.findOne({ _id: request.body.userId });
-                if (user?.email) {
-                    userEmail = user.email;
-                    userName = user.name;
-                    userInfo = {
-                        name: user.name,
-                        email: user.email,
-                        mobile: user.mobile,
-                        phone: user.mobile
-                    };
-                }
-            } else if (request.body.guestCustomer?.email) {
-                // Guest checkout
-                userEmail = request.body.guestCustomer.email;
-                userName = request.body.guestCustomer.name;
-                userInfo = {
-                    name: request.body.guestCustomer.name,
-                    email: request.body.guestCustomer.email,
-                    phone: request.body.guestCustomer.phone
-                };
-            }
-            
-            // Send customer confirmation email
-            if (userEmail) {
-                console.log('📧 Preparing to send order confirmation email to:', userEmail);
-                const recipients = [userEmail];
-                try {
-                    const emailResult = await sendEmailFun({
-                        sendTo: recipients,
-                        subject: "Order Confirmation - Zuba House",
-                        text: "",
-                        html: OrderConfirmationEmail(userName || 'Customer', order)
-                    });
-                    console.log('✅ Customer confirmation email sent successfully:', {
-                        to: userEmail,
-                        result: emailResult
-                    });
-                } catch (emailError) {
-                    console.error('❌ Failed to send customer confirmation email:', {
-                        to: userEmail,
-                        error: emailError.message,
-                        stack: emailError.stack
-                    });
-                    // Don't fail order creation if email fails
-                }
-            } else {
-                console.warn('⚠️ No user email found - skipping customer confirmation email');
-            }
-
-            // Send admin notification email
-            try {
-                const adminEmail = process.env.ADMIN_EMAIL || 'sales@zubahouse.com';
-                console.log('📧 Preparing to send admin notification email to:', adminEmail);
-                
-                // Get shipping address if available - prefer order.shippingAddress, then fetch from delivery_address
-                let shippingAddress = null;
-                if (order.shippingAddress) {
-                    // Use shipping address stored directly in order
-                    shippingAddress = order.shippingAddress;
-                } else if (order.delivery_address) {
-                    try {
-                        shippingAddress = await AddressModel.findById(order.delivery_address);
-                    } catch (addrError) {
-                        console.log('Could not fetch shipping address:', addrError.message);
-                    }
-                }
-
-                const adminEmailResult = await sendEmailFun({
-                    sendTo: [adminEmail],
-                    subject: `New Order #${order._id} - ${userName || 'Guest Customer'}`,
-                    text: "",
-                    html: AdminOrderNotificationEmail(order, userInfo, shippingAddress)
-                });
-                console.log('✅ Admin notification email sent successfully:', {
-                    to: adminEmail,
-                    result: adminEmailResult
-                });
-            } catch (adminEmailError) {
-                console.error('❌ Error sending admin notification email:', {
-                    error: adminEmailError.message,
-                    stack: adminEmailError.stack
-                });
-                // Don't fail order creation if admin email fails
-            }
+        // Send confirmation emails only once payment is actually captured/paid.
+        if (paymentState === 'paid') {
+            const source = request.body.source || (String(request.body.notes || '').includes('zuba_mobile_app') ? 'zuba_mobile_app' : 'unknown');
+            await sendOrderEmails(order, source);
         }
 
 
@@ -396,6 +402,35 @@ export const createOrderController = async (request, response) => {
             error.message || 'Failed to create order',
             process.env.NODE_ENV === 'development' ? { stack: error.stack } : undefined
         );
+    }
+}
+
+export async function confirmOrderPaymentController(request, response) {
+    try {
+        const { id } = request.params;
+        const order = await OrderModel.findById(id);
+        if (!order) {
+            return sendError(response, 404, 'Order not found');
+        }
+
+        if (request.userRole !== 'ADMIN' && order.userId && String(order.userId) !== String(request.userId)) {
+            return sendError(response, 403, 'Forbidden');
+        }
+
+        const alreadyPaid = String(order.paymentState || '').toLowerCase() === 'paid';
+        if (!alreadyPaid) {
+            order.paymentState = 'paid';
+            order.payment_status = 'paid';
+            if (request.body?.paymentIntentId) order.paymentId = request.body.paymentIntentId;
+            await order.save();
+
+            const source = request.body?.source || (String(order.notes || '').includes('zuba_mobile_app') ? 'zuba_mobile_app' : 'unknown');
+            await sendOrderEmails(order, source);
+        }
+
+        return sendSuccess(response, 200, 'Payment confirmed', { orderId: order._id, paymentState: order.paymentState || 'paid' });
+    } catch (error) {
+        return sendError(response, 500, error.message || 'Failed to confirm payment');
     }
 }
 

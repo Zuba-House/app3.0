@@ -4,7 +4,6 @@
  */
 
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
 
 function resolveApiBaseUrl(): string {
   const trim = (u: string) => u.replace(/\/+$/, '');
@@ -36,12 +35,11 @@ export const API_ENDPOINTS = {
   LOGOUT: '/api/user/logout',
   GET_CURRENT_USER: '/api/user/me',
   UPDATE_PROFILE: '/api/user/me',
-  GOOGLE_AUTH: '/api/user/authWithGoogle',
-  GOOGLE_AUTH_CODE: '/api/user/auth/google',
   VERIFY_EMAIL: '/api/user/verifyEmail',
   FORGOT_PASSWORD: '/api/user/forgot-password',
   VERIFY_FORGOT_PASSWORD_OTP: '/api/user/verify-forgot-password-otp',
   RESET_PASSWORD: '/api/user/reset-password',
+  FORGOT_PASSWORD_CHANGE_PASSWORD: '/api/user/forgot-password/change-password',
 
   // Products
   GET_ALL_PRODUCTS: '/api/product/getAllProducts',
@@ -63,6 +61,7 @@ export const API_ENDPOINTS = {
   GET_ORDERS: '/api/order/order-list/orders',
   GET_ORDER: '/api/order',
   CREATE_ORDER: '/api/order/create',
+  CONFIRM_ORDER_PAYMENT: '/api/order/confirm-payment',
 
   // Address
   GET_ADDRESSES: '/api/address/get',
@@ -135,44 +134,4 @@ export const ERROR_MESSAGES = {
   INVALID_CREDENTIALS: 'Invalid email or password',
   EMAIL_EXISTS: 'Email already exists',
 } as const;
-
-const appExtra = (Constants.expoConfig?.extra as {
-  expoClientId?: string;
-  googleWebClientId?: string;
-  googleIosClientId?: string;
-  googleAndroidClientId?: string;
-  googleOAuthRedirectUri?: string;
-  googleOAuthRedirectPath?: string;
-} | undefined) || {};
-
-export const GOOGLE_AUTH_CONFIG = {
-  expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || appExtra.expoClientId || '',
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || appExtra.googleWebClientId || '',
-  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || appExtra.googleIosClientId || '',
-  androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || appExtra.googleAndroidClientId || '',
-  redirectUri: process.env.EXPO_PUBLIC_GOOGLE_REDIRECT_URI || appExtra.googleOAuthRedirectUri || '',
-  redirectPath: appExtra.googleOAuthRedirectPath || 'redirect',
-} as const;
-
-export function getGoogleClientIdForPlatform(): string {
-  if (Platform.OS === 'ios') return GOOGLE_AUTH_CONFIG.iosClientId;
-  if (Platform.OS === 'android') return GOOGLE_AUTH_CONFIG.androidClientId;
-  return GOOGLE_AUTH_CONFIG.webClientId;
-}
-
-export function getGoogleConfigIssues(): string[] {
-  const issues: string[] = [];
-  const clientId = getGoogleClientIdForPlatform();
-  if (!clientId) {
-    issues.push(`Missing Google OAuth client id for ${Platform.OS}`);
-  }
-  if (!GOOGLE_AUTH_CONFIG.webClientId) {
-    issues.push('Missing Google web client id for OAuth consent compatibility');
-  }
-  const ids = [GOOGLE_AUTH_CONFIG.webClientId, GOOGLE_AUTH_CONFIG.iosClientId, GOOGLE_AUTH_CONFIG.androidClientId].filter(Boolean);
-  if (ids.length > 1 && new Set(ids).size === 1) {
-    issues.push('Google OAuth client ids are identical across platforms. Use distinct web/iOS/android clients.');
-  }
-  return issues;
-}
 

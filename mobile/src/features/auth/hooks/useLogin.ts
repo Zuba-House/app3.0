@@ -11,6 +11,7 @@ export function useLogin() {
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async (input: LoginDTO): Promise<boolean> => {
+    if (submitting) return false;
     const errors = validateLogin(input);
     if (errors.length > 0) {
       setError(errors[0].message);

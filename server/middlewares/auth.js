@@ -14,6 +14,13 @@ function readBearerToken(request) {
     return parts.length > 1 ? parts[1].trim() : authHeader.trim();
 }
 
+function attachResolvedAuth(request, user) {
+    request.user = user || null;
+    request.userId = user?._id ? String(user._id) : null;
+    request.userRole = user?.role || 'USER';
+    request.vendorId = user?.vendorId || user?.vendor || null;
+}
+
 const auth = async(request, response, next) => {
     try {
         const token = readBearerToken(request);
@@ -46,9 +53,7 @@ const auth = async(request, response, next) => {
             })
         }
         
-        request.userId = decode.id;
-        request.userRole = user?.role || 'USER';
-        request.vendorId = user?.vendorId || null;
+        attachResolvedAuth(request, user);
         next()
 
     } catch (error) {
@@ -82,22 +87,20 @@ const auth = async(request, response, next) => {
 export const optionalAuth = async (request, response, next) => {
     try {
         const token = readBearerToken(request);
+        request.authResolved = false;
+        request.authTokenPresent = Boolean(token);
+        attachResolvedAuth(request, null);
 
         if (token) {
             try {
                 const decode = jwt.verify(token, env.jwtAccessSecret);
                 if (decode && decode.id) {
-                    request.userId = decode.id;
-                    request.userRole = decode.role || 'USER';
-                    request.vendorId = decode.vendorId || null;
-                    
                     // Get user details to include role and vendorId
                     try {
                         const user = await UserModel.findById(decode.id).select('role vendor vendorId');
                         if (user) {
-                            request.userId = user._id.toString();
-                            request.userRole = user.role || 'USER';
-                            request.vendorId = user.vendorId || user.vendor || null;
+                            attachResolvedAuth(request, user);
+                            request.authResolved = true;
                         }
                     } catch (userError) {
                         // If user lookup fails, continue with token data
@@ -110,7 +113,15 @@ export const optionalAuth = async (request, response, next) => {
                 console.log('Optional auth - invalid token, continuing as guest:', error.message);
             }
         }
-        
+
+        if (env.nodeEnv !== 'production') {
+            console.log('[optionalAuth]', {
+                tokenPresent: request.authTokenPresent,
+                authResolved: request.authResolved,
+                userId: request.userId || null,
+            });
+        }
+
         // Continue regardless of auth status
         next();
     } catch (error) {

@@ -37,6 +37,7 @@ class AnalyticsService {
         properties: {
           ...properties,
           platform: 'mobile',
+          page: properties?.page || 'mobile_app',
           timestamp: new Date().toISOString(),
         },
         userId: this.userId || undefined,

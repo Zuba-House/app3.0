@@ -10,6 +10,22 @@ import { clearDeviceSessionMemory, getDeviceSessionId } from './authDevice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../../constants/config';
 import { wishlistService } from '../../services/wishlist.service';
+const AUTH_REQUEST_TIMEOUT_MS = 15000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = AUTH_REQUEST_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timed out. Please check your connection and try again.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 interface CredentialsInput {
   email: string;
@@ -74,7 +90,7 @@ async function mergeGuestCart(accessToken: string): Promise<void> {
     const quantity = Number(item?.quantity || 1);
     if (!productId) continue;
     try {
-      await fetch(`${API_URL}${API_ENDPOINTS.ADD_TO_CART}`, {
+      await fetchWithTimeout(`${API_URL}${API_ENDPOINTS.ADD_TO_CART}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -125,7 +141,7 @@ export const authManager = {
     authSession.setState({ isLoading: true, authStatus: 'loading' });
     try {
       const deviceSessionId = await getDeviceSessionId();
-      const response = await fetch(`${API_URL}${API_ENDPOINTS.LOGIN}`, {
+      const response = await fetchWithTimeout(`${API_URL}${API_ENDPOINTS.LOGIN}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Device-Session-Id': deviceSessionId },
         body: JSON.stringify(input),
@@ -147,7 +163,7 @@ export const authManager = {
     authSession.setState({ isLoading: true, authStatus: 'loading' });
     try {
       const deviceSessionId = await getDeviceSessionId();
-      const response = await fetch(`${API_URL}${API_ENDPOINTS.REGISTER}`, {
+      const response = await fetchWithTimeout(`${API_URL}${API_ENDPOINTS.REGISTER}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Device-Session-Id': deviceSessionId },
         body: JSON.stringify(input),
@@ -171,12 +187,12 @@ export const authManager = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
     };
-    let response = await fetch(`${API_URL}${API_ENDPOINTS.GET_CURRENT_USER}`, {
+    let response = await fetchWithTimeout(`${API_URL}${API_ENDPOINTS.GET_CURRENT_USER}`, {
       headers,
     });
     // Backward-compatible fallback for older deployed backends.
     if (response.status === 404) {
-      response = await fetch(`${API_URL}/api/user/user-details`, {
+      response = await fetchWithTimeout(`${API_URL}/api/user/user-details`, {
         headers,
       });
     }
@@ -195,7 +211,7 @@ export const authManager = {
       const startedAt = Date.now();
       try {
         const deviceSessionId = await getDeviceSessionId();
-        const response = await fetch(`${API_URL}${API_ENDPOINTS.REFRESH_TOKEN}`, {
+        const response = await fetchWithTimeout(`${API_URL}${API_ENDPOINTS.REFRESH_TOKEN}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -232,7 +248,7 @@ export const authManager = {
     try {
       const accessToken = authSession.getAccessToken();
       if (accessToken) {
-        await fetch(`${API_URL}${API_ENDPOINTS.LOGOUT}`, {
+        await fetchWithTimeout(`${API_URL}${API_ENDPOINTS.LOGOUT}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

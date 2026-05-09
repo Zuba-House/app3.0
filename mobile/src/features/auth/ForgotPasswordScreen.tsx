@@ -9,11 +9,15 @@ const ForgotPasswordScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { submit, submitting, error } = useForgotPassword();
   const [email, setEmail] = useState('');
-  const [done, setDone] = useState(false);
 
   const onSubmit = async () => {
     const ok = await submit(email);
-    setDone(ok);
+    if (ok) {
+      navigation.navigate('VerifyOtp', {
+        email: email.trim().toLowerCase(),
+        purpose: 'forgotPassword',
+      });
+    }
   };
 
   return (
@@ -24,7 +28,6 @@ const ForgotPasswordScreen: React.FC = () => {
             <Text style={styles.title}>Forgot password</Text>
             <Text style={styles.text}>Enter your email and we will send a reset code.</Text>
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            {done ? <Text style={styles.success}>Reset instructions were sent. Check your email inbox.</Text> : null}
             <TextInput
               label="Email"
               mode="outlined"
@@ -66,7 +69,6 @@ const styles = StyleSheet.create({
   primaryBtnContent: { minHeight: 52 },
   primaryBtnLabel: { color: '#FFFFFF', fontWeight: '700' },
   error: { color: '#d32f2f' },
-  success: { color: '#1f7a3f', fontWeight: '600' },
   link: { marginTop: 6, alignSelf: 'center' },
   linkLabel: { color: Colors.primary, fontWeight: '600' },
 });

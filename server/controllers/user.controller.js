@@ -247,191 +247,6 @@ export async function verifyEmailController(request, response) {
 }
 
 
-export async function authWithGoogle(request, response) {
-    const { name, email, password, avatar, mobile, role, guestCart } = request.body;
-    const normalizedEmail = normalizeEmail(email);
-
-    try {
-        const existingUser = await UserModel.findOne({ email: normalizedEmail });
-
-        if (!existingUser) {
-            const user = await UserModel.create({
-                name: name,
-                mobile: mobile,
-                email: normalizedEmail,
-                password: "null",
-                avatar: avatar,
-                role: role,
-                verify_email: true,
-                signUpWithGoogle: true
-            });
-
-            await user.save();
-
-            const { accessToken, refreshToken } = await issueAuthTokens(response, user._id);
-
-            await UserModel.findByIdAndUpdate(user?._id, {
-                last_login_date: new Date()
-            })
-
-            await mergeGuestCartForUser(user._id, guestCart);
-
-            return response.json({
-                success: true,
-                message: "Login successfully",
-                data: buildTokenData(accessToken, refreshToken),
-            })
-
-        } else {
-            const { accessToken, refreshToken } = await issueAuthTokens(response, existingUser._id);
-
-            await UserModel.findByIdAndUpdate(existingUser?._id, {
-                last_login_date: new Date()
-            })
-
-            await mergeGuestCartForUser(existingUser._id, guestCart);
-
-            return response.json({
-                success: true,
-                message: "Login successfully",
-                data: buildTokenData(accessToken, refreshToken),
-            })
-        }
-
-    } catch (error) {
-        return sendError(response, 500, error.message || "Google auth failed");
-    }
-}
-
-/**
- * Google OAuth: exchange authorization code for tokens (server-side).
- * Body: code, redirect_uri, code_verifier, google_client_id (optional; defaults to GOOGLE_CLIENT_ID).
- * Web client: uses client_secret. iOS/Android OAuth clients: PKCE only (no secret).
- */
-export async function authWithGoogleCode(request, response) {
-    try {
-        const { code, redirect_uri, code_verifier, guestCart, google_client_id } = request.body;
-        if (!code) {
-            return sendError(response, 400, "Authorization code is required");
-        }
-        if (!code_verifier || typeof code_verifier !== "string") {
-            return sendError(response, 400, "code_verifier is required (PKCE)");
-        }
-
-        const fallbackRedirect = env.googleOAuthRedirectUri;
-        const redirectUri = (typeof redirect_uri === "string" && redirect_uri.trim()) || fallbackRedirect;
-        const allowedRedirectUris = Array.isArray(env.googleOAuthRedirectUris) && env.googleOAuthRedirectUris.length > 0
-            ? env.googleOAuthRedirectUris
-            : [fallbackRedirect];
-        if (!allowedRedirectUris.includes(redirectUri)) {
-            return sendError(response, 400, "redirect_uri is not allow-listed for Google OAuth exchange");
-        }
-
-        const resolvedClientId =
-            typeof google_client_id === "string" && google_client_id.trim()
-                ? google_client_id.trim()
-                : env.googleClientId;
-
-        const allowedIds = [
-            env.googleClientId,
-            env.googleIosClientId,
-            env.googleAndroidClientId,
-        ].filter(Boolean);
-
-        if (!resolvedClientId || !allowedIds.includes(resolvedClientId)) {
-            return sendError(response, 400, "Invalid or unknown google_client_id");
-        }
-
-        const useWebSecret =
-            resolvedClientId === env.googleClientId &&
-            env.googleClientSecret;
-
-        if (resolvedClientId === env.googleClientId && !env.googleClientSecret) {
-            return sendError(response, 500, "GOOGLE_CLIENT_SECRET required for web client exchange");
-        }
-
-        const tokenParams = new URLSearchParams({
-            code,
-            client_id: resolvedClientId,
-            redirect_uri: redirectUri,
-            grant_type: "authorization_code",
-            code_verifier,
-        });
-        if (useWebSecret) {
-            tokenParams.append("client_secret", env.googleClientSecret);
-        }
-
-        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: tokenParams,
-        });
-
-        if (!tokenRes.ok) {
-            const errData = await tokenRes.json().catch(() => ({}));
-            return sendError(response, 400, errData.error_description || "Failed to exchange code with Google");
-        }
-
-        const tokenData = await tokenRes.json();
-        const accessToken = tokenData.access_token;
-        if (!accessToken) {
-            return sendError(response, 400, "No access token from Google");
-        }
-
-        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        if (!userInfoRes.ok) {
-            return sendError(response, 400, "Failed to fetch Google profile");
-        }
-        const userInfo = await userInfoRes.json();
-        const email = normalizeEmail(userInfo.email);
-        const name = userInfo.name || userInfo.given_name || '';
-        const avatar = userInfo.picture || '';
-
-        if (!email) {
-            return sendError(response, 400, "Google account has no email");
-        }
-
-        let user = await UserModel.findOne({ email });
-        if (!user) {
-            user = await UserModel.create({
-                name,
-                email,
-                password: 'null',
-                avatar,
-                verify_email: true,
-                signUpWithGoogle: true,
-                role: 'USER',
-            });
-        } else {
-            user.avatar = avatar || user.avatar;
-            user.name = name || user.name;
-            user.last_login_date = new Date();
-            await user.save();
-        }
-
-        const { accessToken: appAccessToken, refreshToken } = await issueAuthTokens(response, user._id);
-
-        await mergeGuestCartForUser(user._id, guestCart);
-
-        return sendSuccess(
-            response,
-            200,
-            "Login successfully",
-            buildTokenData(appAccessToken, refreshToken, {
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                avatar: user.avatar,
-                role: user.role,
-            })
-        );
-    } catch (error) {
-        return sendError(response, 500, error.message || "Google login failed");
-    }
-}
-
 export async function loginUserController(request, response) {
     try {
         const { email, password, guestCart } = request.body;
@@ -725,61 +540,35 @@ export async function verifyForgotPasswordOtp(request, response) {
 //reset password (forgot-password flow: email + newPassword + confirmPassword; or change-password: + oldPassword)
 export async function resetpassword(request, response) {
     try {
-        const { email, oldPassword, newPassword, confirmPassword } = request.body;
-        if (!email || !newPassword || !confirmPassword) {
-            return response.status(400).json({
-                error: true,
-                success: false,
-                message: "provide required fields email, newPassword, confirmPassword"
-            })
+        const { email, newPassword, confirmPassword } = request.body;
+        const normalizedEmail = normalizeEmail(email);
+        if (!normalizedEmail || !newPassword || !confirmPassword) {
+            return sendError(response, 400, "Please provide email and both password fields");
         }
 
-        const user = await UserModel.findOne({ email });
+        const user = await UserModel.findOne({ email: normalizedEmail });
         if (!user) {
-            return response.status(400).json({
-                message: "Email is not available",
-                error: true,
-                success: false
-            })
+            return sendError(response, 404, "We could not find an account with this email");
         }
 
-        const isForgotFlow = !oldPassword;
-        if (isForgotFlow) {
-            if (!user.forgotPasswordVerifiedAt) {
-                return response.status(400).json({
-                    message: "Please verify OTP first (forgot password flow).",
-                    error: true,
-                    success: false
-                });
-            }
-            const verifiedAt = new Date(user.forgotPasswordVerifiedAt).getTime();
-            const fifteenMin = 15 * 60 * 1000;
-            if (Date.now() - verifiedAt > fifteenMin) {
-                user.forgotPasswordVerifiedAt = null;
-                await user.save();
-                return response.status(400).json({
-                    message: "Reset link expired. Please request a new OTP.",
-                    error: true,
-                    success: false
-                });
-            }
-        } else if (user?.signUpWithGoogle === false) {
-            const checkPassword = await bcryptjs.compare(oldPassword, user.password);
-            if (!checkPassword) {
-                return response.status(400).json({
-                    message: "Your old password is wrong",
-                    error: true,
-                    success: false,
-                })
-            }
+        if (!user.forgotPasswordVerifiedAt) {
+            return sendError(response, 400, "Please confirm your reset code first");
+        }
+
+        const verifiedAt = new Date(user.forgotPasswordVerifiedAt).getTime();
+        const fifteenMin = 15 * 60 * 1000;
+        if (Date.now() - verifiedAt > fifteenMin) {
+            user.forgotPasswordVerifiedAt = null;
+            await user.save();
+            return sendError(response, 400, "Your reset code has expired. Please request a new one");
         }
 
         if (newPassword !== confirmPassword) {
-            return response.status(400).json({
-                message: "newPassword and confirmPassword must be same.",
-                error: true,
-                success: false,
-            })
+            return sendError(response, 400, "Passwords do not match");
+        }
+
+        if (String(newPassword).length < 8) {
+            return sendError(response, 400, "Password must be at least 8 characters");
         }
 
         const salt = await bcryptjs.genSalt(10);
@@ -787,18 +576,14 @@ export async function resetpassword(request, response) {
 
         user.password = hashPassword;
         user.signUpWithGoogle = false;
-        if (isForgotFlow) user.forgotPasswordVerifiedAt = null;
+        user.forgotPasswordVerifiedAt = null;
         await user.save();
 
-        return response.json({
-            message: "Password updated successfully.",
-            error: false,
-            success: true
-        })
+        return sendSuccess(response, 200, "Password updated successfully");
 
 
     } catch (error) {
-        return sendError(response, 500, error.message || "Password reset failed");
+        return sendError(response, 500, "We could not reset your password right now. Please try again.");
     }
 }
 

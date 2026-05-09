@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { authFeatureApi } from '../auth.api';
+import { toUserFriendlyAuthError } from '../auth.errors';
 import { validateResetPassword } from '../auth.validators';
 import { ResetPasswordDTO } from '../types';
 
@@ -8,6 +9,7 @@ export function useResetPassword() {
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async (payload: ResetPasswordDTO): Promise<boolean> => {
+    if (submitting) return false;
     const errors = validateResetPassword(payload);
     if (errors.length > 0) {
       setError(errors[0].message);
@@ -19,7 +21,7 @@ export function useResetPassword() {
       const result = await authFeatureApi.resetPassword(payload);
       return result.success;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password');
+      setError(toUserFriendlyAuthError(err, 'Unable to reset password. Please try again.'));
       return false;
     } finally {
       setSubmitting(false);

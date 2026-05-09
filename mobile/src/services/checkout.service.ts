@@ -32,8 +32,11 @@ export interface CreateOrderData {
     email: string;
     phone: string;
   };
+  customerName?: string;
+  phone?: string;
   couponCode?: string;
   giftCardCode?: string;
+  deliveryNote?: string;
   notes?: string;
 }
 
@@ -41,6 +44,13 @@ export interface CheckoutSession {
   url: string;
   sessionId: string;
   paymentIntentId?: string;
+}
+
+export interface ConfirmOrderPaymentPayload {
+  sessionId?: string;
+  paymentIntentId?: string;
+  paymentMethod?: string;
+  source?: string;
 }
 
 export interface CouponValidation {
@@ -242,6 +252,13 @@ export const checkoutService = {
       currency: string;
     }>(`${API_ENDPOINTS.GET_CHECKOUT_STATUS}/${sessionId}`);
     return response;
+  },
+
+  /**
+   * Confirm order payment after Stripe reports paid
+   */
+  confirmOrderPayment: async (orderId: string, payload: ConfirmOrderPaymentPayload): Promise<ApiResponse<any>> => {
+    return postData(`${API_ENDPOINTS.CONFIRM_ORDER_PAYMENT}/${orderId}`, payload);
   },
 
   /**

@@ -1,6 +1,7 @@
 import { AuthFormError, ForgotPasswordDTO, LoginDTO, RegisterDTO, ResetPasswordDTO, VerifyOtpDTO } from './types';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const OTP_REGEX = /^\d{6}$/;
 
 function required(value: string, field: string, message: string): AuthFormError | null {
   if (!value.trim()) return { field, message };
@@ -42,7 +43,11 @@ export function validateForgotPassword(input: ForgotPasswordDTO): AuthFormError[
 
 export function validateResetPassword(input: ResetPasswordDTO): AuthFormError[] {
   const errors: AuthFormError[] = [];
-  if (!input.otp.trim()) errors.push({ field: 'otp', message: 'OTP is required' });
+  if (!input.otp.trim()) {
+    errors.push({ field: 'otp', message: 'OTP is required' });
+  } else if (!OTP_REGEX.test(input.otp.trim())) {
+    errors.push({ field: 'otp', message: 'OTP must be a 6-digit code' });
+  }
   if (!input.newPassword.trim()) errors.push({ field: 'newPassword', message: 'New password is required' });
   if (!input.confirmPassword.trim()) errors.push({ field: 'confirmPassword', message: 'Confirm password is required' });
   if (input.newPassword && input.confirmPassword && input.newPassword !== input.confirmPassword) {
@@ -56,7 +61,17 @@ export function validateResetPassword(input: ResetPasswordDTO): AuthFormError[] 
 
 export function validateVerifyOtp(input: VerifyOtpDTO): AuthFormError[] {
   const errors: AuthFormError[] = [];
-  if (!input.email.trim()) errors.push({ field: 'email', message: 'Email is required' });
-  if (!input.otp.trim()) errors.push({ field: 'otp', message: 'OTP is required' });
+  const email = input.email.trim();
+  const otp = input.otp.trim();
+  if (!email) {
+    errors.push({ field: 'email', message: 'Email is required' });
+  } else if (!EMAIL_REGEX.test(email)) {
+    errors.push({ field: 'email', message: 'Email is invalid' });
+  }
+  if (!otp) {
+    errors.push({ field: 'otp', message: 'OTP is required' });
+  } else if (!OTP_REGEX.test(otp)) {
+    errors.push({ field: 'otp', message: 'OTP must be a 6-digit code' });
+  }
   return errors;
 }

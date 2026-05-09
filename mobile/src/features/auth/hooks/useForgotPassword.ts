@@ -8,6 +8,7 @@ export function useForgotPassword() {
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async (email: string): Promise<boolean> => {
+    if (submitting) return false;
     const errors = validateForgotPassword({ email });
     if (errors.length > 0) {
       setError(errors[0].message);

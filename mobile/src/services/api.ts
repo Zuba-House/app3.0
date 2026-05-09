@@ -3,6 +3,22 @@ import { authManager } from '../core/auth/authManager';
 import { ApiResponse } from '../types/api.types';
 
 type RequestConfig = RequestInit & { _retryCount?: number };
+const REQUEST_TIMEOUT_MS = 15000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timed out. Please try again.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function normalizeResponse<T>(raw: any): ApiResponse<T> {
   const data = raw?.data ?? raw?.product ?? raw?.products ?? raw?.result ?? raw?.user ?? raw?.address ?? null;
@@ -24,8 +40,24 @@ async function request<T>(url: string, config: RequestConfig = {}): Promise<ApiR
   if (accessToken) {
     (headers as Record<string, string>).Authorization = `Bearer ${accessToken}`;
   }
-  const response = await fetch(`${API_URL}${url}`, { ...config, headers });
+  if (__DEV__ && url.includes('/api/order/create')) {
+    console.info('[Checkout][request]', {
+      url,
+      method: config.method || 'GET',
+      hasAuthHeader: Boolean((headers as Record<string, string>).Authorization),
+      hasBody: Boolean(config.body),
+    });
+  }
+  const response = await fetchWithTimeout(`${API_URL}${url}`, { ...config, headers });
   const json = await response.json().catch(() => ({}));
+  if (__DEV__ && url.includes('/api/order/create')) {
+    console.info('[Checkout][response]', {
+      url,
+      status: response.status,
+      ok: response.ok,
+      message: json?.message,
+    });
+  }
   if (response.status === 401 && retryCount < 1) {
     const refreshed = await authManager.refreshSession();
     if (!refreshed) {
@@ -65,7 +97,7 @@ export const uploadImage = async (file: any): Promise<ApiResponse> => {
   if (accessToken) {
     (headers as Record<string, string>).Authorization = `Bearer ${accessToken}`;
   }
-  const response = await fetch(`${API_URL}/api/media/upload`, {
+  const response = await fetchWithTimeout(`${API_URL}/api/media/upload`, {
     method: 'POST',
     headers,
     body: formData,

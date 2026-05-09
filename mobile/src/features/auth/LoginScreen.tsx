@@ -4,27 +4,17 @@ import { Button, TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../../constants/colors';
 import { useLogin } from './hooks/useLogin';
-import { useGoogleAuth } from './hooks/useGoogleAuth';
-import GoogleAuthButton from './components/GoogleAuthButton';
 
 const LoginScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { submit, submitting, error } = useLogin();
-  const { signInWithGoogle, googleLoading, googleError, googleReady, googleConfigIssues } = useGoogleAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const primaryError = error || googleError;
+  const primaryError = error;
 
   const onSubmit = async () => {
     const ok = await submit({ email, password });
-    if (ok && navigation.canGoBack()) {
-      navigation.goBack();
-    }
-  };
-
-  const onGoogle = async () => {
-    const ok = await signInWithGoogle();
     if (ok && navigation.canGoBack()) {
       navigation.goBack();
     }
@@ -38,7 +28,6 @@ const LoginScreen: React.FC = () => {
             <Text style={styles.title}>Sign in</Text>
             <Text style={styles.subtitle}>Continue shopping with your saved cart, orders, and wishlist sync.</Text>
             {primaryError ? <Text style={styles.error}>{primaryError}</Text> : null}
-            {googleConfigIssues.length > 0 ? <Text style={styles.info}>Google Sign-In is currently unavailable in this runtime. You can continue with email.</Text> : null}
             <TextInput label="Email" mode="outlined" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
             <TextInput
               label="Password"
@@ -52,10 +41,9 @@ const LoginScreen: React.FC = () => {
             <Button mode="text" onPress={() => navigation.navigate('ForgotPassword')} style={styles.forgotLink} labelStyle={styles.forgotLinkLabel}>
               Forgot password?
             </Button>
-            <Button mode="contained" onPress={onSubmit} loading={submitting} disabled={googleLoading} style={styles.primaryBtn} contentStyle={styles.primaryBtnContent} labelStyle={styles.primaryBtnLabel}>
+            <Button mode="contained" onPress={onSubmit} loading={submitting} style={styles.primaryBtn} contentStyle={styles.primaryBtnContent} labelStyle={styles.primaryBtnLabel}>
               Continue
             </Button>
-            <GoogleAuthButton onPress={onGoogle} loading={googleLoading} disabled={!googleReady || submitting} />
             <Button mode="text" onPress={() => navigation.navigate('Register')} style={styles.link} labelStyle={styles.linkLabel}>
               Create account
             </Button>
@@ -82,7 +70,6 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, lineHeight: 20, color: '#4A5A66', marginBottom: 10, textAlign: 'center' },
   input: { marginBottom: 4 },
   error: { color: '#d32f2f' },
-  info: { color: '#a16207', fontSize: 13 },
   forgotLink: { alignSelf: 'flex-end', marginTop: -8 },
   forgotLinkLabel: { color: '#1f4a66', fontWeight: '600' },
   primaryBtn: { marginTop: 2, borderRadius: 14 },

@@ -27,7 +27,7 @@ import { cartService } from '../../services/cart.service';
 import { wishlistService } from '../../services/wishlist.service';
 import { Product } from '../../types/product.types';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { setCart, addItem } from '../../store/slices/cartSlice';
+import { setCart, addItem, selectCartCount } from '../../store/slices/cartSlice';
 import Colors from '../../constants/colors';
 import { FREE_SHIPPING_THRESHOLD } from '../../constants/config';
 import { getEstDeliveryLabel } from '../../constants/shipping';
@@ -237,6 +237,7 @@ const ProductDetailScreen: React.FC = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
+  const cartCount = useAppSelector(selectCartCount);
   const { authStatus } = useAuthState();
   const isAuthenticated = authStatus === 'authenticated';
   const shippingLocation = useAppSelector((state) => state.shippingLocation);
@@ -878,6 +879,11 @@ const ProductDetailScreen: React.FC = () => {
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.headerIconBtn} onPress={() => navigation.navigate('Cart')} activeOpacity={0.7}>
             <Ionicons name="cart-outline" size={22} color={Colors.primary} />
+            {cartCount > 0 && (
+              <View style={styles.headerCartBadge}>
+                <Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerIconBtn} onPress={handleShare} activeOpacity={0.7}>
             <Ionicons name="share-outline" size={22} color={Colors.primary} />
@@ -1676,6 +1682,24 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+  },
+  headerCartBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 0,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#E60012',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  headerCartBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   headerCenter: {
     flex: 1,

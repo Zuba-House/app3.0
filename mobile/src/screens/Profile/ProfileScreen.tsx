@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthState } from '../../core/auth/authGuards';
 import Colors from '../../constants/colors';
 import { useAuthGate } from '../../core/auth/authGate';
+import { useAppSelector } from '../../store/hooks';
+import { selectCartCount } from '../../store/slices/cartSlice';
 
 interface MenuItem {
   icon: string;
@@ -33,6 +35,7 @@ const ProfileScreen: React.FC = () => {
   const { user, authStatus, logout } = useAuthState();
   const isAuthenticated = authStatus === 'authenticated';
   const { openAuth } = useAuthGate();
+  const cartCount = useAppSelector(selectCartCount);
 
   const handleLogout = () => {
     Alert.alert(
@@ -220,7 +223,14 @@ const ProfileScreen: React.FC = () => {
           style={styles.statItem}
           onPress={() => navigation.navigate('Cart')}
         >
-          <Ionicons name="cart" size={24} color={Colors.secondary} />
+          <View style={styles.profileCartIconWrap}>
+            <Ionicons name="cart" size={24} color={Colors.secondary} />
+            {cartCount > 0 && (
+              <View style={styles.profileCartBadge}>
+                <Text style={styles.profileCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.statLabel}>Cart</Text>
         </TouchableOpacity>
       </View>
@@ -401,6 +411,26 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     marginTop: 6,
     fontWeight: '500',
+  },
+  profileCartIconWrap: {
+    position: 'relative',
+  },
+  profileCartBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#E60012',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  profileCartBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   menuSection: {
     marginTop: 24,

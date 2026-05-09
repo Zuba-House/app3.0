@@ -53,6 +53,20 @@ const PaymentScreen: React.FC = () => {
     };
   }, [sessionId]);
 
+  const confirmOrderAsPaid = async () => {
+    if (!orderId) return;
+    try {
+      await checkoutService.confirmOrderPayment(orderId, {
+        sessionId: sessionId || undefined,
+        paymentMethod,
+        source: 'zuba_mobile_app',
+      });
+    } catch (error) {
+      // Non-blocking: user can still continue after successful Stripe payment.
+      console.warn('Order payment confirmation call failed:', error);
+    }
+  };
+
   const handleAppStateChange = (nextAppState: AppStateStatus) => {
     // When app comes back to foreground from background (after browser)
     if (
@@ -139,6 +153,7 @@ const PaymentScreen: React.FC = () => {
           
           if (response.success && response.data) {
             if (response.data.paymentStatus === 'paid') {
+              await confirmOrderAsPaid();
               // Payment successful
               setWaitingForPayment(false);
               if (onSuccess) onSuccess();
