@@ -5,18 +5,29 @@
 
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { postData } from './api';
+import { API_ENDPOINTS } from '../constants/config';
+import { deleteData, postData } from './api';
+import { showInfo, showSuccess, showWarning } from '../utils/toast';
+import { shouldShowNotificationType } from '../utils/notificationPrefs';
 
-// Configure how notifications appear when app is in foreground
+// Configure how notifications appear when app is in foreground (banner + sound)
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    priority: Notifications.AndroidNotificationPriority.HIGH,
-  }),
+  handleNotification: async (notification) => {
+    const data = notification.request.content.data as Record<string, unknown> | undefined;
+    const channelId = typeof data?.channelId === 'string' ? data.channelId : 'orders';
+    return {
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      priority:
+        channelId === 'orders'
+          ? Notifications.AndroidNotificationPriority.MAX
+          : Notifications.AndroidNotificationPriority.HIGH,
+    };
+  },
 });
 
 export interface NotificationData {
@@ -59,14 +70,19 @@ class NotificationService {
         return null;
       }
 
-      // Get Expo push token
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ??
+        (Constants as { easConfig?: { projectId?: string } }).easConfig?.projectId ??
+        'b1c36a7f-6753-42dd-a363-8c673e354a69';
+
       const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: 'zuba-house-019',
+        projectId,
       });
-      
+
       this.expoPushToken = tokenData.data;
-      // Logging disabled for production - uncomment for debugging
-      // console.log('✅ Push notifications initialized');
+      if (__DEV__) {
+        console.log('[Push] Token:', this.expoPushToken);
+      }
 
       // Configure Android notification channel
       if (Platform.OS === 'android') {
@@ -100,19 +116,28 @@ class NotificationService {
       name: 'Order Updates',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
+      lightColor: '#e8a87c',
       sound: 'default',
+      enableVibrate: true,
     });
 
     await Notifications.setNotificationChannelAsync('promotions', {
       name: 'Promotions & Deals',
       importance: Notifications.AndroidImportance.HIGH,
       sound: 'default',
+      enableVibrate: true,
     });
 
     await Notifications.setNotificationChannelAsync('cart', {
       name: 'Cart Reminders',
       importance: Notifications.AndroidImportance.DEFAULT,
+      sound: 'default',
+    });
+
+    await Notifications.setNotificationChannelAsync('general', {
+      name: 'General',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      sound: 'default',
     });
   }
 
@@ -129,13 +154,24 @@ class NotificationService {
     }
 
     try {
-      const response = await postData('/api/notifications/register-token', {
+      const response = await postData(API_ENDPOINTS.REGISTER_PUSH_TOKEN, {
+        token: this.expoPushToken,
         pushToken: this.expoPushToken,
+        platform: Platform.OS,
         deviceType: Platform.OS,
+        deviceName: Device.deviceName || Device.modelName || 'Unknown',
         userId,
       });
 
-      return response.success || false;
+      if (__DEV__) {
+        if (response.success !== false) {
+          console.log('[Push] Token sent to server ✓');
+        } else {
+          console.warn('[Push] Failed to send token:', response.message);
+        }
+      }
+
+      return response.success !== false;
     } catch (error) {
       console.error('Error registering push token:', error);
       return false;
@@ -245,6 +281,20 @@ class NotificationService {
   getToken(): string | null {
     return this.expoPushToken;
   }
+
+  /** Remove token from server on logout */
+  async unregisterFromBackend(): Promise<void> {
+    try {
+      if (!this.expoPushToken) return;
+      await deleteData(API_ENDPOINTS.UNREGISTER_PUSH_TOKEN, {
+        token: this.expoPushToken,
+        pushToken: this.expoPushToken,
+      });
+      if (__DEV__) console.log('[Push] Token unregistered from server');
+    } catch (err) {
+      if (__DEV__) console.warn('[Push] Unregister failed (non-critical):', err);
+    }
+  }
 }
 
 // Export singleton instance
@@ -258,6 +308,112 @@ export type NotificationType =
   | 'price_drop'
   | 'general';
 
+function normalizeNotificationType(raw: unknown): NotificationType {
+  const value = String(raw ?? 'general').toLowerCase();
+  if (value.includes('order')) return 'order_status';
+  if (value.includes('promo') || value.includes('deal')) return 'promotion';
+  if (value.includes('cart')) return 'cart_reminder';
+  if (value.includes('price')) return 'price_drop';
+  return 'general';
+}
+
+/** Build user-facing title/body from push payload or backend data object. */
+export function formatNotificationMessage(
+  data: Partial<NotificationData> & Record<string, unknown>
+): { title: string; body: string } {
+  const type = data.type ?? normalizeNotificationType(data.type);
+  const title = String(data.title ?? '').trim();
+  const body = String(data.body ?? data.message ?? '').trim();
+  const orderId = data.orderId != null ? String(data.orderId) : undefined;
+  const orderNumber = data.orderNumber != null ? String(data.orderNumber) : undefined;
+  const status = data.status != null ? String(data.status) : undefined;
+
+  if (type === 'order_status') {
+    const ref = orderNumber ? `#${orderNumber}` : orderId ? `#${orderId.slice(-6).toUpperCase()}` : 'your order';
+    const statusLabel = status ? status.replace(/_/g, ' ') : '';
+    return {
+      title: title || (statusLabel ? `Order ${statusLabel}` : 'Order update'),
+      body:
+        body ||
+        (statusLabel
+          ? `Your order ${ref} is now ${statusLabel}. Tap to view details.`
+          : `There's an update on order ${ref}. Tap to view details.`),
+    };
+  }
+
+  if (type === 'promotion' || type === 'price_drop') {
+    return {
+      title: title || 'Special offer',
+      body: body || 'Check out the latest deals on Zuba House.',
+    };
+  }
+
+  if (type === 'cart_reminder') {
+    return {
+      title: title || 'Items in your cart',
+      body: body || 'Complete checkout before items sell out.',
+    };
+  }
+
+  return {
+    title: title || 'Zuba House',
+    body: body || 'You have a new notification.',
+  };
+}
+
+export function parseNotificationPayload(
+  notification: Notifications.Notification
+): NotificationData {
+  const content = notification.request.content;
+  const raw = (content.data ?? {}) as Record<string, unknown>;
+  const type = normalizeNotificationType(raw.type);
+  const formatted = formatNotificationMessage({
+    ...raw,
+    type,
+    title: content.title != null ? String(content.title) : raw.title != null ? String(raw.title) : undefined,
+    body:
+      content.body != null
+        ? String(content.body)
+        : raw.body != null
+          ? String(raw.body)
+          : raw.message != null
+            ? String(raw.message)
+            : undefined,
+    orderId: raw.orderId != null ? String(raw.orderId) : undefined,
+    productId: raw.productId != null ? String(raw.productId) : undefined,
+  });
+
+  return {
+    type,
+    title: formatted.title,
+    body: formatted.body,
+    orderId: raw.orderId != null ? String(raw.orderId) : undefined,
+    productId: raw.productId != null ? String(raw.productId) : undefined,
+    data: raw,
+  };
+}
+
+/** In-app toast when a push arrives while the app is open. */
+export function presentInAppNotification(data: NotificationData): void {
+  if (!shouldShowNotificationType(data)) {
+    return;
+  }
+  const { title, body } = data;
+  if (data.type === 'order_status') {
+    showSuccess(title, body);
+    return;
+  }
+  if (data.type === 'promotion' || data.type === 'price_drop') {
+    showInfo(title, body);
+    return;
+  }
+  if (data.type === 'cart_reminder') {
+    showWarning(title, body);
+    return;
+  }
+  showInfo(title, body);
+}
+
 /**
  * Handle notification navigation
  * Call this when user taps on notification
@@ -266,26 +422,56 @@ export const handleNotificationNavigation = (
   navigation: any,
   data: NotificationData
 ) => {
+  const raw = data.data || {};
+  const channel = String(raw.channel || raw.channelId || '').toLowerCase();
+  const screen = String(raw.screen || '').trim();
+  const orderId = data.orderId || (raw.orderId != null ? String(raw.orderId) : undefined);
+  const productId = data.productId || (raw.productId != null ? String(raw.productId) : undefined);
+
+  const navigateMain = (screenName: string, params?: object) => {
+    if (navigation.navigate) {
+      navigation.navigate('MainApp', {
+        screen: screenName,
+        params,
+      });
+    }
+  };
+
+  if (screen === 'OrderDetail' && orderId) {
+    navigateMain('OrderDetail', { orderId });
+    return;
+  }
+
   switch (data.type) {
     case 'order_status':
-      if (data.orderId) {
-        navigation.navigate('OrderDetail', { orderId: data.orderId });
+      if (orderId) {
+        navigateMain('OrderDetail', { orderId });
+      } else if (channel === 'orders') {
+        navigateMain('MainTabs', { screen: 'Orders' });
       } else {
-        navigation.navigate('Orders');
+        navigateMain('MainTabs', { screen: 'Orders' });
       }
       break;
     case 'promotion':
     case 'price_drop':
-      if (data.productId) {
-        navigation.navigate('ProductDetail', { productId: data.productId });
+      if (productId) {
+        navigateMain('ProductDetail', { productId });
+      } else if (channel === 'promotions') {
+        navigateMain('MainTabs', { screen: 'Home' });
       } else {
-        navigation.navigate('Home');
+        navigateMain('MainTabs', { screen: 'Home' });
       }
       break;
     case 'cart_reminder':
-      navigation.navigate('Cart');
+      navigateMain('Cart');
       break;
     default:
-      navigation.navigate('Home');
+      if (channel === 'cart') {
+        navigateMain('Cart');
+      } else if (channel === 'orders') {
+        navigateMain('MainTabs', { screen: 'Orders' });
+      } else {
+        navigateMain('MainTabs', { screen: 'Home' });
+      }
   }
 };

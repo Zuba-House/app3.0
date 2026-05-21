@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, TextField, MenuItem, Switch, FormControlLabel } from "@mui/material";
+import { Button, TextField, MenuItem, Switch, FormControlLabel, Checkbox, FormGroup, Typography } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchDataFromApi, putData } from '../../utils/api';
 import { MyContext } from '../../App';
@@ -25,7 +25,8 @@ const EditCoupon = () => {
         freeShipping: false,
         excludeSaleItems: false,
         individualUse: false,
-        isActive: true
+        isActive: true,
+        allowedChannels: ['web', 'mobile']
     });
 
     useEffect(() => {
@@ -51,7 +52,10 @@ const EditCoupon = () => {
                         freeShipping: coupon.freeShipping || false,
                         excludeSaleItems: coupon.excludeSaleItems || false,
                         individualUse: coupon.individualUse || false,
-                        isActive: coupon.isActive !== undefined ? coupon.isActive : true
+                        isActive: coupon.isActive !== undefined ? coupon.isActive : true,
+                        allowedChannels: coupon.allowedChannels?.length
+                            ? coupon.allowedChannels
+                            : ['web', 'mobile']
                     });
                 } else {
                     context?.alertBox("error", "Coupon not found");
@@ -72,6 +76,16 @@ const EditCoupon = () => {
         setFormFields({
             ...formFields,
             [name]: type === 'checkbox' ? checked : value
+        });
+    };
+
+    const toggleChannel = (channel) => {
+        setFormFields((prev) => {
+            const has = prev.allowedChannels.includes(channel);
+            const next = has
+                ? prev.allowedChannels.filter((c) => c !== channel)
+                : [...prev.allowedChannels, channel];
+            return { ...prev, allowedChannels: next.length ? next : [channel] };
         });
     };
 
@@ -265,6 +279,30 @@ const EditCoupon = () => {
                         }
                         label="Active"
                     />
+
+                    <Typography variant="subtitle2" sx={{ mt: 2, fontWeight: 600 }}>
+                        Redeemable on
+                    </Typography>
+                    <FormGroup row>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={formFields.allowedChannels.includes('web')}
+                                    onChange={() => toggleChannel('web')}
+                                />
+                            }
+                            label="Web (zubahouse.com)"
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={formFields.allowedChannels.includes('mobile')}
+                                    onChange={() => toggleChannel('mobile')}
+                                />
+                            }
+                            label="Mobile app (iOS & Android)"
+                        />
+                    </FormGroup>
                 </div>
 
                 <div className="flex gap-3 mt-6">

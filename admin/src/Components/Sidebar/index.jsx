@@ -1,6 +1,7 @@
 import { Button } from "@mui/material";
 import React, { useContext, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import Badge from "@mui/material/Badge";
 import { RxDashboard } from "react-icons/rx";
 import { FaRegImage } from "react-icons/fa";
 import { FiUsers } from "react-icons/fi";
@@ -9,21 +10,24 @@ import { RiProductHuntLine } from "react-icons/ri";
 import { TbCategory } from "react-icons/tb";
 import { IoBagCheckOutline } from "react-icons/io5";
 import { IoMdLogOut } from "react-icons/io";
+import { FaRegUser } from "react-icons/fa6";
 import { FaAngleDown } from "react-icons/fa6";
 import { Collapse } from "react-collapse";
 import { MyContext } from "../../App";
 import { SiBloglovin } from "react-icons/si";
-import { fetchDataFromApi } from "../../utils/api";
-import { IoLogoBuffer } from "react-icons/io";
+import { fetchDataFromApi, postData } from "../../utils/api";
+import { IoNotificationsOutline } from "react-icons/io5";
 import { IoAnalytics } from "react-icons/io5";
 import { RiCoupon3Line, RiGiftLine } from "react-icons/ri";
 import { MdLocalOffer } from "react-icons/md";
 
 
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen = true }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [submenuIndex, setSubmenuIndex] = useState(null);
+  const [pushBadge, setPushBadge] = useState(0);
   const isOpenSubMenu = (index) => {
     if (submenuIndex === index) {
       setSubmenuIndex(null);
@@ -34,6 +38,18 @@ const Sidebar = () => {
 
   const context = useContext(MyContext);
 
+  useEffect(() => {
+    const loadBadge = async () => {
+      const res = await fetchDataFromApi('/api/notifications/unread-count', {
+        silent: true,
+      });
+      const count = res?.data?.count ?? res?.count;
+      if (count != null) setPushBadge(Number(count) || 0);
+    };
+    loadBadge();
+    const id = setInterval(loadBadge, 30000);
+    return () => clearInterval(id);
+  }, [location.pathname]);
 
   const logout = () => {
     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
@@ -53,24 +69,43 @@ const Sidebar = () => {
   }
 
 
+  const openClass = isOpen ? 'is-open' : 'is-closed';
+
   return (
     <>
-      <div className={`sidebar fixed top-0 left-0 z-[52] h-full border-r border-[rgba(255,255,255,0.1)] py-2 px-4 w-[${context.isSidebarOpen === true ? `${20}%` : '0px'}]`}>
-        <div className="py-2 w-full"
+      <div
+        className={`sidebar sidebar-fixed ${openClass} border-r border-[rgba(255,255,255,0.1)] py-1.5 px-2`}
+        aria-hidden={!isOpen}
+      >
+        <div
+          className="sidebar-header flex-shrink-0 pb-2 w-full overflow-hidden"
           onClick={() => {
             context?.windowWidth < 992 && context?.setisSidebarOpen(false)
             setSubmenuIndex(null)
           }}
         >
-          <Link to="/">
+          <Link to="/" className="block overflow-hidden max-w-full">
             <img
-            src={localStorage.getItem('logo')}
-              className="w-[170px] md:min-w-[200px]"
+              src={localStorage.getItem('logo') || '/fav.png'}
+              alt="Zuba"
+              className="sidebar-logo-img"
             />
           </Link>
+          <span
+            className="inline-block mt-1 px-2 py-0.5 rounded-full text-[9px] font-semibold text-white leading-tight"
+            style={{ backgroundColor: '#7c3aed' }}
+          >
+            App Control Panel
+          </span>
         </div>
 
-        <ul className="mt-4 overflow-y-scroll max-h-[80vh]">
+        <nav className="sidebar-nav flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
+        <ul className="mt-1 pb-2 space-y-0">
+          <li className="px-2 pt-1 pb-0.5">
+            <span className="sidebar-section-label">
+              Overview
+            </span>
+          </li>
           <li>
             <Link to="/"
               onClick={() => {
@@ -79,12 +114,31 @@ const Sidebar = () => {
               }}
             >
               <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
-                <RxDashboard className="text-[18px] text-[#efb291]" /> <span>Dashboard</span>
+                <RxDashboard className="text-[20px] text-[#efb291]" /> <span>Dashboard</span>
               </Button>
             </Link>
           </li>
 
           <li>
+            <Link to="/app-analytics"
+              onClick={() => {
+                context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                setSubmenuIndex(null)
+              }}
+            >
+              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)] border-l-[3px] border-transparent hover:border-[#e8a87c]">
+                <IoAnalytics className="text-[20px] text-[#efb291]" /> <span>App Analytics</span>
+              </Button>
+            </Link>
+          </li>
+
+          <li className="px-2 pt-3 pb-0.5">
+            <span className="sidebar-section-label">
+              Users
+            </span>
+          </li>
+
+          <li className="hidden">
             <Button
               className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
               onClick={() => isOpenSubMenu(1)}
@@ -199,7 +253,7 @@ const Sidebar = () => {
             </Collapse>
           </li>
 
-          <li>
+          <li className="hidden">
             <Button
               className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
               onClick={() => isOpenSubMenu(4)}
@@ -252,7 +306,7 @@ const Sidebar = () => {
               }}
             >
               <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
-                <FiUsers className="text-[18px] text-[#efb291]" /> <span>Users</span>
+                <FiUsers className="text-[20px] text-[#efb291]" /> <span>All Users</span>
               </Button>
             </Link>
           </li>
@@ -304,6 +358,12 @@ const Sidebar = () => {
           </li>
 
 
+          <li className="px-2 pt-3 pb-0.5">
+            <span className="sidebar-section-label">
+              Orders
+            </span>
+          </li>
+
           <li>
             <Link to="/orders"
               onClick={() => {
@@ -317,20 +377,7 @@ const Sidebar = () => {
             </Link>
           </li>
 
-          <li>
-            <Link to="/analytics"
-              onClick={() => {
-                context?.windowWidth < 992 && context?.setisSidebarOpen(false)
-                setSubmenuIndex(null)
-              }}
-            >
-              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
-                <IoAnalytics className="text-[20px] text-[#efb291]" /> <span>Analytics</span>
-              </Button>
-            </Link>
-          </li>
-
-          <li>
+          <li className="hidden">
             <Button
               className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
               onClick={() => isOpenSubMenu(5)}
@@ -419,7 +466,7 @@ const Sidebar = () => {
           </li>
 
 
-          <li>
+          <li className="hidden">
             <Button
               className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
               onClick={() => isOpenSubMenu(6)}
@@ -467,7 +514,120 @@ const Sidebar = () => {
           </li>
 
 
+          <li className="px-2 pt-3 pb-0.5">
+            <span className="sidebar-section-label">
+              Engagement
+            </span>
+          </li>
+
           <li>
+            <Link to="/notifications"
+              onClick={() => {
+                context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                setSubmenuIndex(null)
+              }}
+            >
+              <Button
+                className={`w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)] ${
+                  location.pathname === '/notifications'
+                    ? '!bg-[rgba(232,168,124,0.15)] !border-l-[3px] !border-[#e8a87c]'
+                    : ''
+                }`}
+              >
+                <Badge badgeContent={pushBadge} color="error" max={99} invisible={!pushBadge}>
+                  <IoNotificationsOutline className="text-[20px] text-[#efb291]" />
+                </Badge>
+                <span>Push Notifications</span>
+              </Button>
+            </Link>
+          </li>
+
+          <li>
+            <Link to="/app-activity"
+              onClick={() => {
+                context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                setSubmenuIndex(null)
+              }}
+            >
+              <Button
+                className={`w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)] ${
+                  location.pathname === '/app-activity'
+                    ? '!bg-[rgba(232,168,124,0.15)] !border-l-[3px] !border-[#e8a87c]'
+                    : ''
+                }`}
+              >
+                <IoNotificationsOutline className="text-[20px] text-[#efb291]" />
+                <span>App Activity</span>
+              </Button>
+            </Link>
+          </li>
+
+          <li className="px-2 pt-3 pb-0.5">
+            <span className="sidebar-section-label">
+              App Promotions
+            </span>
+          </li>
+
+          <li>
+            <Link to="/app-promotions"
+              onClick={() => {
+                context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                setSubmenuIndex(null)
+              }}
+            >
+              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
+                <RiCoupon3Line className="text-[20px] text-[#efb291]" /> <span>App-Only Coupons</span>
+              </Button>
+            </Link>
+          </li>
+
+          <li>
+            <Link to="/app-gift-cards"
+              onClick={() => {
+                context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                setSubmenuIndex(null)
+              }}
+            >
+              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
+                <RiGiftLine className="text-[20px] text-[#efb291]" /> <span>App Gift Cards</span>
+              </Button>
+            </Link>
+          </li>
+
+          <li className="hidden">
+            <Button
+              className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
+              onClick={() => isOpenSubMenu(9)}
+            >
+              <IoNotificationsOutline className="text-[18px] text-[#efb291]" /> <span>Marketing</span>
+              <span className="ml-auto w-[30px] h-[30px] flex items-center justify-center">
+                <FaAngleDown
+                  className={`transition-all ${submenuIndex === 9 ? "rotate-180" : ""
+                    }`}
+                />
+              </span>
+            </Button>
+
+            <Collapse isOpened={submenuIndex === 9 ? true : false}>
+              <ul className="w-full">
+                <li className="w-full">
+                  <Link to="/notifications"
+                    onClick={() => {
+                      context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                      setSubmenuIndex(null)
+                    }}
+                  >
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <IoNotificationsOutline className="text-[14px] text-[#efb291]" />
+                      Push Notifications
+                    </Button>
+                  </Link>
+                </li>
+              </ul>
+            </Collapse>
+          </li>
+
+          <li className="hidden">
             <Button
               className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
               onClick={() => isOpenSubMenu(8)}
@@ -483,7 +643,7 @@ const Sidebar = () => {
 
             <Collapse isOpened={submenuIndex === 8 ? true : false}>
               <ul className="w-full">
-                <li className="w-full">
+                <li className="w-full hidden">
                   <Link to="/coupons"
                     onClick={() => {
                       context?.windowWidth < 992 && context?.setisSidebarOpen(false)
@@ -513,39 +673,37 @@ const Sidebar = () => {
             </Collapse>
           </li>
 
+          <li className="px-2 pt-3 pb-0.5">
+            <span className="sidebar-section-label">
+              Settings
+            </span>
+          </li>
+
           <li>
-            <Link to="/logo/manage">
-              <Button
-                className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
-              >
-                <IoLogoBuffer className="text-[18px] text-[#efb291]" />
-                <span>Manage Logo</span>
+            <Link to="/profile"
+              onClick={() => {
+                context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                setSubmenuIndex(null)
+              }}
+            >
+              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
+                <FaRegUser className="text-[20px] text-[#efb291]" /> <span>Settings</span>
               </Button>
             </Link>
           </li>
 
-          <li>
-            <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]" onClick={logout}>
-              <IoMdLogOut className="text-[20px] text-[#efb291]" /> <span>Logout</span>
-            </Button>
-          </li>
         </ul>
+        </nav>
 
-
-
-      </div>
-
-
-      {
-        context?.windowWidth < 920 && context?.isSidebarOpen === true &&
-        <div className="sidebarOverlay pointer-events-none fixed top-0 left-0 bg-[rgba(0,0,0,0.5)] w-full h-full
-       z-[51]" onClick={() => {
-            context?.setisSidebarOpen(false)
-            setSubmenuIndex(null)
-          }}>
+        <div className="sidebar-footer flex-shrink-0 pt-1 border-t border-[rgba(255,255,255,0.12)]">
+          <Button
+            className="sidebar-link w-full !capitalize !justify-start !min-h-[32px] !py-1"
+            onClick={logout}
+          >
+            <IoMdLogOut className="sidebar-icon text-[#efb291]" /> <span>Logout</span>
+          </Button>
         </div>
-      }
-
+      </div>
 
 
     </>

@@ -15,6 +15,7 @@ export interface AnalyticsEvent {
 
 class AnalyticsService {
   private userId: string | null = null;
+  private sessionId: string | null = null;
   private enabled: boolean = true;
 
   /**
@@ -36,6 +37,7 @@ class AnalyticsService {
         event,
         properties: {
           ...properties,
+          session_id: this.sessionId || properties?.session_id,
           platform: 'mobile',
           page: properties?.page || 'mobile_app',
           timestamp: new Date().toISOString(),
@@ -135,6 +137,18 @@ class AnalyticsService {
       brand_id: brandId,
       brand_name: brandName,
     });
+  }
+
+  /**
+   * Register an active app session (heartbeat for admin metrics).
+   */
+  async sessionHeartbeat(sessionId: string) {
+    this.sessionId = sessionId;
+    await this.track('app_session', { session_id: sessionId });
+  }
+
+  setSessionId(sessionId: string | null) {
+    this.sessionId = sessionId;
   }
 
   /**

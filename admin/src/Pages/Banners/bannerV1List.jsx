@@ -118,7 +118,7 @@ export const BannerV1List = () => {
                             {
                                 slidesData?.length !== 0 && slidesData?.map((item, index) => {
                                     return (
-                                        <TableRow>
+                                        <TableRow key={item._id || `banner-${index}`}>
 
                                             <TableCell width={100}>
                                                 <div className="flex items-center gap-4 w-[130px] lg:w-[200px]">

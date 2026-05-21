@@ -120,38 +120,53 @@ export const postData = async (url, formData) => {
 
         if (response.ok) {
             const data = await response.json();
-            //console.log(data)
-            return data;
-        } else {
-            const errorData = await response.json();
-            return errorData;
+            return { ...data, httpStatus: response.status, ok: true };
         }
+        let errorData = { success: false, message: response.statusText };
+        try {
+            errorData = { ...(await response.json()), httpStatus: response.status, ok: false };
+        } catch {
+            errorData = { success: false, message: response.statusText, httpStatus: response.status, ok: false };
+        }
+        return errorData;
 
     } catch (error) {
-        console.error('Error:', error);
+        return { success: false, message: error?.message || 'Network error', httpStatus: 0, ok: false };
     }
 
 }
 
 
 
-export const fetchDataFromApi = async (url) => {
-    try {
-        const params={
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`, // Include your API key in the Authorization header
-                'Content-Type': 'application/json', // Adjust the content type as needed
-              },
-        
-        } 
+/** True when fetchDataFromApi failed (404, network, etc.) */
+export function isApiFailure(res) {
+    return res == null || Boolean(res?.isAxiosError);
+}
 
-        const { data } = await axios.get(apiUrl + url,params)
+export const fetchDataFromApi = async (url, options = {}) => {
+    const { silent = false } =
+        typeof options === 'object' ? options : { silent: Boolean(options) };
+
+    try {
+        const params = {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+                'Content-Type': 'application/json',
+            },
+        };
+
+        const { data } = await axios.get(apiUrl + url, params);
         return data;
     } catch (error) {
-        console.log(error);
-        return error;
+        const status = error.response?.status;
+        if (!silent) {
+            if (status && status >= 500) {
+                console.warn('[API]', status, url, error.message);
+            }
+        }
+        return null;
     }
-}
+};
 
 
 export const uploadImage = async (url, updatedData ) => {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, TextField, MenuItem, Switch, FormControlLabel } from "@mui/material";
+import { Button, TextField, MenuItem, Switch, FormControlLabel, Checkbox, FormGroup, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { postData } from '../../utils/api';
 import { MyContext } from '../../App';
@@ -22,7 +22,8 @@ const AddCoupon = () => {
         freeShipping: false,
         excludeSaleItems: false,
         individualUse: false,
-        isActive: true
+        isActive: true,
+        allowedChannels: ['web', 'mobile']
     });
 
     const [loading, setLoading] = useState(false);
@@ -35,6 +36,16 @@ const AddCoupon = () => {
         });
     };
 
+    const toggleChannel = (channel) => {
+        setFormFields((prev) => {
+            const has = prev.allowedChannels.includes(channel);
+            const next = has
+                ? prev.allowedChannels.filter((c) => c !== channel)
+                : [...prev.allowedChannels, channel];
+            return { ...prev, allowedChannels: next.length ? next : [channel] };
+        });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -42,6 +53,12 @@ const AddCoupon = () => {
         // Validation
         if (!formFields.code || !formFields.discountAmount) {
             context?.alertBox("error", "Code and discount amount are required");
+            setLoading(false);
+            return;
+        }
+
+        if (!formFields.allowedChannels?.length) {
+            context?.alertBox("error", "Select at least one channel (Web or Mobile)");
             setLoading(false);
             return;
         }
@@ -233,6 +250,33 @@ const AddCoupon = () => {
                         }
                         label="Active"
                     />
+
+                    <Typography variant="subtitle2" sx={{ mt: 2, fontWeight: 600 }}>
+                        Redeemable on
+                    </Typography>
+                    <FormGroup row>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={formFields.allowedChannels.includes('web')}
+                                    onChange={() => toggleChannel('web')}
+                                />
+                            }
+                            label="Web (zubahouse.com)"
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={formFields.allowedChannels.includes('mobile')}
+                                    onChange={() => toggleChannel('mobile')}
+                                />
+                            }
+                            label="Mobile app (iOS & Android)"
+                        />
+                    </FormGroup>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                        App-only coupons are exclusive to mobile users and won&apos;t work on the website.
+                    </Typography>
                 </div>
 
                 <div className="flex gap-3 mt-6">

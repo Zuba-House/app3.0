@@ -15,11 +15,9 @@ import { fetchDataFromApi, postData } from "../../utils/api";
 import { useContext } from "react";
 import { MyContext } from "../../App.jsx";
 
-import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { firebaseApp } from "../../firebase";
+import { signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
+import { getFirebaseAuth, isFirebaseConfigured } from "../../firebase";
 import { useEffect } from "react";
-const auth = getAuth(firebaseApp);
-const googleProvider = new GoogleAuthProvider();
 
 const Login = () => {
   const [loadingGoogle, setLoadingGoogle] = React.useState(false);
@@ -82,6 +80,41 @@ const Login = () => {
 
   }
 
+  const completeAdminLogin = async (res, clearForm) => {
+    if (res?.error === true) {
+      context.alertBox("error", res?.message);
+      return false;
+    }
+
+    localStorage.setItem("accessToken", res?.data?.accesstoken);
+    localStorage.setItem("refreshToken", res?.data?.refreshToken);
+
+    try {
+      const details = await fetchDataFromApi("/api/user/user-details");
+      const role = details?.data?.role;
+      if (role !== "ADMIN") {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        context.setIsLogin(false);
+        context.alertBox("error", "This account does not have admin access.");
+        return false;
+      }
+      context.setUserData(details.data);
+      context.setIsLogin(true);
+      context.alertBox("success", res?.message || "Login successful");
+      if (clearForm) {
+        setFormsFields({ email: "", password: "" });
+      }
+      history("/");
+      return true;
+    } catch {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      context.alertBox("error", "Could not verify admin access. Please try again.");
+      return false;
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -89,47 +122,36 @@ const Login = () => {
 
     if (formFields.email === "") {
       context.alertBox("error", "Please enter email id");
-      return false
+      setIsLoading(false);
+      return false;
     }
-
 
     if (formFields.password === "") {
       context.alertBox("error", "Please enter password");
-      return false
+      setIsLoading(false);
+      return false;
     }
 
-
-    postData("/api/user/login", formFields, { withCredentials: true }).then((res) => {
-
-      if (res?.error !== true) {
-        setIsLoading(false);
-        context.alertBox("success", res?.message);
-        setFormsFields({
-          email: "",
-          password: ""
-        })
-
-        localStorage.setItem("accessToken", res?.data?.accesstoken);
-        localStorage.setItem("refreshToken", res?.data?.refreshToken);
-
-        context.setIsLogin(true);
-
-        history("/")
-      } else {
-        context.alertBox("error", res?.message);
-        setIsLoading(false);
-
-      }
-
-    })
-
-
-  }
+    postData("/api/user/login", formFields, { withCredentials: true })
+      .then((res) => completeAdminLogin(res, true))
+      .finally(() => setIsLoading(false));
+  };
 
 
 
-  const authWithGoogle = () => {
+  const authWithGoogle = async () => {
+    if (!isFirebaseConfigured) {
+      context.alertBox("error", "Google sign-in is not configured. Use email and password, or add Firebase keys to admin/.env");
+      return;
+    }
 
+    const auth = await getFirebaseAuth();
+    if (!auth) {
+      context.alertBox("error", "Google sign-in is unavailable right now.");
+      return;
+    }
+
+    const googleProvider = new GoogleAuthProvider();
     setLoadingGoogle(true);
 
     signInWithPopup(auth, googleProvider)
@@ -150,42 +172,34 @@ const Login = () => {
         };
 
 
-        postData("/api/user/authWithGoogle", fields).then((res) => {
-
-          if (res?.error !== true) {
-            setLoadingGoogle(false);
-            setIsLoading(false);
-            context.alertBox("success", res?.message);
-            localStorage.setItem("userEmail", fields.email)
-            localStorage.setItem("accessToken", res?.data?.accesstoken);
-            localStorage.setItem("refreshToken", res?.data?.refreshToken);
-
-            context.setIsLogin(true);
-
-            history("/")
+        postData("/api/user/authWithGoogle", fields).then(async (res) => {
+          const ok = await completeAdminLogin(res, false);
+          if (!ok) {
+            await signOut(auth);
+            context.alertBox(
+              "error",
+              "This Google account is not an admin account."
+            );
           } else {
-            context.alertBox("error", res?.message);
-            setIsLoading(false);
+            localStorage.setItem("userEmail", fields.email);
           }
-
-        })
+          setLoadingGoogle(false);
+          setIsLoading(false);
+        }).catch(async () => {
+          await signOut(auth).catch(() => {});
+          setLoadingGoogle(false);
+          setIsLoading(false);
+        });
 
         console.log(user)
         // IdP data available using getAdditionalUserInfo(result)
         // ...
       }).catch((error) => {
-        // Handle Errors here.
-        const errorCode = error.code;
-        const errorMessage = error.message;
-        // The email of the user's account used.
-        const email = error.customData.email;
-        // The AuthCredential type that was used.
-        const credential = GoogleAuthProvider.credentialFromError(error);
-        // ...
+        setLoadingGoogle(false);
+        setIsLoading(false);
+        context.alertBox("error", error?.message || "Google sign-in failed");
       });
-
-
-  }
+  };
   return (
     <section className="bg-white w-full">
       <header className="w-full static lg:fixed top-0 left-0  px-4 py-3 flex items-center justify-center sm:justify-between z-50">
@@ -197,13 +211,13 @@ const Login = () => {
         </Link>
 
         <div className="hidden sm:flex items-center gap-0">
-          <NavLink to="/login" exact={true} activeClassName="isActive">
+          <NavLink to="/login" end className={({ isActive }) => (isActive ? "isActive" : undefined)}>
             <Button className="!rounded-full !text-[rgba(0,0,0,0.8)] !px-5 flex gap-1">
               <CgLogIn className="text-[18px]" /> Login
             </Button>
           </NavLink>
 
-          <NavLink to="/sign-up" exact={true} activeClassName="isActive">
+          <NavLink to="/sign-up" end className={({ isActive }) => (isActive ? "isActive" : undefined)}>
             <Button className="!rounded-full !text-[rgba(0,0,0,0.8)] !px-5 flex gap-1">
               <FaRegUser className="text-[15px]" /> Sign Up
             </Button>

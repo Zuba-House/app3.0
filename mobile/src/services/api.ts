@@ -85,8 +85,14 @@ export const editData = async <T = unknown>(url: string, data?: unknown): Promis
   return request<T>(url, { method: 'PUT', body: JSON.stringify(data ?? {}) });
 };
 
-export const deleteData = async <T = unknown>(url: string): Promise<ApiResponse<T>> => {
-  return request<T>(url, { method: 'DELETE' });
+export const deleteData = async <T = unknown>(
+  url: string,
+  data?: unknown
+): Promise<ApiResponse<T>> => {
+  return request<T>(url, {
+    method: 'DELETE',
+    body: data != null ? JSON.stringify(data) : undefined,
+  });
 };
 
 export const uploadImage = async (file: any): Promise<ApiResponse> => {

@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -16,6 +17,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../constants/colors';
+import { navigateToCategories, navigateToProductList } from '../navigation/navigationHelpers';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -25,6 +27,7 @@ interface CategoryDeal {
   image: string;
   discount: string;
   itemCount: number;
+  categoryId?: string;
 }
 
 interface CategoryDealsProps {
@@ -65,12 +68,15 @@ const DEFAULT_CATEGORIES: CategoryDeal[] = [
 const CategoryDeals: React.FC<CategoryDealsProps> = ({
   categories = DEFAULT_CATEGORIES,
 }) => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
 
   const handlePress = (category: CategoryDeal) => {
-    navigation.navigate('MainTabs', {
-      screen: 'Search',
-      params: { categoryId: category.id },
+    navigateToProductList(navigation, {
+      categoryId: category.categoryId || category.id,
+      categoryName: category.name,
+      title: category.name,
+      subtitle: category.discount,
     });
   };
 
@@ -102,10 +108,10 @@ const CategoryDeals: React.FC<CategoryDealsProps> = ({
       <View style={styles.header}>
         <View style={styles.titleContainer}>
           <Ionicons name="grid" size={20} color={Colors.primary} />
-          <Text style={styles.title}>Shop by Category</Text>
+          <Text style={styles.title}>{t('home.shopByCategory')}</Text>
         </View>
-        <TouchableOpacity style={styles.seeAllButton}>
-          <Text style={styles.seeAllText}>See All</Text>
+        <TouchableOpacity style={styles.seeAllButton} onPress={() => navigateToCategories(navigation)}>
+          <Text style={styles.seeAllText}>{t('common.seeAll')}</Text>
           <Ionicons name="chevron-forward" size={16} color={Colors.secondary} />
         </TouchableOpacity>
       </View>

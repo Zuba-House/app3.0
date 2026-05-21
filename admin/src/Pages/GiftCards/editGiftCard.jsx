@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Button, TextField, MenuItem } from "@mui/material";
-import { useNavigate, useParams } from "react-router-dom";
+import {
+    Button,
+    TextField,
+    MenuItem,
+    Checkbox,
+    FormControlLabel,
+    FormGroup,
+    Typography,
+} from "@mui/material";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { fetchDataFromApi, putData } from '../../utils/api';
 import { MyContext } from '../../App';
 import CircularProgress from '@mui/material/CircularProgress';
 
 const EditGiftCard = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { id } = useParams();
     const context = React.useContext(MyContext);
+    const isAppRoute = location.pathname.includes('/app-gift-cards');
+    const listPath = '/app-gift-cards';
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -18,7 +29,8 @@ const EditGiftCard = () => {
         recipientName: '',
         message: '',
         expiryDate: '',
-        isActive: true
+        isActive: true,
+        allowedChannels: ['web', 'mobile'],
     });
 
     useEffect(() => {
@@ -37,17 +49,19 @@ const EditGiftCard = () => {
                         recipientName: card.recipientName || '',
                         message: card.message || '',
                         expiryDate: card.expiryDate ? new Date(card.expiryDate).toISOString().split('T')[0] : '',
-                        isActive: card.isActive !== undefined ? card.isActive : true
+                        isActive: card.isActive !== undefined ? card.isActive : true,
+                        allowedChannels: card.allowedChannels?.length
+                            ? card.allowedChannels
+                            : ['web', 'mobile'],
                     });
                 } else {
                     context?.alertBox("error", "Gift card not found");
-                    navigate('/gift-cards');
+                    navigate(listPath);
                 }
             }
         } catch (error) {
-            console.error('Error fetching gift card:', error);
             context?.alertBox("error", "Failed to load gift card");
-            navigate('/gift-cards');
+            navigate(listPath);
         } finally {
             setLoading(false);
         }
@@ -61,9 +75,25 @@ const EditGiftCard = () => {
         });
     };
 
+    const toggleChannel = (channel) => {
+        setFormFields((prev) => {
+            const has = prev.allowedChannels.includes(channel);
+            const next = has
+                ? prev.allowedChannels.filter((c) => c !== channel)
+                : [...prev.allowedChannels, channel];
+            return { ...prev, allowedChannels: next.length ? next : [channel] };
+        });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSaving(true);
+
+        if (!formFields.allowedChannels?.length) {
+            context?.alertBox("error", "Select at least one channel (Web or Mobile)");
+            setSaving(false);
+            return;
+        }
 
         try {
             const payload = {
@@ -71,19 +101,19 @@ const EditGiftCard = () => {
                 expiryDate: formFields.expiryDate || null,
                 recipientEmail: formFields.recipientEmail || null,
                 recipientName: formFields.recipientName || null,
-                message: formFields.message || null
+                message: formFields.message || null,
+                allowedChannels: formFields.allowedChannels,
             };
 
             const res = await putData(`/api/gift-cards/${id}`, payload);
 
             if (res?.success) {
                 context?.alertBox("success", "Gift card updated successfully");
-                navigate('/gift-cards');
+                navigate(listPath);
             } else {
                 context?.alertBox("error", res?.error || "Failed to update gift card");
             }
         } catch (error) {
-            console.error('Error updating gift card:', error);
             context?.alertBox("error", "Failed to update gift card");
         } finally {
             setSaving(false);
@@ -101,7 +131,9 @@ const EditGiftCard = () => {
     return (
         <div className="w-full">
             <div className="mb-5">
-                <h2 className="text-[24px] font-[700]">Edit Gift Card</h2>
+                <h2 className="text-xl sm:text-2xl font-bold">
+                    {isAppRoute ? 'Edit App Gift Card' : 'Edit Gift Card'}
+                </h2>
             </div>
 
             <form onSubmit={handleSubmit} className="bg-white rounded-md shadow-md p-5">
@@ -170,7 +202,7 @@ const EditGiftCard = () => {
                         {saving ? 'Updating...' : 'Update Gift Card'}
                     </Button>
                     <Button
-                        onClick={() => navigate('/gift-cards')}
+                        onClick={() => navigate(listPath)}
                         className="btn-outline"
                     >
                         Cancel

@@ -3,7 +3,9 @@
  * Countdown timer with urgency indicators
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useCurrency } from '../context/CurrencyContext';
 import {
   View,
   Text,
@@ -17,6 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { Product } from '../types/product.types';
 import Colors from '../constants/colors';
+import { filterPricedProducts, getSoldPercent, isAlmostGone } from '../utils/productDisplay';
+import { navigateToProductDetail, navigateToProductList } from '../navigation/navigationHelpers';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.38;
@@ -80,24 +84,35 @@ const getSaleInfo = (p: any) => {
 
 const FlashSaleTimer: React.FC<{ endTime: Date }> = ({ endTime }) => {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({ hours: 0, minutes: 0, seconds: 0 });
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const calculateTimeLeft = () => {
-      const difference = endTime.getTime() - new Date().getTime();
-      
-      if (difference > 0) {
-        setTimeLeft({
-          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-          minutes: Math.floor((difference / 1000 / 60) % 60),
-          seconds: Math.floor((difference / 1000) % 60),
-        });
+      const difference = endTime.getTime() - Date.now();
+      if (difference <= 0) {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
+        return;
       }
+      setTimeLeft({
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60),
+      });
     };
 
     calculateTimeLeft();
-    const timer = setInterval(calculateTimeLeft, 1000);
+    timerRef.current = setInterval(calculateTimeLeft, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [endTime]);
 
   const formatNumber = (num: number) => num.toString().padStart(2, '0');
@@ -120,17 +135,19 @@ const FlashSaleTimer: React.FC<{ endTime: Date }> = ({ endTime }) => {
 };
 
 const FlashSaleCard: React.FC<{ product: Product; index: number }> = ({ product, index }) => {
+  const { t } = useTranslation();
+  const { formatPrice } = useCurrency();
   const navigation = useNavigation<any>();
 
   // Real discount only: supports salePrice/oldPrice/discount payload shapes.
   const saleInfo = getSaleInfo(product as any);
   const displayPrice = saleInfo.displayPrice;
   const discountPercent = saleInfo.discountPercent;
-  const soldPercent = Math.floor(Math.random() * 60) + 30; // 30-90%
+  const soldPercent = getSoldPercent(product);
   const originalPrice = saleInfo.originalPrice;
 
   const handlePress = () => {
-    navigation.navigate('ProductDetail', { productId: product._id });
+    navigateToProductDetail(navigation, product._id);
   };
 
   const imageUrl = product.images?.[0] || (product as any).featuredImage || '';
@@ -167,9 +184,9 @@ const FlashSaleCard: React.FC<{ product: Product; index: number }> = ({ product,
 
       {/* Price Section */}
       <View style={styles.priceSection}>
-        <Text style={styles.salePrice}>${displayPrice.toFixed(2)}</Text>
+        <Text style={styles.salePrice}>{formatPrice(displayPrice)}</Text>
         {originalPrice !== null && (
-          <Text style={styles.originalPrice}>${originalPrice.toFixed(2)}</Text>
+          <Text style={styles.originalPrice}>{formatPrice(originalPrice)}</Text>
         )}
       </View>
 
@@ -178,14 +195,16 @@ const FlashSaleCard: React.FC<{ product: Product; index: number }> = ({ product,
         <View style={styles.soldBarBackground}>
           <View style={[styles.soldBarFill, { width: `${soldPercent}%` }]} />
         </View>
-        <Text style={styles.soldText}>{soldPercent}% sold</Text>
+        <Text style={styles.soldText}>
+          {soldPercent}% {t('home.sold')}
+        </Text>
       </View>
 
       {/* Stock Warning */}
-      {soldPercent > 70 && (
+      {isAlmostGone(product) && (
         <View style={styles.stockWarning}>
           <Ionicons name="flame" size={12} color="#FF5722" />
-          <Text style={styles.stockWarningText}>Almost gone!</Text>
+          <Text style={styles.stockWarningText}>{t('home.almostGone')}</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -197,12 +216,15 @@ const FlashSale: React.FC<FlashSaleProps> = ({
   endTime = new Date(Date.now() + 4 * 60 * 60 * 1000), // Default 4 hours from now
   title = "Flash Sale"
 }) => {
-  if (!products || products.length === 0) return null;
+  const navigation = useNavigation<any>();
+  const priced = filterPricedProducts(products ?? []);
+  if (!priced || priced.length === 0) return null;
   const [cycleEnd, setCycleEnd] = useState<Date>(endTime);
   const [cycleTick, setCycleTick] = useState(0);
+  const [dealEnded, setDealEnded] = useState(false);
 
   // Only show truly discounted products in flash sale, sorted by highest discount first.
-  const saleProducts = products
+  const saleProducts = priced
     .filter((p) => getSaleInfo(p as any).isOnSale)
     .sort((a, b) => {
       const aDisc = getSaleInfo(a as any).discountPercent;
@@ -211,7 +233,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({
     });
 
   // If on-sale items are not enough, fill with mixed products for a richer section.
-  const restProducts = products.filter((p) => !saleProducts.find((s) => s._id === p._id));
+  const restProducts = priced.filter((p) => !saleProducts.find((s) => s._id === p._id));
   const mixedPool = [...saleProducts, ...restProducts];
   if (mixedPool.length === 0) return null;
 
@@ -236,13 +258,19 @@ const FlashSale: React.FC<FlashSaleProps> = ({
   useEffect(() => {
     const tick = setInterval(() => {
       if (Date.now() >= cycleEnd.getTime()) {
-        // Rotate list and restart countdown window
-        setCycleTick((v) => v + 1);
-        setCycleEnd(new Date(Date.now() + 4 * 60 * 60 * 1000));
+        setDealEnded(true);
       }
     }, 1000);
     return () => clearInterval(tick);
   }, [cycleEnd]);
+
+  if (dealEnded) {
+    return (
+      <View style={[styles.container, styles.endedBox]}>
+        <Text style={styles.endedText}>Flash sale ended — check back soon!</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container} key={`flash-cycle-${cycleTick}`}>
@@ -260,6 +288,19 @@ const FlashSale: React.FC<FlashSaleProps> = ({
           <Text style={styles.endsIn}>Ends in</Text>
           <FlashSaleTimer endTime={cycleEnd} />
         </View>
+        <TouchableOpacity
+          style={styles.viewAllBtn}
+          onPress={() =>
+            navigateToProductList(navigation, {
+              filter: 'flash-sale',
+              title: 'Flash Sale',
+              sortBy: 'sale',
+            })
+          }
+        >
+          <Text style={styles.viewAllText}>View All</Text>
+          <Ionicons name="chevron-forward" size={14} color={Colors.secondary} />
+        </TouchableOpacity>
       </View>
 
       {/* Products List */}
@@ -447,6 +488,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 4,
   },
+  viewAllBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+  viewAllText: { fontSize: 12, color: Colors.secondary, fontWeight: '600', marginRight: 2 },
+  endedBox: { alignItems: 'center', paddingVertical: 24 },
+  endedText: { fontSize: 14, fontWeight: '600', color: '#6b7280' },
 });
 
 export default FlashSale;

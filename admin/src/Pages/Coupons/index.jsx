@@ -15,6 +15,7 @@ import SearchBox from '../../Components/SearchBox';
 import { MyContext } from '../../App';
 import { fetchDataFromApi, deleteData, postData } from '../../utils/api';
 import CircularProgress from '@mui/material/CircularProgress';
+import Chip from '@mui/material/Chip';
 import { formatCurrency } from '../../utils/currency';
 
 const columns = [
@@ -96,6 +97,17 @@ export const Coupons = () => {
         return new Date(date).toLocaleDateString();
     };
 
+    const getChannelChip = (coupon) => {
+        const channels = coupon.allowedChannels || ['web', 'mobile'];
+        if (channels.length === 1 && channels[0] === 'mobile') {
+            return <Chip size="small" label="📱 App only" color="secondary" sx={{ ml: 1 }} />;
+        }
+        if (channels.length === 1 && channels[0] === 'web') {
+            return <Chip size="small" label="🌐 Web only" color="primary" variant="outlined" sx={{ ml: 1 }} />;
+        }
+        return null;
+    };
+
     const getStatus = (coupon) => {
         if (!coupon.isActive) return { text: 'Inactive', color: 'text-red-600' };
         const now = new Date();
@@ -155,6 +167,7 @@ export const Coupons = () => {
                                             <TableRow key={coupon._id} hover>
                                                 <TableCell>
                                                     <span className="font-[600] text-primary">{coupon.code}</span>
+                                                    {getChannelChip(coupon)}
                                                 </TableCell>
                                                 <TableCell>{coupon.description || '-'}</TableCell>
                                                 <TableCell>

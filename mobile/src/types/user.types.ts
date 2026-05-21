@@ -28,6 +28,10 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  mobile?: string;
+  bio?: string;
+  avatar?: string;
+  signUpWithGoogle?: boolean;
   addresses?: Address[];
   vendorId?: string;
   status?: 'active' | 'inactive';

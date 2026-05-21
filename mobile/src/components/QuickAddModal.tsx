@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -24,6 +23,7 @@ import { setCart, addItem } from '../store/slices/cartSlice';
 import Colors from '../constants/colors';
 import { API_URL } from '../constants/config';
 import { useAuthState } from '../core/auth/authGuards';
+import { showError, showWarning } from '../utils/toast';
 
 interface QuickAddModalProps {
   visible: boolean;
@@ -76,7 +76,7 @@ export default function QuickAddModal({ visible, product, onClose, onAdded }: Qu
     if (!p) return;
     const isVariable = p.productType === 'variable' && variations.length > 0;
     if (isVariable && !selectedVariation) {
-      Alert.alert('Select option', 'Please select a size or option.');
+      showWarning('Please select a size or option.');
       return;
     }
 
@@ -98,7 +98,7 @@ export default function QuickAddModal({ visible, product, onClose, onAdded }: Qu
           onAdded?.();
           onClose();
         } else {
-          Alert.alert('Error', response.message || 'Failed to add to cart');
+          showError(response.message || 'Failed to add to cart');
         }
       } else {
         const cartItem = {
@@ -114,7 +114,7 @@ export default function QuickAddModal({ visible, product, onClose, onAdded }: Qu
         onClose();
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to add to cart');
+      showError(err.message || 'Failed to add to cart');
     } finally {
       setAdding(false);
     }

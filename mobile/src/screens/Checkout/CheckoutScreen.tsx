@@ -10,7 +10,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Dimensions,
   Platform,
   TextInput,
@@ -30,13 +29,14 @@ import { selectCartItems, selectCartTotal, clearCart, setCart } from '../../stor
 import Colors from '../../constants/colors';
 import { getDeliveryEstimateForMethod } from '../../constants/shipping';
 import { analyticsService } from '../../services/analytics.service';
-import { showError } from '../../utils/toast';
+import { showError, showSuccess, showWarning } from '../../utils/toast';
 import { useAuthState } from '../../core/auth/authGuards';
 import { useAuthGate } from '../../core/auth/authGate';
 import { authManager } from '../../core/auth/authManager';
 import { buildCheckoutPayload } from '../../features/checkout/utils/buildCheckoutPayload';
 import { createCheckoutOrder } from '../../features/checkout/api/createOrder';
 import { checkoutStore } from '../../features/checkout/store/checkoutStore';
+import { getOrderId, needsOnlineStripePayment, type RawOrder } from '../../utils/order.mappers';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SAVED_CARDS_STORAGE_KEY = 'checkout_saved_cards_v1';
@@ -337,7 +337,7 @@ const CheckoutScreen: React.FC = () => {
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
-      Alert.alert('Error', 'Please enter a coupon code');
+      showError('Please enter a coupon code');
       return;
     }
     
@@ -353,12 +353,23 @@ const CheckoutScreen: React.FC = () => {
           discount,
           type: response.data.type || 'fixed'
         });
-        Alert.alert('Success', `Coupon applied! You saved $${discount.toFixed(2)}`);
+        showSuccess(`Coupon applied! You saved $${discount.toFixed(2)}`);
       } else {
-        Alert.alert('Invalid Coupon', (response as any).error || 'This coupon is not valid');
+        const errMsg = (response as any).error || (response as any).message;
+        const code = (response as any).code;
+        if (code === 'PLATFORM_MISMATCH') {
+          showWarning('This coupon is only valid on our website.');
+        } else {
+          showWarning(errMsg || 'This coupon is not valid');
+        }
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to apply coupon');
+      const code = error?.response?.data?.code || error?.code;
+      if (code === 'PLATFORM_MISMATCH') {
+        showWarning('This coupon is only valid on our website.');
+      } else {
+        showError(error.message || 'Failed to apply coupon');
+      }
     } finally {
       setCouponLoading(false);
     }
@@ -372,7 +383,7 @@ const CheckoutScreen: React.FC = () => {
 
   const handleApplyGiftCard = async () => {
     if (!giftCardCode.trim()) {
-      Alert.alert('Error', 'Please enter a gift card code');
+      showError('Please enter a gift card code');
       return;
     }
     
@@ -389,12 +400,12 @@ const CheckoutScreen: React.FC = () => {
           discount,
           balance: giftCard?.currentBalance || 0
         });
-        Alert.alert('Success', `Gift card applied! $${discount.toFixed(2)} will be deducted`);
+        showSuccess(`Gift card applied! $${discount.toFixed(2)} will be deducted`);
       } else {
-        Alert.alert('Invalid Gift Card', (response as any).error || 'This gift card is not valid');
+        showWarning((response as any).error || 'This gift card is not valid');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to apply gift card');
+      showError(error.message || 'Failed to apply gift card');
     } finally {
       setGiftCardLoading(false);
     }
@@ -429,13 +440,13 @@ const CheckoutScreen: React.FC = () => {
           });
           return;
         }
-        Alert.alert('Address Required', 'Please select or add a shipping address');
+        showWarning('Please select or add a shipping address');
         return;
       }
       setCurrentStep('shipping');
     } else if (currentStep === 'shipping') {
       if (!selectedShipping) {
-        Alert.alert('Shipping Required', 'Please select a shipping method');
+        showWarning('Please select a shipping method');
         return;
       }
       setCurrentStep('payment');
@@ -460,7 +471,7 @@ const CheckoutScreen: React.FC = () => {
     if (processing) return;
 
     if (!selectedAddress || !selectedShipping) {
-      Alert.alert('Error', 'Please complete all checkout steps');
+      showError('Please complete all checkout steps');
       return;
     }
     // Guest checkout supported
@@ -541,9 +552,8 @@ const CheckoutScreen: React.FC = () => {
       }
 
       if (outOfStockTitles.length > 0) {
-        Alert.alert(
-          'Out of stock',
-          `Please remove unavailable item(s) from cart:\n\n${outOfStockTitles.join('\n')}`
+        showError(
+          `Please remove unavailable item(s) from cart: ${outOfStockTitles.join(', ')}`
         );
         setProcessing(false);
         return;
@@ -577,7 +587,7 @@ const CheckoutScreen: React.FC = () => {
       if (isAuthenticated && !accessToken) {
         const refreshed = await authManager.refreshSession();
         if (!refreshed) {
-          Alert.alert('Session Expired', 'Please sign in again before placing your order.');
+          showError('Please sign in again before placing your order.');
           setProcessing(false);
           openAuth({ target: { screen: 'Checkout' } });
           return;
@@ -603,7 +613,7 @@ const CheckoutScreen: React.FC = () => {
       });
 
       if (!payloadResult.ok) {
-        Alert.alert('Checkout Info Needed', payloadResult.errors[0]?.message || 'Please review checkout details.');
+        showWarning(payloadResult.errors[0]?.message || 'Please review checkout details.');
         setProcessing(false);
         return;
       }
@@ -622,61 +632,52 @@ const CheckoutScreen: React.FC = () => {
       const orderResponse: ApiResponse<any> = await createCheckoutOrder(payloadResult.data.payload);
 
       if (orderResponse.success && orderResponse.data) {
-        const orderId = orderResponse.data._id || orderResponse.data.orderId;
-        if (isAuthenticated) {
-          // Real payment screen (can be sample too)
-          navigation.navigate('Payment', {
-            orderId,
-            amount: totals.total,
-            paymentMethod,
-            onSuccess: () => {
-              analyticsService.purchase(
-                orderId,
-                totals.total,
-                cartItems.map(item => ({
-                  id: typeof item.product === 'object' ? item.product?._id : '',
-                  name: typeof item.product === 'object' ? item.product?.name || 'Unknown' : 'Unknown',
-                  price: item.price,
-                  quantity: item.quantity,
-                }))
-              );
-              cartService
-                .clearCart()
-                .catch(() => {
-                  // Non-blocking: always clear local cart for UI consistency.
-                })
-                .finally(() => {
-                  dispatch(clearCart());
-                  navigation.navigate('OrderConfirmation', {
-                    orderId,
-                    total: totals.total,
-                  });
-                });
-            },
-          });
-        } else {
-          // Sample order: skip Stripe, go straight to confirmation
+        const orderRaw = orderResponse.data as RawOrder;
+        const orderId = getOrderId(orderRaw) || String(orderResponse.data._id || orderResponse.data.orderId || '');
+
+        const completeCheckoutSuccess = (paymentPending = false) => {
           analyticsService.purchase(
             orderId,
             totals.total,
-            cartItems.map(item => ({
+            cartItems.map((item) => ({
               id: typeof item.product === 'object' ? item.product?._id : '',
               name: typeof item.product === 'object' ? item.product?.name || 'Unknown' : 'Unknown',
               price: item.price,
               quantity: item.quantity,
             }))
           );
+          cartService.clearCart().catch(() => undefined);
           dispatch(clearCart());
-          navigation.navigate('OrderConfirmation', {
-            orderId,
-            total: totals.total,
+          navigation.reset({
+            index: 0,
+            routes: [
+              {
+                name: 'OrderConfirmation',
+                params: {
+                  orderId,
+                  total: totals.total,
+                  paymentPending,
+                  paymentAmount: totals.total,
+                  paymentMethod,
+                },
+              },
+            ],
           });
+        };
+
+        const requiresStripe =
+          isAuthenticated && needsOnlineStripePayment(orderRaw, paymentMethod);
+
+        if (requiresStripe) {
+          completeCheckoutSuccess(true);
+        } else {
+          completeCheckoutSuccess(false);
         }
       } else {
-        Alert.alert('Order Not Placed', toUserFriendlyOrderError((orderResponse as any).message || ''));
+        showError(toUserFriendlyOrderError((orderResponse as any).message || ''));
       }
     } catch (error: any) {
-      Alert.alert('Order Not Placed', toUserFriendlyOrderError(error.message || ''));
+      showError(toUserFriendlyOrderError(error.message || ''));
     } finally {
       setProcessing(false);
     }
@@ -907,21 +908,21 @@ const CheckoutScreen: React.FC = () => {
   const handleSaveCard = () => {
     const digits = cardForm.number.replace(/\D/g, '');
     if (digits.length < 13) {
-      Alert.alert('Invalid Card', 'Please enter a valid card number.');
+      showError('Please enter a valid card number.');
       return;
     }
     if (!cardForm.name.trim()) {
-      Alert.alert('Invalid Name', 'Please enter cardholder name.');
+      showError('Please enter cardholder name.');
       return;
     }
     const month = Number(cardForm.expMonth);
     const year = Number(cardForm.expYear);
     if (!month || month < 1 || month > 12 || !year || cardForm.expYear.length !== 2) {
-      Alert.alert('Invalid Expiry', 'Enter expiry as MM / YY.');
+      showError('Enter expiry as MM / YY.');
       return;
     }
     if (cardForm.cvc.replace(/\D/g, '').length < 3) {
-      Alert.alert('Invalid CVC', 'Please enter a valid CVC.');
+      showError('Please enter a valid CVC.');
       return;
     }
 
@@ -937,7 +938,7 @@ const CheckoutScreen: React.FC = () => {
     setSelectedPaymentId(newCard.id);
     setShowCardForm(false);
     resetCardForm();
-    Alert.alert('Card Added', 'Your test card has been saved for this checkout.');
+    showSuccess('Your test card has been saved for this checkout.');
   };
 
   const renderPaymentStep = () => (

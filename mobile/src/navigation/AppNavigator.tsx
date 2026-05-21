@@ -20,9 +20,16 @@ import SelectLocationScreen from '../screens/Address/SelectLocationScreen';
 import HelpSupportScreen from '../screens/Support/HelpSupportScreen';
 import ReturnPolicyScreen from '../screens/Support/ReturnPolicyScreen';
 import SafePaymentsPrivacyScreen from '../screens/Support/SafePaymentsPrivacyScreen';
-import AboutScreen from '../screens/About/AboutScreen';
-import NotificationsScreen from '../screens/Settings/NotificationsScreen';
+import SettingsAboutScreen from '../screens/Settings/AboutScreen';
+import NotificationPreferencesScreen from '../screens/Settings/NotificationPreferencesScreen';
+import SettingsScreen from '../screens/Settings/SettingsScreen';
+import EditProfileScreen from '../screens/Settings/EditProfileScreen';
+import ChangePasswordScreen from '../screens/Settings/ChangePasswordScreen';
+import PrivacySettingsScreen from '../screens/Settings/PrivacySettingsScreen';
 import OrderDetailScreen from '../screens/Orders/OrderDetailScreen';
+import ProductListScreen from '../screens/Products/ProductListScreen';
+import CategoriesScreen from '../screens/Categories/CategoriesScreen';
+import type { ProductListParams } from '../constants/routes';
 
 export type MainTabParamList = {
   Home: undefined;
@@ -47,11 +54,27 @@ export type MainStackParamList = {
   ReturnPolicy: undefined;
   SafePaymentsPrivacy: undefined;
   About: undefined;
+  SettingsAbout: undefined;
   Notifications: undefined;
+  NotificationPreferences: undefined;
+  Settings: undefined;
+  EditProfile: undefined;
+  ChangePassword: undefined;
+  PrivacySettings: undefined;
+  ProductList: ProductListParams;
+  Categories: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const MainStack = createNativeStackNavigator<MainStackParamList>();
+
+const stackHeaderOptions = {
+  headerStyle: { backgroundColor: '#f5f0eb' },
+  headerTintColor: '#1a2332',
+  headerTitleStyle: { fontWeight: '700' as const, color: '#1a2332' },
+  headerShadowVisible: false,
+  headerBackTitleVisible: false,
+};
 
 // Tab Navigator
 const TabNavigator = () => {
@@ -157,19 +180,16 @@ const TabNavigator = () => {
 // Main Navigator (Tabs + Product Detail + Checkout)
 const AppNavigator = () => {
   return (
-    <MainStack.Navigator>
+    <MainStack.Navigator screenOptions={stackHeaderOptions}>
       <MainStack.Screen
         name="MainTabs"
         component={TabNavigator}
-        options={{ headerShown: false }}
+        options={{ headerShown: false, title: 'Home' }}
       />
       <MainStack.Screen
         name="ProductDetail"
         component={ProductDetailScreen}
-        options={{ 
-          headerShown: false,
-          title: '',
-        }}
+        options={{ headerShown: false, title: 'Product' }}
       />
       <MainStack.Screen
         name="Brands"
@@ -179,62 +199,112 @@ const AppNavigator = () => {
       <MainStack.Screen
         name="Cart"
         component={CartScreen}
-        options={{ title: 'Shopping Cart', headerShown: false }}
+        options={{ title: 'Cart', headerShown: false, headerBackTitle: 'Home' }}
       />
       <MainStack.Screen
         name="Checkout"
         component={CheckoutScreen}
-        options={{ headerShown: false }}
+        options={{ headerShown: false, title: 'Checkout', headerBackTitle: 'Cart' }}
       />
       <MainStack.Screen
         name="Payment"
         component={PaymentScreen}
-        options={{ headerShown: false }}
+        options={{ headerShown: false, title: 'Payment', headerBackTitle: 'Checkout' }}
       />
       <MainStack.Screen
         name="OrderConfirmation"
         component={OrderConfirmationScreen}
-        options={{ headerShown: false }}
+        options={{ headerShown: false, title: 'Confirmation', headerBackTitle: 'Home' }}
       />
       <MainStack.Screen
         name="AddAddress"
         component={AddAddressScreen}
-        options={{ headerShown: false }}
+        options={{ headerShown: false, title: 'Address', headerBackTitle: 'Account' }}
       />
       <MainStack.Screen
         name="SelectLocation"
         component={SelectLocationScreen}
-        options={{ headerShown: false }}
+        options={{ headerShown: false, title: 'Location', headerBackTitle: 'Checkout' }}
       />
       <MainStack.Screen
         name="HelpSupport"
         component={HelpSupportScreen}
-        options={{ headerShown: false }}
+        options={{ headerShown: false, title: 'Help', headerBackTitle: 'Account' }}
       />
       <MainStack.Screen
         name="ReturnPolicy"
         component={ReturnPolicyScreen}
-        options={{ headerShown: false }}
+        options={{ headerShown: false, title: 'Returns', headerBackTitle: 'Account' }}
       />
       <MainStack.Screen
         name="SafePaymentsPrivacy"
         component={SafePaymentsPrivacyScreen}
-        options={{ headerShown: false }}
+        options={{ headerShown: false, title: 'Privacy', headerBackTitle: 'Account' }}
       />
       <MainStack.Screen
         name="About"
-        component={AboutScreen}
-        options={{ headerShown: false }}
+        component={SettingsAboutScreen}
+        options={{ headerShown: false, title: 'About', headerBackTitle: 'Account' }}
+      />
+      <MainStack.Screen
+        name="SettingsAbout"
+        component={SettingsAboutScreen}
+        options={{ headerShown: false, title: 'About', headerBackTitle: 'Settings' }}
       />
       <MainStack.Screen
         name="Notifications"
-        component={NotificationsScreen}
-        options={{ headerShown: false }}
+        component={NotificationPreferencesScreen}
+        options={{ headerShown: false, title: 'Notifications', headerBackTitle: 'Account' }}
+      />
+      <MainStack.Screen
+        name="NotificationPreferences"
+        component={NotificationPreferencesScreen}
+        options={{ headerShown: false, title: 'Notifications', headerBackTitle: 'Settings' }}
+      />
+      <MainStack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ headerShown: false, title: 'Settings', headerBackTitle: 'Account' }}
+      />
+      <MainStack.Screen
+        name="EditProfile"
+        component={EditProfileScreen}
+        options={{ headerShown: false, title: 'Edit Profile', headerBackTitle: 'Settings' }}
+      />
+      <MainStack.Screen
+        name="ChangePassword"
+        component={ChangePasswordScreen}
+        options={{ headerShown: false, title: 'Change Password', headerBackTitle: 'Settings' }}
+      />
+      <MainStack.Screen
+        name="PrivacySettings"
+        component={PrivacySettingsScreen}
+        options={{ headerShown: false, title: 'Privacy', headerBackTitle: 'Settings' }}
+      />
+      <MainStack.Screen
+        name="ProductList"
+        component={ProductListScreen}
+        options={{
+          title: 'Products',
+          headerShown: true,
+          headerBackTitle: 'Home',
+          headerBackTitleVisible: true,
+        }}
+      />
+      <MainStack.Screen
+        name="Categories"
+        component={CategoriesScreen}
+        options={{ headerShown: false, title: 'Categories', headerBackTitle: 'Home' }}
       />
       <MainStack.Screen
         name="OrderDetail"
         component={OrderDetailScreen}
-        options={{ title: 'Order details', headerShown: true }}
+        options={{
+          title: 'Order Details',
+          headerShown: true,
+          headerBackTitle: 'Orders',
+          headerBackTitleVisible: true,
+        }}
       />
     </MainStack.Navigator>
   );

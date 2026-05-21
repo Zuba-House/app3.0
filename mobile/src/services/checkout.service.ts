@@ -167,7 +167,10 @@ export const checkoutService = {
    * Validate coupon code
    */
   validateCoupon: async (couponCode: string): Promise<ApiResponse<CouponValidation>> => {
-    const response = await postData<CouponValidation>(API_ENDPOINTS.VALIDATE_COUPON, { code: couponCode });
+    const response = await postData<CouponValidation>(API_ENDPOINTS.VALIDATE_COUPON, {
+      code: couponCode,
+      platform: 'mobile',
+    });
     return response;
   },
 
@@ -178,7 +181,8 @@ export const checkoutService = {
     const response = await postData<{ discount: number; type: string; freeShipping?: boolean }>(API_ENDPOINTS.APPLY_COUPON, { 
       code: couponCode,
       cartItems,
-      cartTotal
+      cartTotal,
+      platform: 'mobile',
     });
     return response;
   },

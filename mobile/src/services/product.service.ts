@@ -8,6 +8,32 @@ import { API_ENDPOINTS, PAGINATION } from '../constants/config';
 import { Product, ProductFilters, Category } from '../types/product.types';
 import { ApiResponse, PaginatedResponse } from '../types/api.types';
 
+function isProductVisibleOnMobile(product: Product): boolean {
+  const p = product as Product & { appExclusive?: boolean; channels?: string[] };
+  if (p.appExclusive) return true;
+  const channels = p.channels;
+  if (!channels || channels.length === 0) return true;
+  return channels.includes('mobile');
+}
+
+function filterProductsForMobilePlatform<T extends ApiResponse<Product[]> | PaginatedResponse<Product>>(
+  response: T
+): T {
+  if ('success' in response && response.success === false) return response;
+  const data = response.data;
+  if (Array.isArray(data)) {
+    return { ...response, data: data.filter(isProductVisibleOnMobile) };
+  }
+  if (data && typeof data === 'object' && Array.isArray((data as { products?: Product[] }).products)) {
+    const inner = data as { products: Product[] };
+    return {
+      ...response,
+      data: { ...inner, products: inner.products.filter(isProductVisibleOnMobile) },
+    } as T;
+  }
+  return response;
+}
+
 export const productService = {
   /**
    * Get all products with filters
@@ -18,6 +44,7 @@ export const productService = {
     const params = {
       page: filters?.page || 1,
       limit: filters?.limit || PAGINATION.DEFAULT_PAGE_SIZE,
+      platform: 'mobile',
       ...(filters?.category && { category: filters.category }),
       ...(filters?.minPrice && { minPrice: filters.minPrice }),
       ...(filters?.maxPrice && { maxPrice: filters.maxPrice }),
@@ -30,7 +57,7 @@ export const productService = {
       params
     );
 
-    return response;
+    return filterProductsForMobilePlatform(response);
   },
 
   /**

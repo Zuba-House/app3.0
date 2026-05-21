@@ -1,18 +1,36 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Text, StyleSheet, View } from 'react-native';
 import { Button, TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../../constants/colors';
 import { useRegister } from './hooks/useRegister';
+import { useGoogleSignIn } from './hooks/useGoogleSignIn';
+import GoogleSignInButton from './components/GoogleSignInButton';
 
 const RegisterScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const { submit, submitting, error } = useRegister();
+  const onAuthSuccess = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Login');
+    }
+  };
+  const {
+    signInWithGoogle,
+    error: googleError,
+    submitting: googleSubmitting,
+    disabled: googleDisabled,
+  } = useGoogleSignIn(onAuthSuccess);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const primaryError = error;
+  const primaryError = error || googleError;
+  const isBusy = submitting || googleSubmitting;
 
   const onSubmit = async () => {
     const ok = await submit({ name, email, password });
@@ -29,13 +47,13 @@ const RegisterScreen: React.FC = () => {
       <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.formCard}>
-            <Text style={styles.title}>Create account</Text>
-            <Text style={styles.subtitle}>Sign up in seconds and keep your shopping session in sync.</Text>
+            <Text style={styles.title}>{t('auth.signUp')}</Text>
+            <Text style={styles.subtitle}>{t('auth.signUpSubtitle')}</Text>
             {primaryError ? <Text style={styles.error}>{primaryError}</Text> : null}
-            <TextInput label="Name" mode="outlined" value={name} onChangeText={setName} />
-            <TextInput label="Email" mode="outlined" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+            <TextInput label={t('auth.name')} mode="outlined" value={name} onChangeText={setName} />
+            <TextInput label={t('auth.email')} mode="outlined" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
             <TextInput
-              label="Password"
+              label={t('auth.password')}
               mode="outlined"
               value={password}
               onChangeText={setPassword}
@@ -43,11 +61,25 @@ const RegisterScreen: React.FC = () => {
               style={styles.input}
               right={<TextInput.Icon icon={showPassword ? 'eye-off' : 'eye'} onPress={() => setShowPassword((prev) => !prev)} />}
             />
-            <Button mode="contained" onPress={onSubmit} loading={submitting} style={styles.primaryBtn} contentStyle={styles.primaryBtnContent} labelStyle={styles.primaryBtnLabel}>
-              Continue
+            <Button
+              mode="contained"
+              onPress={onSubmit}
+              loading={submitting}
+              disabled={isBusy}
+              style={styles.primaryBtn}
+              contentStyle={styles.primaryBtnContent}
+              labelStyle={styles.primaryBtnLabel}
+            >
+              {t('common.continue')}
             </Button>
+            <Text style={styles.orDivider}>{t('auth.orContinueWith')}</Text>
+            <GoogleSignInButton
+              onPress={() => void signInWithGoogle()}
+              loading={googleSubmitting}
+              disabled={googleDisabled || isBusy}
+            />
             <Button mode="text" onPress={() => navigation.navigate('Login')} style={styles.link} labelStyle={styles.linkLabel}>
-              Already have an account
+              {t('auth.alreadyHaveAccount')}
             </Button>
           </View>
         </ScrollView>
@@ -75,6 +107,7 @@ const styles = StyleSheet.create({
   primaryBtn: { marginTop: 2, borderRadius: 14 },
   primaryBtnContent: { minHeight: 52 },
   primaryBtnLabel: { color: '#FFFFFF', fontWeight: '700' },
+  orDivider: { textAlign: 'center', color: '#6B7C89', fontSize: 13, marginVertical: 4 },
   link: { marginTop: 8, alignSelf: 'center' },
   linkLabel: { color: Colors.primary, fontWeight: '600' },
 });

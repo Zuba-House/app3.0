@@ -17,13 +17,13 @@ const ForgotPassword = () => {
         </Link>
 
         <div className="flex items-center gap-0">
-          <NavLink to="/login" exact={true} activeClassName="isActive">
+          <NavLink to="/login" end className={({ isActive }) => (isActive ? "isActive" : undefined)}>
             <Button className="!rounded-full !text-[rgba(0,0,0,0.8)] !px-5 flex gap-1">
               <CgLogIn className="text-[18px]" /> Login
             </Button>
           </NavLink>
 
-          <NavLink to="/sign-up" exact={true} activeClassName="isActive">
+          <NavLink to="/sign-up" end className={({ isActive }) => (isActive ? "isActive" : undefined)}>
             <Button className="!rounded-full !text-[rgba(0,0,0,0.8)] !px-5 flex gap-1">
               <FaRegUser className="text-[15px]" /> Sign Up
             </Button>

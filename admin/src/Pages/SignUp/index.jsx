@@ -17,11 +17,9 @@ import { useNavigate } from "react-router-dom";
 import { fetchDataFromApi, postData } from '../../utils/api.js';
 import { useContext } from "react";
 import { MyContext } from "../../App.jsx";
-import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { firebaseApp } from "../../firebase";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { getFirebaseAuth, isFirebaseConfigured } from "../../firebase";
 import { useEffect } from "react";
-const auth = getAuth(firebaseApp);
-const googleProvider = new GoogleAuthProvider();
 
 const SignUp = () => {
     const [loadingGoogle, setLoadingGoogle] = React.useState(false);
@@ -107,8 +105,19 @@ const SignUp = () => {
     }
 
 
-    const authWithGoogle = () => {
+    const authWithGoogle = async () => {
+        if (!isFirebaseConfigured) {
+            context.alertBox("error", "Google sign-in is not configured. Use email sign-up or add Firebase keys to admin/.env");
+            return;
+        }
 
+        const auth = await getFirebaseAuth();
+        if (!auth) {
+            context.alertBox("error", "Google sign-in is unavailable right now.");
+            return;
+        }
+
+        const googleProvider = new GoogleAuthProvider();
         setLoadingGoogle(true);
 
         signInWithPopup(auth, googleProvider)
@@ -177,13 +186,13 @@ const SignUp = () => {
                 </Link>
 
                 <div className="hidden sm:flex items-center gap-0">
-                    <NavLink to="/login" exact={true} activeClassName="isActive">
+                    <NavLink to="/login" end className={({ isActive }) => (isActive ? "isActive" : undefined)}>
                         <Button className="!rounded-full !text-[rgba(0,0,0,0.8)] !px-5 flex gap-1">
                             <CgLogIn className="text-[18px]" /> Login
                         </Button>
                     </NavLink>
 
-                    <NavLink to="/sign-up" exact={true} activeClassName="isActive">
+                    <NavLink to="/sign-up" end className={({ isActive }) => (isActive ? "isActive" : undefined)}>
                         <Button className="!rounded-full !text-[rgba(0,0,0,0.8)] !px-5 flex gap-1">
                             <FaRegUser className="text-[15px]" /> Sign Up
                         </Button>

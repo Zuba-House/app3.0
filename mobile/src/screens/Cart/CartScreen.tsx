@@ -4,6 +4,8 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useCurrency } from '../../context/CurrencyContext';
 import {
   View,
   Text,
@@ -26,7 +28,7 @@ import { selectCartItems, selectCartTotal, setCart, updateQuantity, removeItem }
 import { CartItem } from '../../types/cart.types';
 import Colors from '../../constants/colors';
 import { FREE_SHIPPING_THRESHOLD, API_URL } from '../../constants/config';
-import { showError } from '../../utils/toast';
+import { showError, showWarning } from '../../utils/toast';
 import { STORAGE_KEYS } from '../../constants/config';
 import { store } from '../../store/store';
 import { useAuthState } from '../../core/auth/authGuards';
@@ -35,6 +37,8 @@ import { useAuthGate } from '../../core/auth/authGate';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const CartScreen: React.FC = () => {
+  const { t } = useTranslation();
+  const { formatPrice } = useCurrency();
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
   const { authStatus } = useAuthState();
@@ -118,7 +122,7 @@ const CartScreen: React.FC = () => {
         .then((response) => {
           if (response.success) loadCart();
         })
-        .catch(() => Alert.alert('Error', 'Failed to update quantity'));
+        .catch(() => showError('Failed to update quantity'));
     } else {
       dispatch(updateQuantity({ itemId, quantity: newQuantity }));
     }
@@ -136,7 +140,7 @@ const CartScreen: React.FC = () => {
               .then((response) => {
                 if (response.success) loadCart();
               })
-              .catch(() => Alert.alert('Error', 'Failed to remove item'));
+              .catch(() => showError('Failed to remove item'));
           } else {
             dispatch(removeItem(itemId));
           }
@@ -147,7 +151,7 @@ const CartScreen: React.FC = () => {
 
   const handleCheckout = () => {
     if (cartItems.length === 0) {
-      Alert.alert('Empty Cart', 'Your cart is empty');
+      showWarning('Your cart is empty');
       return;
     }
     if (!isAuthenticated) {
@@ -202,12 +206,12 @@ const CartScreen: React.FC = () => {
           </Text>
           
           <View style={styles.itemPriceRow}>
-            <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
-            {(product as any)?.salePrice && (
+            <Text style={styles.itemPrice}>{formatPrice(item.price)}</Text>
+            {(product as any)?.salePrice && (product as any)?.originalPrice ? (
               <Text style={styles.itemOriginalPrice}>
-                ${(product as any).originalPrice?.toFixed(2)}
+                {formatPrice(Number((product as any).originalPrice))}
               </Text>
-            )}
+            ) : null}
           </View>
 
           <View style={styles.quantityRow}>
@@ -227,7 +231,7 @@ const CartScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             
-            <Text style={styles.subtotal}>${item.subtotal.toFixed(2)}</Text>
+            <Text style={styles.subtotal}>{formatPrice(item.subtotal)}</Text>
           </View>
         </View>
 
@@ -259,16 +263,14 @@ const CartScreen: React.FC = () => {
         <View style={styles.emptyIconContainer}>
           <Ionicons name="cart-outline" size={80} color={Colors.secondary} />
         </View>
-        <Text style={styles.emptyTitle}>Your cart is empty</Text>
-        <Text style={styles.emptySubtitle}>
-          Discover amazing products and start shopping
-        </Text>
+        <Text style={styles.emptyTitle}>{t('cart.empty')}</Text>
+        <Text style={styles.emptySubtitle}>{t('cart.startShopping')}</Text>
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
         >
           <Ionicons name="home" size={20} color={Colors.white} />
-          <Text style={styles.primaryButtonText}>Start Shopping</Text>
+          <Text style={styles.primaryButtonText}>{t('cart.startShopping')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -281,7 +283,7 @@ const CartScreen: React.FC = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={Colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Shopping Cart</Text>
+        <Text style={styles.headerTitle}>{t('cart.title')}</Text>
         <Text style={styles.itemCount}>{cartItems.length} items</Text>
       </View>
 
@@ -317,14 +319,14 @@ const CartScreen: React.FC = () => {
         <View style={styles.totalContainer}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Subtotal ({cartItems.length} items)</Text>
-            <Text style={styles.totalAmount}>${total.toFixed(2)}</Text>
+            <Text style={styles.totalAmount}>{formatPrice(total)}</Text>
           </View>
           <Text style={styles.taxNote}>Shipping calculated at checkout</Text>
         </View>
         
         <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>
           <Ionicons name="lock-closed" size={18} color={Colors.white} />
-          <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
+          <Text style={styles.checkoutButtonText}>{t('cart.checkout')}</Text>
           <Ionicons name="arrow-forward" size={18} color={Colors.white} />
         </TouchableOpacity>
       </View>

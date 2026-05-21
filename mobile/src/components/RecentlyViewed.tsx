@@ -4,6 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useCurrency } from '../context/CurrencyContext';
 import {
   View,
   Text,
@@ -11,12 +13,14 @@ import {
   TouchableOpacity,
   FlatList,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../constants/colors';
+import { navigateToProductDetail } from '../navigation/navigationHelpers';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_SIZE = 80;
@@ -34,6 +38,8 @@ interface RecentlyViewedProps {
 }
 
 const RecentlyViewed: React.FC<RecentlyViewedProps> = ({ maxItems = 10 }) => {
+  const { t } = useTranslation();
+  const { formatPrice } = useCurrency();
   const navigation = useNavigation<any>();
   const [recentProducts, setRecentProducts] = useState<RecentProduct[]>([]);
 
@@ -58,16 +64,25 @@ const RecentlyViewed: React.FC<RecentlyViewedProps> = ({ maxItems = 10 }) => {
   };
 
   const handlePress = (productId: string) => {
-    navigation.navigate('ProductDetail', { productId });
+    navigateToProductDetail(navigation, productId);
   };
 
-  const handleClearAll = async () => {
-    try {
-      await AsyncStorage.removeItem('recentlyViewed');
-      setRecentProducts([]);
-    } catch (error) {
-      console.error('Error clearing recent products:', error);
-    }
+  const handleClearAll = () => {
+    Alert.alert('Clear History', 'Remove all recently viewed items?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await AsyncStorage.removeItem('recentlyViewed');
+            setRecentProducts([]);
+          } catch (error) {
+            console.error('Error clearing recent products:', error);
+          }
+        },
+      },
+    ]);
   };
 
   if (recentProducts.length === 0) return null;
@@ -78,10 +93,10 @@ const RecentlyViewed: React.FC<RecentlyViewedProps> = ({ maxItems = 10 }) => {
       <View style={styles.header}>
         <View style={styles.titleContainer}>
           <Ionicons name="time-outline" size={20} color={Colors.primary} />
-          <Text style={styles.title}>Recently Viewed</Text>
+          <Text style={styles.title}>{t('home.recentlyViewed')}</Text>
         </View>
         <TouchableOpacity onPress={handleClearAll}>
-          <Text style={styles.clearText}>Clear All</Text>
+          <Text style={styles.clearText}>{t('home.clearAll')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -106,7 +121,7 @@ const RecentlyViewed: React.FC<RecentlyViewedProps> = ({ maxItems = 10 }) => {
                 <Ionicons name="cube-outline" size={24} color={Colors.primary} />
               </View>
             )}
-            <Text style={styles.productPrice}>${item.price.toFixed(0)}</Text>
+            <Text style={styles.productPrice}>{formatPrice(item.price)}</Text>
           </TouchableOpacity>
         )}
         keyExtractor={(item) => `recent-${item._id}`}

@@ -1,7 +1,7 @@
 import "./App.css";
 import "./responsive.css";
 import React from 'react';
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Navigate, useParams } from "react-router-dom";
 import Dashboard from "./Pages/Dashboard";
 import Header from "./Components/Header";
 import Sidebar from "./Components/Sidebar";
@@ -33,20 +33,28 @@ import BannerV1List from "./Pages/Banners/bannerV1List";
 import { BannerList2 } from "./Pages/Banners/bannerList2";
 import ResponsiveBannerManager from "./Pages/Banners/ResponsiveBannerManager";
 import { BlogList } from "./Pages/Blog";
-import ManageLogo from "./Pages/ManageLogo";
 import LoadingBar from "react-top-loading-bar";
 import NotFound from "./Pages/NotFound";
-import Analytics from "./Pages/Analytics";
 
 // Promotions
 import CouponsList from "./Pages/Coupons";
 import AddCoupon from "./Pages/Coupons/addCoupon";
 import EditCoupon from "./Pages/Coupons/editCoupon";
-import GiftCardsList from "./Pages/GiftCards";
+import AppGiftCards from "./Pages/AppGiftCards";
 import AddGiftCard from "./Pages/GiftCards/addGiftCard";
 import EditGiftCard from "./Pages/GiftCards/editGiftCard";
 
-import { useParams } from 'react-router-dom';
+const GiftCardEditRedirect = () => {
+  const { id } = useParams();
+  return <Navigate to={`/app-gift-cards/edit/${id}`} replace />;
+};
+
+import { buildAdminRoute } from "./utils/buildAdminRoute";
+import Unauthorized from "./Pages/Unauthorized";
+import Notifications from "./Pages/Notifications";
+import AppActivity from "./Pages/AppActivity";
+import AppAnalytics from "./Pages/AppAnalytics";
+import AppPromotions from "./Pages/AppPromotions";
 
 const MyContext = createContext();
 
@@ -100,28 +108,7 @@ function App() {
     {
       path: "/",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <Dashboard />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(Dashboard),
     },
     {
       path: "/login",
@@ -171,605 +158,153 @@ function App() {
     {
       path: "/products",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <Products />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(Products),
     },
     {
       path: "/add-product-enhanced",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <AddProductEnhanced />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(AddProductEnhanced, { contentClass: '' }),
     },
     {
       path: "/homeSlider/list",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '82%' }}
-              >
-                <HomeSliderBanners />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(HomeSliderBanners, { contentWidth: '82%' }),
     },
     {
       path: "/category/list",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <CategoryList />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(CategoryList),
     },
     {
       path: "/subCategory/list",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <SubCategoryList />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(SubCategoryList),
     },
     {
       path: "/users",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <Users />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(Users),
     },
     {
       path: "/vendors",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <Vendors />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(Vendors),
     },
     {
       path: "/vendor-products",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <VendorProducts />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(VendorProducts),
     },
     {
       path: "/orders",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <Orders />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(Orders),
     },
     // Coupons Routes
     {
       path: "/coupons",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <CouponsList />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(CouponsList),
     },
     {
       path: "/coupons/add",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <AddCoupon />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(AddCoupon),
     },
     {
       path: "/coupons/edit/:id",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <EditCoupon />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(EditCoupon),
     },
-    // Gift Cards Routes
+    // App gift cards (primary)
+    {
+      path: "/app-gift-cards",
+      exact: true,
+      element: buildAdminRoute(AppGiftCards),
+    },
+    {
+      path: "/app-gift-cards/add",
+      exact: true,
+      element: buildAdminRoute(AddGiftCard),
+    },
+    {
+      path: "/app-gift-cards/edit/:id",
+      exact: true,
+      element: buildAdminRoute(EditGiftCard),
+    },
+    // Legacy URLs → app gift cards
     {
       path: "/gift-cards",
-      exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <GiftCardsList />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: <Navigate to="/app-gift-cards" replace />,
     },
     {
       path: "/gift-cards/add",
-      exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <AddGiftCard />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: <Navigate to="/app-gift-cards/add" replace />,
     },
     {
       path: "/gift-cards/edit/:id",
-      exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <EditGiftCard />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: <GiftCardEditRedirect />,
     },
     {
       path: "/profile",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <Profile />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(Profile),
     },
     {
       path: "/product/:id",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <ProductDetails />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(ProductDetails),
     },
     {
       path: "/product/:id/variations",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <VariationsManagerWrapper />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(VariationsManagerWrapper),
     },
 
     {
       path: "/bannerV1/list",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <BannerV1List />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(BannerV1List),
     },
     {
       path: "/bannerlist2/List",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <BannerList2 />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(BannerList2),
     },
     {
       path: "/banners/responsive",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <ResponsiveBannerManager />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(ResponsiveBannerManager),
     },
     {
       path: "/blog/List",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <BlogList />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(BlogList),
     },
     {
-      path: "/logo/manage",
+      path: "/notifications",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <ManageLogo />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(Notifications),
     },
     {
-      path: "/analytics",
+      path: "/app-activity",
       exact: true,
-      element: (
-        <>
-          <section className="main">
-            <Header />
-            <div className="contentMain flex">
-              <div
-                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
-                  } transition-all`}
-              >
-                <Sidebar />
-              </div>
-              <div
-                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
-                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
-              >
-                <Analytics />
-              </div>
-            </div>
-          </section>
-        </>
-      ),
+      element: buildAdminRoute(AppActivity),
+    },
+    {
+      path: "/app-analytics",
+      exact: true,
+      element: buildAdminRoute(AppAnalytics),
+    },
+    {
+      path: "/app-promotions",
+      exact: true,
+      element: buildAdminRoute(AppPromotions),
+    },
+    {
+      path: "/unauthorized",
+      exact: true,
+      element: <Unauthorized />,
     },
   ]);
 

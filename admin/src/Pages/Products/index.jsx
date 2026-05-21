@@ -553,6 +553,11 @@ export const Products = () => {
                                                             </Link>
                                                         </h3>
                                                         <span className="text-[12px]">{product?.brand}</span>
+                                                        {product?.appExclusive || (product?.channels?.length === 1 && product?.channels[0] === 'mobile') ? (
+                                                          <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-semibold">📱 App only</span>
+                                                        ) : product?.channels?.length === 1 && product?.channels[0] === 'web' ? (
+                                                          <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-semibold">🌐 Web only</span>
+                                                        ) : null}
                                                     </div>
                                                 </div>
                                             </TableCell>
@@ -652,7 +657,7 @@ export const Products = () => {
 
                                     <>
                                         <TableRow>
-                                            <TableCell colspan={8}>
+                                            <TableCell colSpan={8}>
                                                 <div className="flex items-center justify-center w-full min-h-[400px]">
                                                     <CircularProgress color="inherit" />
                                                 </div>
@@ -670,7 +675,7 @@ export const Products = () => {
                 <TablePagination
                     rowsPerPageOptions={[50, 100, 150, 200]}
                     component="div"
-                    count={productData?.totalPages * rowsPerPage}
+                    count={Number(productData?.totalProducts ?? productData?.total ?? (productData?.totalPages * rowsPerPage) ?? 0) || 0}
                     rowsPerPage={rowsPerPage}
                     page={page}
                     onPageChange={handleChangePage}

@@ -16,10 +16,17 @@ import { MyContext } from '../../App';
 import { fetchDataFromApi, deleteData, postData } from '../../utils/api';
 import CircularProgress from '@mui/material/CircularProgress';
 import { formatCurrency } from '../../utils/currency';
+import { Chip } from '@mui/material';
+import {
+    giftCardHasMobile,
+    giftCardIsAppExclusive,
+    giftCardPlatformLabel,
+} from '../../utils/giftCardChannels';
 
-const columns = [
+const baseColumns = [
     { id: "code", label: "CODE", minWidth: 150 },
     { id: "balance", label: "BALANCE", minWidth: 100 },
+    { id: "platform", label: "PLATFORM", minWidth: 100 },
     { id: "recipient", label: "RECIPIENT", minWidth: 150 },
     { id: "status", label: "STATUS", minWidth: 100 },
     { id: "expiry", label: "EXPIRY", minWidth: 120 },
@@ -27,7 +34,8 @@ const columns = [
     { id: "action", label: "ACTION", minWidth: 150 },
 ];
 
-export const GiftCards = () => {
+export const GiftCards = ({ appOnly = false }) => {
+    const listPath = appOnly ? '/app-gift-cards' : '/gift-cards';
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(50);
     const [giftCardData, setGiftCardData] = useState([]);
@@ -43,12 +51,11 @@ export const GiftCards = () => {
     const getGiftCards = async () => {
         setIsLoading(true);
         try {
-            const res = await fetchDataFromApi('/api/gift-cards/all');
+            const res = await fetchDataFromApi('/api/gift-cards/all', { silent: false });
             if (res?.success && res?.giftCards) {
                 setGiftCardData(res.giftCards);
             }
         } catch (error) {
-            console.error('Error fetching gift cards:', error);
             context?.alertBox("error", "Failed to load gift cards");
         } finally {
             setIsLoading(false);
@@ -95,12 +102,21 @@ export const GiftCards = () => {
         }
     };
 
-    const filteredGiftCards = giftCardData.filter((card) =>
-        searchQuery === "" ||
-        card.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        card.recipientEmail?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        card.recipientName?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredGiftCards = giftCardData.filter((card) => {
+        if (appOnly && !giftCardHasMobile(card)) return false;
+        if (searchQuery === "") return true;
+        const q = searchQuery.toLowerCase();
+        return (
+            card.code?.toLowerCase().includes(q) ||
+            card.recipientEmail?.toLowerCase().includes(q) ||
+            card.recipientName?.toLowerCase().includes(q)
+        );
+    });
+
+    const appStats = {
+        total: filteredGiftCards.length,
+        exclusive: filteredGiftCards.filter(giftCardIsAppExclusive).length,
+    };
 
     const formatDate = (date) => {
         if (!date) return 'No expiry';
@@ -118,12 +134,21 @@ export const GiftCards = () => {
 
     return (
         <div className="w-full">
-            <div className="flex items-center justify-between mb-5">
-                <h2 className="text-[24px] font-[700]">Gift Cards</h2>
-                <Link to="/gift-cards/add">
-                    <Button className="btn-org !capitalize flex gap-2 items-center">
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                    <h2 className="text-xl sm:text-2xl font-bold">
+                        {appOnly ? 'App-Only Gift Cards' : 'Gift Cards'}
+                    </h2>
+                    {appOnly && (
+                        <p className="text-sm text-gray-500 mt-1">
+                            Redeemable in the mobile app · Active: {appStats.total} · App exclusive: {appStats.exclusive}
+                        </p>
+                    )}
+                </div>
+                <Link to={`${listPath}/add`}>
+                    <Button className="btn-org !capitalize flex gap-2 items-center" size="small">
                         <IoMdAdd className="text-[20px]" />
-                        Add Gift Card
+                        {appOnly ? 'Create App Gift Card' : 'Add Gift Card'}
                     </Button>
                 </Link>
             </div>
@@ -146,7 +171,7 @@ export const GiftCards = () => {
                         <Table>
                             <TableHead>
                                 <TableRow>
-                                    {columns.map((column) => (
+                                    {baseColumns.map((column) => (
                                         <TableCell
                                             key={column.id}
                                             style={{ minWidth: column.minWidth }}
@@ -178,6 +203,13 @@ export const GiftCards = () => {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
+                                                    <Chip
+                                                        size="small"
+                                                        label={giftCardPlatformLabel(card)}
+                                                        color={giftCardIsAppExclusive(card) ? 'secondary' : 'default'}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
                                                     <div className="text-[12px]">
                                                         {card.recipientName && <div>{card.recipientName}</div>}
                                                         {card.recipientEmail && <div className="text-gray-500">{card.recipientEmail}</div>}
@@ -195,7 +227,7 @@ export const GiftCards = () => {
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex items-center gap-2">
-                                                        <Link to={`/gift-cards/edit/${card._id}`}>
+                                                        <Link to={`${listPath}/edit/${card._id}`}>
                                                             <Button className="!min-w-0 !p-2">
                                                                 <AiOutlineEdit className="text-[18px] text-blue-600" />
                                                             </Button>
@@ -225,7 +257,9 @@ export const GiftCards = () => {
 
                 {filteredGiftCards.length === 0 && !isLoading && (
                     <div className="text-center py-10 text-gray-500">
-                        No gift cards found
+                        {appOnly
+                            ? 'No app gift cards yet. Create one with Mobile channel enabled.'
+                            : 'No gift cards found'}
                     </div>
                 )}
 
@@ -239,6 +273,7 @@ export const GiftCards = () => {
                         setRowsPerPage(parseInt(e.target.value, 10));
                         setPage(0);
                     }}
+                    rowsPerPageOptions={[10, 25, 50, 100]}
                 />
             </div>
         </div>

@@ -40,6 +40,7 @@ import {
   isVariationInStock,
 } from '../../utils/productStock';
 import { useAuthState } from '../../core/auth/authGuards';
+import { showError, showInfo, showSuccess, showWarning } from '../../utils/toast';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IMAGE_HEIGHT = SCREEN_WIDTH; // Square images for better display
@@ -340,7 +341,7 @@ const ProductDetailScreen: React.FC = () => {
       loadProduct();
     } else {
       setLoading(false);
-      Alert.alert('Error', 'Product ID is missing');
+      showError('Product ID is missing');
       navigation.goBack();
     }
   }, [productId]);
@@ -416,7 +417,7 @@ const ProductDetailScreen: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Error loading product:', error);
-      Alert.alert('Error', error.message || 'Failed to load product');
+      showError(error.message || 'Failed to load product');
     } finally {
       setLoading(false);
     }
@@ -492,19 +493,19 @@ const ProductDetailScreen: React.FC = () => {
 
     // Validation: Check product exists
     if (!product) {
-      Alert.alert('Error', 'Product information is missing');
+      showError('Product information is missing');
       return;
     }
 
     // Validation: Check if product needs variation selection
     if (needsVariation) {
-      Alert.alert('Select Options', 'Please select all required options before adding to cart');
+      showWarning('Please select all required options before adding to cart');
       return;
     }
 
     // Validation: Check stock availability
     if (isOutOfStock) {
-      Alert.alert('Out of Stock', 'This item is currently out of stock');
+      showWarning('This item is currently out of stock');
       return;
     }
 
@@ -531,7 +532,7 @@ const ProductDetailScreen: React.FC = () => {
 
     // Validation: Check quantity is valid
     if (quantity < 1) {
-      Alert.alert('Invalid Quantity', 'Please select a valid quantity');
+      showWarning('Please select a valid quantity');
       return;
     }
 
@@ -591,11 +592,11 @@ const ProductDetailScreen: React.FC = () => {
           
           // Check for specific error types
           if (errorMessage.toLowerCase().includes('stock') || errorMessage.toLowerCase().includes('available')) {
-            Alert.alert('Stock Issue', errorMessage);
+            showWarning(errorMessage);
           } else if (errorMessage.toLowerCase().includes('variation') || errorMessage.toLowerCase().includes('option')) {
-            Alert.alert('Selection Required', errorMessage);
+            showWarning(errorMessage);
           } else {
-            Alert.alert('Error', errorMessage);
+            showError(errorMessage);
           }
         }
       } else {
@@ -633,12 +634,9 @@ const ProductDetailScreen: React.FC = () => {
       
       // Handle network errors
       if (error.message?.includes('network') || error.message?.includes('fetch')) {
-        Alert.alert(
-          'Connection Error',
-          'Unable to connect to server. Please check your internet connection and try again.'
-        );
+        showError('Unable to connect to server. Please check your internet connection and try again.');
       } else {
-        Alert.alert('Error', error.message || 'Failed to add to cart. Please try again.');
+        showError(error.message || 'Failed to add to cart. Please try again.');
       }
     } finally {
       setAddingToCart(false);
@@ -663,29 +661,29 @@ const ProductDetailScreen: React.FC = () => {
         if (isWishlisted) {
           await wishlistService.removeFromLocalWishlist(product._id);
           setIsWishlisted(false);
-          Alert.alert('Removed', 'Product removed from local wishlist');
+          showSuccess('Product removed from local wishlist');
         } else {
           await wishlistService.addToLocalWishlist(product);
           setIsWishlisted(true);
-          Alert.alert('Saved', 'Product added to local wishlist');
+          showSuccess('Product added to local wishlist');
         }
         return;
       }
 
       if (isWishlisted) {
         setIsWishlisted(false);
-        Alert.alert('Removed', 'Product removed from wishlist');
+        showSuccess('Product removed from wishlist');
       } else {
         const response = await wishlistService.addToWishlist(product);
         if (response.success) {
           setIsWishlisted(true);
-          Alert.alert('Saved', 'Product added to wishlist');
+          showSuccess('Product added to wishlist');
         } else {
-          Alert.alert('Wishlist', response.message || 'Could not add to wishlist. Try again.');
+          showWarning(response.message || 'Could not add to wishlist. Try again.');
         }
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update wishlist');
+      showError(error.message || 'Failed to update wishlist');
     }
   };
 
@@ -732,14 +730,14 @@ const ProductDetailScreen: React.FC = () => {
         }}
         onAddToCart={async () => {
           if (!isAuthenticated) {
-            Alert.alert('Login Required', 'Please login to add items to cart');
+            showWarning('Please login to add items to cart');
             return;
           }
           try {
             await cartService.addToCart(item._id, 1, undefined, undefined, item);
-            Alert.alert('Added', 'Product added to cart');
+            showSuccess('Product added to cart');
           } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to add to cart');
+            showError(error.message || 'Failed to add to cart');
           }
         }}
         style={styles.relatedProductCard}
@@ -756,14 +754,14 @@ const ProductDetailScreen: React.FC = () => {
         }}
         onAddToCart={async () => {
           if (!isAuthenticated) {
-            Alert.alert('Login Required', 'Please login to add items to cart');
+            showWarning('Please login to add items to cart');
             return;
           }
           try {
             await cartService.addToCart(item._id, 1, undefined, undefined, item);
-            Alert.alert('Added', 'Product added to cart');
+            showSuccess('Product added to cart');
           } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to add to cart');
+            showError(error.message || 'Failed to add to cart');
           }
         }}
         style={styles.relatedProductCard}
@@ -1384,10 +1382,8 @@ const ProductDetailScreen: React.FC = () => {
               style={styles.shippingRow}
               activeOpacity={0.7}
               onPress={() =>
-                Alert.alert(
-                  'Free Shipping',
-                  `Orders over $${FREE_SHIPPING_THRESHOLD} qualify for free shipping. Add more items to your cart to get free delivery!`,
-                  [{ text: 'OK' }]
+                showInfo(
+                  `Orders over $${FREE_SHIPPING_THRESHOLD} qualify for free shipping. Add more items to your cart to get free delivery!`
                 )
               }
             >
@@ -1399,10 +1395,8 @@ const ProductDetailScreen: React.FC = () => {
               style={styles.shippingRow}
               activeOpacity={0.7}
               onPress={() =>
-                Alert.alert(
-                  'Estimated Delivery',
-                  `Zuba House\n\n• Zuba House Regular — ${getEstDeliveryLabel(shippingLocation.countryCode)}\n• Zuba House Express — faster delivery at checkout`,
-                  [{ text: 'OK' }]
+                showInfo(
+                  `Zuba House Regular — ${getEstDeliveryLabel(shippingLocation.countryCode)}. Express options at checkout.`
                 )
               }
             >

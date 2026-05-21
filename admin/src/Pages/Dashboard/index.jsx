@@ -1,11 +1,14 @@
-import React, { useState, PureComponent, useContext, useEffect } from "react";
-import DashboardBoxes from "../../Components/DashboardBoxes";
-import { FaPlus } from "react-icons/fa6";
-import { Button, Pagination } from "@mui/material";
-import { FaAngleDown } from "react-icons/fa6";
-import Badge from "../../Components/Badge";
-import { FaAngleUp } from "react-icons/fa6";
-
+import React, { useContext, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Typography,
+} from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import {
   LineChart,
   Line,
@@ -15,528 +18,510 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
-} from "recharts";
-
+} from 'recharts';
+import {
+  FiUsers,
+  FiUserPlus,
+  FiShoppingBag,
+  FiBell,
+  FiDollarSign,
+  FiActivity,
+} from 'react-icons/fi';
 import { MyContext } from '../../App';
-import SearchBox from "../../Components/SearchBox";
-import { fetchDataFromApi } from "../../utils/api";
-import Products from "../Products";
+import { fetchDataFromApi } from '../../utils/api';
+import {
+  groupCountByDate,
+  countSinceMonthStart,
+  sumOrderRevenueThisMonth,
+} from '../../utils/dashboardData';
+import { fetchAppActivityFeed, countUnreadActivity } from '../../utils/appActivityFeed';
+import {
+  loadActiveSessions,
+  parseOrdersPayload,
+} from '../../utils/activeSessions';
 
+function maskEmail(email) {
+  if (!email || !email.includes('@')) return email || '—';
+  const [local, domain] = email.split('@');
+  const visible = local.slice(0, Math.min(3, local.length));
+  return `${visible}***@${domain}`;
+}
+
+function formatRelative(dateStr) {
+  if (!dateStr) return 'Never';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function MetricCard({ title, value, icon: Icon, color }) {
+  return (
+    <Card className="dashboard-metric-card shadow-sm h-full">
+      <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 1,
+            minWidth: 0,
+          }}
+        >
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: 'block', lineHeight: 1.3, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+            >
+              {title}
+            </Typography>
+            <Typography
+              sx={{
+                fontWeight: 700,
+                mt: 0.5,
+                fontSize: { xs: '1.25rem', sm: '1.5rem' },
+                lineHeight: 1.2,
+                wordBreak: 'break-word',
+              }}
+            >
+              {value}
+            </Typography>
+          </Box>
+          <Box
+            sx={{
+              width: { xs: 36, sm: 40 },
+              height: { xs: 36, sm: 40 },
+              flexShrink: 0,
+              borderRadius: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontSize: { xs: '1rem', sm: '1.15rem' },
+              bgcolor: color,
+            }}
+          >
+            <Icon />
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
 
 const Dashboard = () => {
-  const [isOpenOrderdProduct, setIsOpenOrderdProduct] = useState(null);
-
-  const [productCat, setProductCat] = React.useState('');
-  const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(50);
-
-  const [chartData, setChartData] = useState([]);
-  const [year, setYear] = useState(new Date().getFullYear());
-
-  const [productData, setProductData] = useState([]);
-  const [productTotalData, setProductTotalData] = useState([]);
-
-  const [ordersData, setOrdersData] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [pageOrder, setPageOrder] = useState(1);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [orderSearchQuery, setOrderSearchQuery] = useState("");
-
-  const [totalOrdersData, setTotalOrdersData] = useState([]);
-
-  const [users, setUsers] = useState([]);
-  const [allReviews, setAllReviews] = useState([]);
-  const [ordersCount, setOrdersCount] = useState(null);
-
   const context = useContext(MyContext);
+  const navigate = useNavigate();
 
+  const [metrics, setMetrics] = useState({
+    totalUsers: '—',
+    newSignups: '—',
+    appOrders: '—',
+    pushSent: 0,
+    revenue: '—',
+    activeSessions: 0,
+  });
+  const [signupChart, setSignupChart] = useState([]);
+  const [ordersChart, setOrdersChart] = useState([]);
+  const [chartError, setChartError] = useState({ signups: false, orders: false });
+  const [recentUsers, setRecentUsers] = useState([]);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [loadingCharts, setLoadingCharts] = useState(true);
 
-    useEffect(() => {
-      context?.setProgress(30);
-        getProducts(page, rowsPerPage);
-    }, [])
+  const loadMetrics = async () => {
+    context?.setProgress?.(40);
+    let totalUsers = '—';
+    let newSignups = '—';
+    let appOrders = '—';
+    let revenue = '—';
 
-
-  const isShowOrderdProduct = (index) => {
-    if (isOpenOrderdProduct === index) {
-      setIsOpenOrderdProduct(null);
-    } else {
-      setIsOpenOrderdProduct(index);
+    const usersRes = await fetchDataFromApi(
+      '/api/user/getAllUsers?page=1&limit=200',
+      { silent: true }
+    );
+    const users = usersRes?.users ?? [];
+    if (usersRes) {
+      totalUsers =
+        usersRes.totalUsersCount ??
+        usersRes.total ??
+        users.length ??
+        '—';
+      const monthCount = countSinceMonthStart(users);
+      if (monthCount > 0) newSignups = monthCount;
     }
+
+    const orderCount = await fetchDataFromApi('/api/order/count', { silent: true });
+    if (orderCount?.count != null) appOrders = orderCount.count;
+
+    const ordersRes = await fetchDataFromApi(
+      '/api/order/order-list?page=1&limit=200',
+      { silent: true }
+    );
+    const orders = parseOrdersPayload(ordersRes);
+    const monthRev = sumOrderRevenueThisMonth(orders);
+    if (monthRev != null) {
+      revenue = `$${Number(monthRev).toLocaleString()}`;
+    }
+
+    const activity = await fetchAppActivityFeed();
+    const activityUnread = countUnreadActivity(activity);
+    const activeSessions = await loadActiveSessions(fetchDataFromApi, orders);
+
+    setMetrics({
+      totalUsers,
+      newSignups,
+      appOrders,
+      pushSent: activityUnread,
+      revenue,
+      activeSessions,
+    });
+    context?.setProgress?.(100);
   };
 
+  const loadCharts = async () => {
+    setLoadingCharts(true);
+    let signupsErr = true;
+    let ordersErr = true;
 
-  useEffect(() => {
-
-
-    fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
-      if (res?.error === false) {
-        setOrdersData(res?.data)
-      }
-    })
-    fetchDataFromApi(`/api/order/order-list`).then((res) => {
-      if (res?.error === false) {
-        setTotalOrdersData(res)
-      }
-    })
-    fetchDataFromApi(`/api/order/count`).then((res) => {
-      if (res?.error === false) {
-        setOrdersCount(res?.count)
-      }
-    })
-  }, [pageOrder])
-
-
-  useEffect(() => {
-
-    // Filter orders based on search query
-    if (orderSearchQuery !== "") {
-      const filteredOrders = totalOrdersData?.data?.filter((order) =>
-        order._id?.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
-        order?.userId?.name?.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
-        order?.userId?.email?.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
-        order?.createdAt?.includes(orderSearchQuery)
-      );
-      setOrdersData(filteredOrders)
-    } else {
-      fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
-        if (res?.error === false) {
-          setOrders(res)
-          setOrdersData(res?.data)
-        }
-      })
+    const usersRes = await fetchDataFromApi(
+      '/api/user/getAllUsers?page=1&limit=200',
+      { silent: true }
+    );
+    const users = usersRes?.users ?? [];
+    const signupSeries = groupCountByDate(users, 'createdAt');
+    if (signupSeries.length) {
+      setSignupChart(signupSeries);
+      signupsErr = false;
     }
-  }, [orderSearchQuery])
 
+    const ordersRes = await fetchDataFromApi(
+      '/api/order/order-list?page=1&limit=200',
+      { silent: true }
+    );
+    const orders = ordersRes?.data ?? [];
+    const orderSeries = groupCountByDate(orders, 'createdAt');
+    if (orderSeries.length) {
+      setOrdersChart(orderSeries);
+      ordersErr = false;
+    }
 
+    setChartError({ signups: signupsErr, orders: ordersErr });
+    setLoadingCharts(false);
+  };
+
+  const loadRecent = async () => {
+    const res = await fetchDataFromApi(
+      '/api/user/getAllUsers?page=1&limit=5',
+      { silent: true }
+    );
+    const list = res?.users ?? [];
+    setRecentUsers(Array.isArray(list) ? list.slice(0, 5) : []);
+    const activity = await fetchAppActivityFeed();
+    setRecentActivity(activity.slice(0, 5));
+  };
 
   useEffect(() => {
-    getTotalSalesByYear();
+    loadMetrics();
+    loadCharts();
+    loadRecent();
+  }, []);
 
-    fetchDataFromApi("/api/user/getAllUsers").then((res) => {
-      const payload = res?.data !== undefined ? res.data : res;
-      if (res?.success !== false && res?.error !== true) {
-        setUsers(payload?.users)
-      }
-    })
-
-    fetchDataFromApi("/api/user/getAllReviews").then((res) => {
-      const payload = res?.data !== undefined ? res.data : res;
-      if (res?.success !== false && res?.error !== true) {
-        setAllReviews(payload?.reviews)
-      }
-    })
-
-  }, [])
-
-
-
-  const getProducts = async (page, limit) => {
-         fetchDataFromApi(`/api/product/getAllProducts?page=${page + 1}&limit=${limit}`).then((res) => {
-             setProductData(res)
-             setProductTotalData(res)
-             context?.setProgress(100);
-         })
-     }
-
-
-  const getTotalUsersByYear = () => {
-    fetchDataFromApi(`/api/order/users`).then((res) => {
-      const payload = res?.data !== undefined ? res.data : res;
-      const users = [];
-      payload?.TotalUsers?.length !== 0 &&
-        payload?.TotalUsers?.map((item) => {
-          users.push({
-            name: item?.name,
-            TotalUsers: parseInt(item?.TotalUsers),
-          });
-        });
-
-      const uniqueArr = users.filter(
-        (obj, index, self) =>
-          index === self.findIndex((t) => t.name === obj.name)
+  const ChartPanel = ({ title, data, errorKey, color }) => {
+    const hasError = chartError[errorKey];
+    const empty = !data?.length;
+    const chartHeight = { xs: 200, sm: 240, md: 220 };
+    if (loadingCharts) {
+      return (
+        <Card className="shadow-sm flex items-center justify-center" sx={{ minHeight: chartHeight }}>
+          <Typography color="text.secondary" variant="body2">
+            Loading chart…
+          </Typography>
+        </Card>
       );
-      setChartData(uniqueArr);
-    })
-  }
-
-  const getTotalSalesByYear = () => {
-    fetchDataFromApi(`/api/order/sales`).then((res) => {
-      const payload = res?.data !== undefined ? res.data : res;
-      const sales = [];
-      payload?.monthlySales?.length !== 0 &&
-        payload?.monthlySales?.map((item) => {
-          sales.push({
-            name: item?.name,
-            TotalSales: parseInt(item?.TotalSales),
-          });
-        });
-
-      const uniqueArr = sales.filter(
-        (obj, index, self) =>
-          index === self.findIndex((t) => t.name === obj.name)
+    }
+    if (hasError || empty) {
+      return (
+        <Card
+          className="shadow-sm flex flex-col items-center justify-center gap-2 p-4"
+          sx={{ minHeight: chartHeight }}
+        >
+          <Typography variant="subtitle2" textAlign="center">
+            {title}
+          </Typography>
+          <Typography color="text.secondary" variant="body2">
+            No data available
+          </Typography>
+          <Button size="small" variant="outlined" onClick={loadCharts}>
+            Retry
+          </Button>
+        </Card>
       );
-      setChartData(uniqueArr);
-    });
-  }
-
-
+    }
+    const Chart = errorKey === 'signups' ? LineChart : BarChart;
+    const Series = errorKey === 'signups' ? Line : Bar;
+    return (
+      <Card className="shadow-sm h-full">
+        <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
+            {title}
+          </Typography>
+          <Box sx={{ width: '100%', height: chartHeight }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <Chart data={data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Series
+                type="monotone"
+                dataKey="count"
+                stroke={color}
+                fill={color}
+                name="Count"
+              />
+            </Chart>
+          </ResponsiveContainer>
+          </Box>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
-    <>
-      <div className="w-full py-4 lg:py-1 px-5 border bg-[#f1faff] border-[rgba(0,0,0,0.1)] flex items-center gap-8 mb-5 justify-between rounded-md">
-        <div className="info">
-          <h1 className="text-[26px] lg:text-[35px] font-bold leading-8 lg:leading-10 mb-3">
-            Welcome,
-            <br />
-            <span className="text-primary">{context?.userData?.name}</span>
-          </h1>
-          <p>
-            Here’s What happening on your store today. See the statistics at
-            once.
-          </p>
-          <br />
-          <Button className="btn-blue btn !capitalize" onClick={() => context.setIsOpenFullScreenPanel({
-            open: true,
-            model: "Add Product"
-          })}>
-            <FaPlus /> Add Product
-          </Button>
-        </div>
+    <Box className="dashboard-page w-full max-w-full box-border" sx={{ px: { xs: 1, sm: 2 }, py: { xs: 1, sm: 2 } }}>
+      <Typography variant="h6" fontWeight={700} sx={{ mb: 1, fontSize: { xs: '1rem', sm: '1.15rem' } }}>
+        App Control Center
+      </Typography>
 
-        <img src="/shop-illustration.webp" className="w-[250px] hidden lg:block" />
-      </div>
+      <Grid container spacing={{ xs: 1, sm: 1.5 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+          <MetricCard title="Total App Users" value={metrics.totalUsers} icon={FiUsers} color="#2e7d32" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+          <MetricCard title="New Signups (month)" value={metrics.newSignups} icon={FiUserPlus} color="#1565c0" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+          <MetricCard title="App Orders" value={metrics.appOrders} icon={FiShoppingBag} color="#7b1fa2" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+          <MetricCard title="New activity" value={metrics.pushSent} icon={FiBell} color="#ef6c00" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+          <MetricCard title="Revenue (month)" value={metrics.revenue} icon={FiDollarSign} color="#00897b" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+          <MetricCard title="Active Sessions" value={metrics.activeSessions} icon={FiActivity} color="#757575" />
+        </Grid>
+      </Grid>
 
-      {
-        productData?.products?.length !== 0 && users?.length !== 0 && allReviews?.length !== 0 && <DashboardBoxes orders={ordersCount} products={productData?.totalCount || productData?.total || productData?.products?.length} users={users?.length} reviews={allReviews?.length} category={context?.catData?.length} />
-      }
+      <Grid container spacing={{ xs: 1.5, sm: 2 }} sx={{ mt: { xs: 1.5, sm: 2 } }}>
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <ChartPanel
+            title="Signups (30d)"
+            data={signupChart}
+            errorKey="signups"
+            color="#1565c0"
+          />
+        </Grid>
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <ChartPanel
+            title="Orders (30d)"
+            data={ordersChart}
+            errorKey="orders"
+            color="#7b1fa2"
+          />
+        </Grid>
+      </Grid>
 
-      <Products/>
+      <Grid container spacing={{ xs: 1.5, sm: 2 }} sx={{ mt: { xs: 1.5, sm: 2 } }}>
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <Card className="shadow-sm h-full">
+            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 1,
+                  mb: 1.5,
+                }}
+              >
+                <Typography variant="subtitle2" fontWeight={600}>
+                  Recent App Users
+                </Typography>
+                <Link to="/users" className="text-sm text-[#e8a87c] whitespace-nowrap">
+                  View all →
+                </Link>
+              </Box>
+              {recentUsers.length === 0 ? (
+                <Typography color="text.secondary" variant="body2">
+                  No recent users loaded
+                </Typography>
+              ) : (
+                <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }}>
+                  {recentUsers.map((u, i) => (
+                    <Box
+                      component="li"
+                      key={u._id || i}
+                      sx={{
+                        display: 'flex',
+                        flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                        alignItems: 'center',
+                        gap: 1,
+                        py: 1,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 32,
+                          height: 32,
+                          flexShrink: 0,
+                          borderRadius: '50%',
+                          bgcolor: '#e8a87c',
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {(u.name || u.email || '?').charAt(0).toUpperCase()}
+                      </Box>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" fontWeight={500} noWrap>
+                          {u.name || 'User'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" noWrap>
+                          {maskEmail(u.email)}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        size="small"
+                        label={
+                          u.loginMethod?.includes('google') || u.googleId
+                            ? 'Google'
+                            : 'Email'
+                        }
+                      />
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <Card className="shadow-sm h-full">
+            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 1,
+                  mb: 1.5,
+                }}
+              >
+                <Typography variant="subtitle2" fontWeight={600}>
+                  Recent app activity
+                </Typography>
+                <Link to="/notifications" className="text-sm text-[#e8a87c] whitespace-nowrap">
+                  View all →
+                </Link>
+              </Box>
+              {recentActivity.length === 0 ? (
+                <Typography color="text.secondary" variant="body2">
+                  No activity yet
+                </Typography>
+              ) : (
+                <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }}>
+                  {recentActivity.map((n, i) => (
+                    <Box
+                      component="li"
+                      key={n.id || i}
+                      sx={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 1,
+                        py: 1,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                      }}
+                    >
+                      <Box sx={{ minWidth: 0, flex: '1 1 60%' }}>
+                        <Typography variant="body2" fontWeight={500} noWrap>
+                          {n.title}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {n.relativeAt || formatRelative(n.at)}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        size="small"
+                        label={n.type === 'signup' ? 'Signup' : n.type === 'order_received' ? 'Order' : 'Delivery'}
+                        color={
+                          n.type === 'signup'
+                            ? 'primary'
+                            : n.type === 'order_received'
+                              ? 'success'
+                              : 'info'
+                        }
+                      />
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
-      <div className="card my-4 shadow-md sm:rounded-lg bg-white">
-        <div className="grid grid-cols-1 lg:grid-cols-2 px-5 py-5 flex-col sm:flex-row">
-          <h2 className="text-[18px] font-[600] text-left mb-2 lg:mb-0">Recent Orders</h2>
-          <div className="ml-auto w-full">
-            <SearchBox
-              searchQuery={orderSearchQuery}
-              setSearchQuery={setOrderSearchQuery}
-
-              setPageOrder={setPageOrder}
-            />
-          </div>
-        </div>
-
-        <div className="relative overflow-x-auto mt-0">
-          <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-              <tr>
-                <th scope="col" className="px-6 py-3">
-                  &nbsp;
-                </th>
-                <th scope="col" className="px-6 py-3 whitespace-nowrap">
-                  Order Id
-                </th>
-                <th scope="col" className="px-6 py-3 whitespace-nowrap">
-                  Paymant Id
-                </th>
-                <th scope="col" className="px-6 py-3 whitespace-nowrap">
-                  Name
-                </th>
-                <th scope="col" className="px-6 py-3 whitespace-nowrap">
-                  Phone Number
-                </th>
-                <th scope="col" className="px-6 py-3 whitespace-nowrap">
-                  Address
-                </th>
-                <th scope="col" className="px-6 py-3 whitespace-nowrap">
-                  Pincode
-                </th>
-                <th scope="col" className="px-6 py-3 whitespace-nowrap">
-                  Total Amount
-                </th>
-                <th scope="col" className="px-6 py-3 whitespace-nowrap">
-                  Email
-                </th>
-                <th scope="col" className="px-6 py-3 whitespace-nowrap">
-                  User Id
-                </th>
-                <th scope="col" className="px-6 py-3 whitespace-nowrap">
-                  Order Status
-                </th>
-                <th scope="col" className="px-6 py-3 whitespace-nowrap">
-                  Date
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-
-              {
-                ordersData?.length !== 0 && ordersData?.map((order, index) => {
-                  return (
-                        <React.Fragment key={order?._id || index}>
-                          <tr className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-                        <td className="px-6 py-4 font-[500]">
-                          <Button
-                            className="!w-[35px] !h-[35px] !min-w-[35px] !rounded-full !bg-[#f1f1f1]"
-                            onClick={() => isShowOrderdProduct(index)}
-                          >
-                            {
-                              isOpenOrderdProduct === index ? <FaAngleUp className="text-[16px] text-[rgba(0,0,0,0.7)]" /> : <FaAngleDown className="text-[16px] text-[rgba(0,0,0,0.7)]" />
-                            }
-
-                          </Button>
-                        </td>
-                        <td className="px-6 py-4 font-[500]">
-                          <span className="text-primary">
-                            {order?._id}
-                          </span>
-                        </td>
-
-                        <td className="px-6 py-4 font-[500]">
-                        <span className="text-primary whitespace-nowrap text-[13px]">
-                          {order?.payment_status === 'FAILED' ? 'FAILED' : (order?.paymentId ? order?.paymentId : 'CASH ON DELIVERY')}
-                        </span>
-                        </td>
-
-                        <td className="px-6 py-4 font-[500] whitespace-nowrap">
-                          {order?.userId?.name}
-                        </td>
-
-                        <td className="px-6 py-4 font-[500]">
-                          {order?.phone || 
-                           order?.delivery_address?.contactInfo?.phone || 
-                           order?.delivery_address?.mobile || 
-                           'N/A'}
-                        </td>
-
-                        <td className="px-6 py-4 font-[500]">
-                          <span className='inline-block text-[13px] font-[500] p-1 bg-[#f1f1f1] rounded-md'>{order?.delivery_address?.addressType}</span>
-                          <span className="block w-[400px]">
-                            {order?.delivery_address?.
-                              address_line1 + " " +
-                              order?.delivery_address?.city + " " +
-                              order?.delivery_address?.landmark + " " +
-                              order?.delivery_address?.state + " " +
-                              order?.delivery_address?.country + ' ' + order?.delivery_address?.mobile
-                            }
-                          </span>
-                        </td>
-
-                        <td className="px-6 py-4 font-[500]">{order?.delivery_address?.pincode}</td>
-
-                        <td className="px-6 py-4 font-[500]">{order?.totalAmt}</td>
-
-                        <td className="px-6 py-4 font-[500]">
-                          {order?.userId?.email}
-                        </td>
-
-                        <td className="px-6 py-4 font-[500]">
-                          <span className="text-primary">
-                            {order?.userId?._id}
-                          </span>
-                        </td>
-
-                        <td className="px-6 py-4 font-[500]">
-                          <Badge status={order?.payment_status || order?.order_status} />
-                        </td>
-                        <td className="px-6 py-4 font-[500] whitespace-nowrap">
-                          {order?.createdAt?.split("T")[0]}
-                        </td>
-                      </tr>
-
-                      {isOpenOrderdProduct === index && (
-                        <tr>
-                          <td className="pl-20" colSpan="6">
-                            <div className="relative overflow-x-auto">
-                              <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-                                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                                  <tr>
-                                    <th
-                                      scope="col"
-                                      className="px-6 py-3 whitespace-nowrap"
-                                    >
-                                      Product Id
-                                    </th>
-                                    <th
-                                      scope="col"
-                                      className="px-6 py-3 whitespace-nowrap"
-                                    >
-                                      Product Title
-                                    </th>
-                                    <th
-                                      scope="col"
-                                      className="px-6 py-3 whitespace-nowrap"
-                                    >
-                                      Image
-                                    </th>
-                                    <th
-                                      scope="col"
-                                      className="px-6 py-3 whitespace-nowrap"
-                                    >
-                                      Quantity
-                                    </th>
-                                    <th
-                                      scope="col"
-                                      className="px-6 py-3 whitespace-nowrap"
-                                    >
-                                      Price
-                                    </th>
-                                    <th
-                                      scope="col"
-                                      className="px-6 py-3 whitespace-nowrap"
-                                    >
-                                      Sub Total
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {
-                                    order?.products?.map((item, idx) => {
-                                      return (
-                                        <tr key={item?._id || idx} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-                                          <td className="px-6 py-4 font-[500]">
-                                            <span className="text-gray-600">
-                                              {item?._id}
-                                            </span>
-                                          </td>
-                                          <td className="px-6 py-4 font-[500]">
-                                            <div className="w-[200px]">
-                                              {item?.productTitle}
-                                            </div>
-                                          </td>
-
-                                          <td className="px-6 py-4 font-[500]">
-                                            <img
-                                              src={item?.image}
-                                              className="w-[40px] h-[40px] object-cover rounded-md"
-                                            />
-                                          </td>
-
-                                          <td className="px-6 py-4 font-[500] whitespace-nowrap">
-                                            {item?.quantity}
-                                          </td>
-
-                                          <td className="px-6 py-4 font-[500]">{item?.price?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
-
-                                          <td className="px-6 py-4 font-[500]">{(item?.price * item?.quantity)?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
-                                        </tr>
-                                      )
-                                    })
-                                  }
-
-
-                                  <tr>
-                                    <td
-                                      className="bg-[#f1f1f1]"
-                                      colSpan="12"
-                                    ></td>
-                                  </tr>
-                                </tbody>
-                              </table>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  )
-                })
-
-              }
-
-            </tbody>
-          </table>
-        </div>
-
-
-        {
-          orders?.totalPages > 1 &&
-          <div className="flex items-center justify-center mt-10 pb-5">
-            <Pagination
-              showFirstButton showLastButton
-              count={orders?.totalPages}
-              page={pageOrder}
-              onChange={(e, value) => setPageOrder(value)}
-            />
-          </div>
-        }
-
-      </div>
-
-
-       <div className="card my-4 shadow-md sm:rounded-lg bg-white">
-            <div className="flex items-center justify-between px-5 py-5 pb-0">
-              <h2 class="text-[18px] font-[600]">Total Users & Total Sales</h2>
-            </div>
-    
-            <div className="flex items-center gap-5 px-5 py-5 pt-1">
-              <span className="flex items-center gap-1 text-[15px] cursor-pointer" onClick={getTotalUsersByYear}>
-                <span className="block w-[8px] h-[8px] rounded-full bg-primary "
-                ></span>
-                Total Users
-              </span>
-    
-              <span className="flex items-center gap-1 text-[15px] cursor-pointer" onClick={getTotalSalesByYear}>
-                <span className="block w-[8px] h-[8px] rounded-full bg-green-600  "
-                ></span>
-                Total Sales
-              </span>
-            </div>
-    
-    
-            <div className="px-5 overflow-x-scroll">
-    
-              {chartData?.length !== 0 &&
-                <BarChart
-                  width={context?.windowWidth > 920 ? (context?.windowWidth - 350) : 800}
-                  height={500}
-                  data={chartData}
-                  margin={{
-                    top: 5,
-                    right: 5,
-                    left: 5,
-                    bottom: 5,
+      <Card className="shadow-sm" sx={{ mt: { xs: 1.5, sm: 2 } }}>
+        <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
+            Quick Actions
+          </Typography>
+          <Grid container spacing={{ xs: 1, sm: 1.5 }}>
+            {[
+              { label: '📣 Announcement', path: '/notifications' },
+              { label: '🏷️ App Coupon', path: '/app-promotions' },
+              { label: '👥 Users', path: '/users' },
+              { label: '📊 Analytics', path: '/app-analytics' },
+            ].map((action) => (
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }} key={action.path}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  size="small"
+                  sx={{
+                    bgcolor: '#1a1a2e',
+                    py: { xs: 1, sm: 1.25 },
+                    fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                    textTransform: 'none',
                   }}
+                  onClick={() => navigate(action.path)}
                 >
-                  <XAxis
-                    dataKey="name"
-                    scale="point"
-                    padding={{ left: 10, right: 10 }}
-                    tick={{ fontSize: 12 }}
-                    label={{ position: "insideBottom", fontSize: 14 }}
-                    style={{ fill: context?.theme === "dark" ? "white" : "#000" }}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    label={{ position: "insideBottom", fontSize: 14 }}
-                    style={{ fill: context?.theme === "dark" ? "white" : "#000" }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#071739  ",
-                      color: "white",
-                    }} // Set tooltip background and text color
-                    labelStyle={{ color: "yellow" }} // Label text color
-                    itemStyle={{ color: "cyan" }} // Set color for individual items in the tooltip
-                    cursor={{ fill: "white" }} // Customize the tooltip cursor background on hover
-                  />
-                  <Legend />
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    horizontal={false}
-                    vertical={false}
-                  />
-                  <Bar dataKey="TotalSales" stackId="a" fill="#16a34a" />
-                  <Bar dataKey="TotalUsers" stackId="b" fill="#0858f7" />
-    
-                </BarChart>
-              }
-            </div>
-          </div>
-    </>
+                  {action.label}
+                </Button>
+              </Grid>
+            ))}
+          </Grid>
+        </CardContent>
+      </Card>
+    </Box>
   );
 };
 
 export default Dashboard;
-

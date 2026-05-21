@@ -62,6 +62,8 @@ export const env = {
   googleOAuthRedirectUris: splitCsv(process.env.GOOGLE_OAUTH_REDIRECT_URIS || 'zuba://redirect,com.zubahouse.customer:/oauthredirect'),
   expoOwner: normalize(process.env.EXPO_OWNER) || 'olivierndev',
   expoSlug: normalize(process.env.EXPO_SLUG) || 'zuba-mobile',
+  /** Optional — expo.dev account access token for higher push throughput in production */
+  expoAccessToken: normalize(process.env.EXPO_ACCESS_TOKEN),
 
   stripeSecretKey: normalize(process.env.STRIPE_SECRET_KEY),
   stripeTargetAccount: normalize(process.env.STRIPE_TARGET_ACCOUNT || process.env.STRIPE_ACCOUNT),

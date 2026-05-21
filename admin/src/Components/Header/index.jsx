@@ -14,7 +14,13 @@ import { FaRegUser } from "react-icons/fa6";
 import { IoMdLogOut } from "react-icons/io";
 import { MyContext } from "../../App";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import Tooltip from "@mui/material/Tooltip";
 import { fetchDataFromApi, postData } from "../../utils/api";
+import {
+  getAppActivityBadgeCount,
+  APP_ACTIVITY_UPDATED_EVENT,
+} from "../../utils/appActivityFeed";
+import NotificationPanel from "./NotificationPanel";
 import AddProductEnhanced from "../../Pages/Products/AddProductEnhanced";
 import AddHomeSlide from "../../Pages/HomeSliderBanners/addHomeSlide";
 import AddCategory from "../../Pages/Categegory/addCategory";
@@ -55,12 +61,16 @@ const StyledBadge = styled(Badge)(({ theme }) => ({
 }));
 
 
-const Header = () => {
+const Header = ({ sidebarOpen = false }) => {
+  const location = useLocation();
+  const history = useNavigate();
+  const context = useContext(MyContext);
+
   const [anchorMyAcc, setAnchorMyAcc] = React.useState(null);
   const openMyAcc = Boolean(anchorMyAcc);
-
-
-  const history = useNavigate();
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [notifAnchor, setNotifAnchor] = useState(null);
+  const notifOpen = Boolean(notifAnchor);
 
   const handleClickMyAcc = (event) => {
     setAnchorMyAcc(event.currentTarget);
@@ -69,9 +79,27 @@ const Header = () => {
     setAnchorMyAcc(null);
   };
 
-  const context = useContext(MyContext);
-
-  const location = useLocation();
+  useEffect(() => {
+    const loadBadge = async () => {
+      setNotificationCount(await getAppActivityBadgeCount());
+    };
+    loadBadge();
+    const onBadge = (e) => {
+      if (typeof e?.detail?.count === 'number') {
+        setNotificationCount(e.detail.count);
+      } else {
+        loadBadge();
+      }
+    };
+    window.addEventListener(APP_ACTIVITY_UPDATED_EVENT, onBadge);
+    window.addEventListener('admin-notification-badge', onBadge);
+    const interval = setInterval(loadBadge, 60_000);
+    return () => {
+      window.removeEventListener(APP_ACTIVITY_UPDATED_EVENT, onBadge);
+      window.removeEventListener('admin-notification-badge', onBadge);
+      clearInterval(interval);
+    };
+  }, [location.pathname]);
 
   useEffect(() => {
 
@@ -111,46 +139,72 @@ const Header = () => {
   return (
     <>
       <header
-        className={`w-full h-[auto] py-2 ${context.isSidebarOpen === true ? "pl-[22%]" : "pl-5"
-          } ${context.isSidebarOpen === true && context?.windowWidth < 992 && '!pl-80'} shadow-md pr-7 bg-[#fff]  flex items-center justify-between transition-all fixed top-0 left-0 z-[50]`}
+        className={`admin-header-bar w-full h-14 min-h-[3.5rem] py-1 pl-3 pr-3 sm:pr-4 shadow-md bg-[#fff] flex items-center justify-between fixed top-0 left-0 right-0 z-[53] transition-[padding] duration-200 ${
+          sidebarOpen ? 'is-sidebar-open' : ''
+        }`}
       >
-        <div className="part1 flex items-center gap-4">
-
-          {
-            context.isSidebarOpen === false && context?.windowWidth > 992 &&
-            <div className="col"
-              onClick={() => {
-                context?.windowWidth < 992 && context?.setisSidebarOpen(false)
-              }}
-            >
-              <Link to="/">
+        <div className="part1 flex items-center gap-2 sm:gap-3 min-w-0 flex-1 overflow-hidden">
+          {(() => {
+            const isMobile = (context?.windowWidth ?? 0) < 992;
+            const showHeaderLogo =
+              isMobile || context.isSidebarOpen === false;
+            const logoSrc = localStorage.getItem('logo') || '/fav.png';
+            if (!showHeaderLogo) return null;
+            return (
+              <Link
+                to="/"
+                className="admin-header-logo-link flex items-center shrink-0 overflow-hidden"
+                onClick={() => {
+                  if (isMobile) context?.setisSidebarOpen(false);
+                }}
+              >
                 <img
-                  src={localStorage.getItem('logo')}
-                  className="w-[170px] md:w-[200px]"
+                  src={logoSrc}
+                  alt="Zuba House"
+                  className="admin-header-logo"
                 />
               </Link>
-            </div>
-          }
-
-
+            );
+          })()}
 
           <Button
-            className="!w-[40px] !h-[40px] !rounded-full !min-w-[40px] !text-[rgba(0,0,0,0.8)]"
+            className="!w-[36px] !h-[36px] sm:!w-[40px] sm:!h-[40px] !rounded-full !min-w-[36px] shrink-0 !text-[rgba(0,0,0,0.8)]"
             onClick={() => context.setisSidebarOpen(!context.isSidebarOpen)}
+            aria-label="Toggle menu"
           >
             <RiMenu2Line className="text-[18px] text-[rgba(0,0,0,0.8)]" />
           </Button>
         </div>
 
-        <div className="part2  flex items-center justify-end gap-5">
-          <IconButton aria-label="cart">
-            <StyledBadge badgeContent={4} color="secondary">
-              <FaRegBell />
-            </StyledBadge>
-          </IconButton>
+        <div className="part2 flex items-center justify-end gap-2 sm:gap-3 shrink-0">
+          <Tooltip title="App activity — signups, orders, deliveries">
+            <IconButton
+              aria-label="App activity notifications"
+              onClick={(e) => setNotifAnchor(e.currentTarget)}
+            >
+              <StyledBadge
+                badgeContent={notificationCount || 0}
+                color="secondary"
+                invisible={!notificationCount}
+              >
+                <FaRegBell />
+              </StyledBadge>
+            </IconButton>
+          </Tooltip>
+          <NotificationPanel
+            anchorEl={notifAnchor}
+            open={notifOpen}
+            onClose={() => setNotifAnchor(null)}
+          />
 
           {context.isLogin === true ? (
-            <div className="relative">
+            <div className="relative flex items-center gap-2">
+              <span
+                className="hidden md:inline text-[10px] font-semibold px-2 py-0.5 rounded-full text-white whitespace-nowrap"
+                style={{ backgroundColor: '#7c3aed' }}
+              >
+                App Control Panel
+              </span>
               <div
                 className="rounded-full w-[35px] h-[35px] overflow-hidden cursor-pointer"
                 onClick={handleClickMyAcc}

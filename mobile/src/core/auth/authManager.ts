@@ -246,6 +246,12 @@ export const authManager = {
 
   async logout(): Promise<void> {
     try {
+      const { notificationService } = await import('../../services/notification.service');
+      await notificationService.unregisterFromBackend();
+    } catch {
+      // non-blocking
+    }
+    try {
       const accessToken = authSession.getAccessToken();
       if (accessToken) {
         await fetchWithTimeout(`${API_URL}${API_ENDPOINTS.LOGOUT}`, {
@@ -271,11 +277,34 @@ export const authManager = {
       clearDeviceSessionMemory();
       authSession.setGuest(true);
       authMonitor.emit('logout', { reason });
-      if (reason !== 'user_logout' && !didEmitSessionExpired) {
+      if (reason !== 'user_logout' && reason !== 'account_deleted' && !didEmitSessionExpired) {
         didEmitSessionExpired = true;
         authEvents.emit(AUTH_EVENTS.SESSION_EXPIRED, { reason });
         authMonitor.emit('session_expired', { reason });
       }
+    } finally {
+      isForceLoggingOut = false;
+    }
+  },
+
+  /** Clears all local app data after account deletion (no session-expired toast). */
+  async purgeLocalAccountData(): Promise<void> {
+    if (isForceLoggingOut) return;
+    isForceLoggingOut = true;
+    try {
+      authRefresh.clearPending();
+      authSession.clearSensitiveMemory();
+      await authStorage.clearAuthStorage();
+      clearDeviceSessionMemory();
+      await AsyncStorage.multiRemove([
+        STORAGE_KEYS.CART,
+        STORAGE_KEYS.WISHLIST_LOCAL,
+        STORAGE_KEYS.RECENT_SEARCHES,
+        STORAGE_KEYS.SHIPPING_LOCATION,
+        STORAGE_KEYS.ACCESS_TOKEN,
+      ]);
+      authSession.setGuest(true);
+      authMonitor.emit('logout', { reason: 'account_deleted' });
     } finally {
       isForceLoggingOut = false;
     }

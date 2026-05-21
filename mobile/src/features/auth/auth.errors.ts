@@ -14,8 +14,11 @@ export function toUserFriendlyAuthError(input: unknown, fallback: string): strin
   if (message.includes('invalid credentials') || message.includes('invalid email or password')) {
     return 'Email or password is incorrect.';
   }
-  if (message.includes('oauth') || message.includes('google')) {
-    return 'Please continue with email sign-in.';
+  if (message.includes('google sign-in is not configured')) {
+    return 'Google sign-in is not set up yet. Use email sign-in or contact support.';
+  }
+  if (message.includes('development build') || message.includes('expo go')) {
+    return 'Google sign-in requires a development build (not Expo Go). Use email sign-in for now.';
   }
   if (message.includes('not verify yet') || message.includes('verify your email first')) {
     return 'Please verify your email first, then sign in.';

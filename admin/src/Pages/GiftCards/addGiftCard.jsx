@@ -1,12 +1,23 @@
 import React, { useState } from 'react';
-import { Button, TextField, MenuItem, Switch, FormControlLabel } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import {
+    Button,
+    TextField,
+    MenuItem,
+    Checkbox,
+    FormControlLabel,
+    FormGroup,
+    Typography,
+} from "@mui/material";
+import { useNavigate, useLocation } from "react-router-dom";
 import { postData } from '../../utils/api';
 import { MyContext } from '../../App';
 
 const AddGiftCard = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const context = React.useContext(MyContext);
+    const isAppRoute = location.pathname.includes('/app-gift-cards');
+    const listPath = '/app-gift-cards';
 
     const [formFields, setFormFields] = useState({
         code: '',
@@ -15,7 +26,8 @@ const AddGiftCard = () => {
         recipientEmail: '',
         recipientName: '',
         message: '',
-        expiryDate: ''
+        expiryDate: '',
+        allowedChannels: isAppRoute ? ['mobile'] : ['web', 'mobile'],
     });
 
     const [loading, setLoading] = useState(false);
@@ -25,6 +37,16 @@ const AddGiftCard = () => {
         setFormFields({
             ...formFields,
             [name]: value
+        });
+    };
+
+    const toggleChannel = (channel) => {
+        setFormFields((prev) => {
+            const has = prev.allowedChannels.includes(channel);
+            const next = has
+                ? prev.allowedChannels.filter((c) => c !== channel)
+                : [...prev.allowedChannels, channel];
+            return { ...prev, allowedChannels: next.length ? next : [channel] };
         });
     };
 
@@ -39,27 +61,33 @@ const AddGiftCard = () => {
             return;
         }
 
+        if (!formFields.allowedChannels?.length) {
+            context?.alertBox("error", "Select at least one channel (Web or Mobile)");
+            setLoading(false);
+            return;
+        }
+
         try {
             const payload = {
                 ...formFields,
                 initialBalance: parseFloat(formFields.initialBalance),
-                code: formFields.code || undefined, // Let server generate if empty
+                code: formFields.code || undefined,
                 expiryDate: formFields.expiryDate || null,
                 recipientEmail: formFields.recipientEmail || null,
                 recipientName: formFields.recipientName || null,
-                message: formFields.message || null
+                message: formFields.message || null,
+                allowedChannels: formFields.allowedChannels,
             };
 
             const res = await postData('/api/gift-cards', payload);
 
             if (res?.success) {
                 context?.alertBox("success", "Gift card created successfully");
-                navigate('/gift-cards');
+                navigate(listPath);
             } else {
                 context?.alertBox("error", res?.error || "Failed to create gift card");
             }
         } catch (error) {
-            console.error('Error creating gift card:', error);
             context?.alertBox("error", "Failed to create gift card");
         } finally {
             setLoading(false);
@@ -69,7 +97,9 @@ const AddGiftCard = () => {
     return (
         <div className="w-full">
             <div className="mb-5">
-                <h2 className="text-[24px] font-[700]">Add New Gift Card</h2>
+                <h2 className="text-xl sm:text-2xl font-bold">
+                    {isAppRoute ? 'Create App Gift Card' : 'Add New Gift Card'}
+                </h2>
             </div>
 
             <form onSubmit={handleSubmit} className="bg-white rounded-md shadow-md p-5">
@@ -150,6 +180,35 @@ const AddGiftCard = () => {
                         helperText="Optional message for the recipient (max 500 characters)"
                         inputProps={{ maxLength: 500 }}
                     />
+
+                    <div className="md:col-span-2">
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                            Redeemable on
+                        </Typography>
+                        <FormGroup row>
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        checked={formFields.allowedChannels.includes('web')}
+                                        onChange={() => toggleChannel('web')}
+                                    />
+                                }
+                                label="Web (zubahouse.com)"
+                            />
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        checked={formFields.allowedChannels.includes('mobile')}
+                                        onChange={() => toggleChannel('mobile')}
+                                    />
+                                }
+                                label="Mobile app (iOS & Android)"
+                            />
+                        </FormGroup>
+                        <Typography variant="caption" color="text.secondary" display="block">
+                            App-only gift cards work in the mobile app and not on the website.
+                        </Typography>
+                    </div>
                 </div>
 
                 <div className="flex gap-3 mt-6">
@@ -161,7 +220,7 @@ const AddGiftCard = () => {
                         {loading ? 'Creating...' : 'Create Gift Card'}
                     </Button>
                     <Button
-                        onClick={() => navigate('/gift-cards')}
+                        onClick={() => navigate(listPath)}
                         className="btn-outline"
                     >
                         Cancel

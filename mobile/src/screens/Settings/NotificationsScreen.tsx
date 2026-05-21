@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../constants/colors';
 import { notificationService } from '../../services/notification.service';
 import * as Notifications from 'expo-notifications';
+import { showError } from '../../utils/toast';
 
 const NotificationsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -72,7 +73,7 @@ const NotificationsScreen: React.FC = () => {
         }
       } catch (error) {
         console.error('Error enabling notifications:', error);
-        Alert.alert('Error', 'Failed to enable notifications');
+        showError('Failed to enable notifications');
       }
     } else {
       setPushEnabled(false);

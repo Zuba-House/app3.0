@@ -59,6 +59,8 @@ const AddProductEnhanced = () => {
     status: 'draft',
     visibility: 'visible',
     isFeatured: false,
+    channels: ['web', 'mobile'],
+    appExclusive: false,
     
     // Images
     images: [],
@@ -1040,6 +1042,60 @@ const AddProductEnhanced = () => {
                   <p className="text-sm mt-1" style={{ color: '#e5e2db', opacity: 0.6 }}>
                     Control where this product appears
                   </p>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block mb-2 font-semibold" style={{ color: '#e5e2db' }}>
+                    Distribution channels
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {['web', 'mobile'].map((ch) => (
+                      <button
+                        key={ch}
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => {
+                            const has = prev.channels.includes(ch);
+                            const next = has
+                              ? prev.channels.filter((c) => c !== ch)
+                              : [...prev.channels, ch];
+                            return {
+                              ...prev,
+                              channels: next.length ? next : [ch],
+                              appExclusive: false,
+                            };
+                          });
+                        }}
+                        className="px-4 py-2 rounded-lg text-sm font-semibold capitalize"
+                        style={{
+                          backgroundColor: formData.channels.includes(ch) ? '#efb291' : '#0b2735',
+                          color: formData.channels.includes(ch) ? '#0b2735' : '#e5e2db',
+                          border: '1px solid rgba(239, 178, 145, 0.3)',
+                        }}
+                      >
+                        {ch === 'web' ? 'Web' : 'Mobile App'}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          appExclusive: !prev.appExclusive,
+                          channels: !prev.appExclusive ? ['mobile'] : ['web', 'mobile'],
+                        }))
+                      }
+                      className="text-3xl"
+                      style={{ color: formData.appExclusive ? '#10b981' : '#6b7280' }}
+                    >
+                      {formData.appExclusive ? <FaToggleOn /> : <FaToggleOff />}
+                    </button>
+                    <label className="font-semibold" style={{ color: '#e5e2db' }}>
+                      📱 App Exclusive
+                    </label>
+                  </div>
                 </div>
 
                 {/* Is Featured */}

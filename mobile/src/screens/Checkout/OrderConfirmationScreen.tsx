@@ -20,12 +20,21 @@ import Colors from '../../constants/colors';
 interface OrderConfirmationParams {
   orderId: string;
   total: number;
+  paymentPending?: boolean;
+  paymentAmount?: number;
+  paymentMethod?: 'stripe' | 'apple_pay' | 'google_pay';
 }
 
 const OrderConfirmationScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { orderId, total } = route.params as OrderConfirmationParams;
+  const {
+    orderId,
+    total,
+    paymentPending = false,
+    paymentAmount = total,
+    paymentMethod = 'stripe',
+  } = route.params as OrderConfirmationParams;
 
   // Animation values
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -108,9 +117,11 @@ const OrderConfirmationScreen: React.FC = () => {
           },
         ]}
       >
-        <Text style={styles.title}>Order Confirmed!</Text>
+        <Text style={styles.title}>Order placed successfully! 🎉</Text>
         <Text style={styles.subtitle}>
-          Thank you for shopping with Zuba House
+          {paymentPending
+            ? 'Your order is received. Complete payment below when ready.'
+            : 'Thank you for shopping with Zuba House'}
         </Text>
 
         {/* Order Details Card */}
@@ -123,17 +134,46 @@ const OrderConfirmationScreen: React.FC = () => {
           </View>
           <View style={styles.divider} />
           <View style={styles.orderRow}>
-            <Text style={styles.orderLabel}>Total Paid</Text>
+            <Text style={styles.orderLabel}>{paymentPending ? 'Order Total' : 'Total Paid'}</Text>
             <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.orderRow}>
             <Text style={styles.orderLabel}>Payment Status</Text>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>Paid</Text>
+            <View style={[styles.statusBadge, paymentPending && styles.statusBadgePending]}>
+              <Text style={[styles.statusText, paymentPending && styles.statusTextPending]}>
+                {paymentPending ? 'Payment pending' : 'Paid'}
+              </Text>
             </View>
           </View>
         </View>
+
+        {paymentPending ? (
+          <TouchableOpacity
+            style={styles.payNowButton}
+            onPress={() =>
+              navigation.navigate('Payment', {
+                orderId,
+                amount: paymentAmount,
+                paymentMethod,
+                onSuccess: () => {
+                  navigation.reset({
+                    index: 0,
+                    routes: [
+                      {
+                        name: 'OrderConfirmation',
+                        params: { orderId, total, paymentPending: false },
+                      },
+                    ],
+                  });
+                },
+              })
+            }
+          >
+            <Ionicons name="card-outline" size={20} color={Colors.white} />
+            <Text style={styles.payNowButtonText}>Complete payment with Stripe</Text>
+          </TouchableOpacity>
+        ) : null}
 
         {/* Info Message */}
         <View style={styles.infoCard}>
@@ -263,6 +303,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#4CAF50',
+  },
+  statusBadgePending: {
+    backgroundColor: '#FFF3E0',
+  },
+  statusTextPending: {
+    color: '#E65100',
+  },
+  payNowButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  payNowButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.white,
   },
   infoCard: {
     flexDirection: 'row',

@@ -4,6 +4,8 @@ import { Button, TextInput } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Colors from '../../constants/colors';
 import { useVerifyOtp } from './hooks/useVerifyOtp';
+import { useResendOtp } from './hooks/useResendOtp';
+import { showSuccess } from '../../utils/toast';
 
 const VerifyOtpScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -14,6 +16,10 @@ const VerifyOtpScreen: React.FC = () => {
   const email = String(route.params?.email || '').trim().toLowerCase();
   const purpose = route.params?.purpose === 'forgotPassword' ? 'forgotPassword' : 'verifyEmail';
   const title = purpose === 'forgotPassword' ? 'Confirm reset code' : 'Verify your email';
+  const { resend, cooldown, submitting: resending, error: resendError, canResend } = useResendOtp(
+    email,
+    purpose
+  );
 
   const onSubmit = async () => {
     if (!email) {
@@ -29,7 +35,13 @@ const VerifyOtpScreen: React.FC = () => {
       navigation.navigate('ResetPassword', { email, otp: otp.trim() });
       return;
     }
+    showSuccess('Email verified. You can sign in now.');
     navigation.navigate('Login');
+  };
+
+  const onResend = async () => {
+    const ok = await resend();
+    if (ok) showSuccess('A new verification code was sent to your email.');
   };
 
   return (
@@ -41,6 +53,7 @@ const VerifyOtpScreen: React.FC = () => {
             <Text style={styles.text}>We sent a 6-digit code to {email || 'your email'}.</Text>
             {!email ? <Text style={styles.error}>Missing email for verification. Please restart from login.</Text> : null}
             {error ? <Text style={styles.error}>{error}</Text> : null}
+            {resendError ? <Text style={styles.error}>{resendError}</Text> : null}
             <TextInput
               label="Verification code"
               mode="outlined"
@@ -51,6 +64,16 @@ const VerifyOtpScreen: React.FC = () => {
             />
             <Button mode="contained" onPress={onSubmit} loading={submitting} style={styles.primaryBtn} contentStyle={styles.primaryBtnContent} labelStyle={styles.primaryBtnLabel}>
               Confirm code
+            </Button>
+            <Button
+              mode="text"
+              onPress={() => void onResend()}
+              disabled={!canResend || !email}
+              loading={resending}
+              style={styles.link}
+              labelStyle={styles.linkLabel}
+            >
+              {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
             </Button>
             <Button mode="text" onPress={() => navigation.navigate('Login')} style={styles.link} labelStyle={styles.linkLabel}>
               Back to sign in

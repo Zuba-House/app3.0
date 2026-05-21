@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -30,6 +31,13 @@ import Colors from '../../constants/colors';
 import SearchBar from '../../components/SearchBar';
 import { API_URL } from '../../constants/config';
 import { showError } from '../../utils/toast';
+import { filterPricedProducts } from '../../utils/productDisplay';
+import {
+  navigateToProductList,
+  navigateToCategories,
+  navigateToProductDetail,
+  openBannerAction,
+} from '../../navigation/navigationHelpers';
 
 // TEMU-style components
 import FlashSale from '../../components/FlashSale';
@@ -45,6 +53,7 @@ const CARD_WIDTH = (width - 36) / 2; // 2 columns with tighter spacing (12px pad
 
 
 const HomeScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -91,27 +100,29 @@ const HomeScreen: React.FC = () => {
   }, []);
 
   // Memoize sorted product arrays to avoid recalculating on every render
+  const pricedProducts = useMemo(() => filterPricedProducts(products), [products]);
+
   const topRatedProducts = useMemo(() => {
-    if (products.length === 0) return [];
-    return [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 8);
-  }, [products]);
+    if (pricedProducts.length === 0) return [];
+    return [...pricedProducts].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 8);
+  }, [pricedProducts]);
 
   const customerFavoritesProducts = useMemo(() => {
-    if (products.length === 0) return [];
-    return [...products].sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0)).slice(0, 8);
-  }, [products]);
+    if (pricedProducts.length === 0) return [];
+    return [...pricedProducts].sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0)).slice(0, 8);
+  }, [pricedProducts]);
 
   const newArrivalsProducts = useMemo(() => {
-    if (products.length === 0) return [];
-    return [...products].slice(0, 4);
-  }, [products]);
+    if (pricedProducts.length === 0) return [];
+    return [...pricedProducts].slice(0, 4);
+  }, [pricedProducts]);
 
   // Calculate trending products based on likes (wishlistCount) and purchases (totalSales)
   const trendingProducts = useMemo(() => {
-    if (products.length === 0) return [];
+    if (pricedProducts.length === 0) return [];
     
     // Calculate trending score: wishlistCount + totalSales + views
-    const productsWithTrendingScore = products.map((product: any) => {
+    const productsWithTrendingScore = pricedProducts.map((product: any) => {
       const wishlistCount = product.wishlistCount || 0;
       const totalSales = product.totalSales || 0;
       const views = product.views || 0;
@@ -143,8 +154,25 @@ const HomeScreen: React.FC = () => {
         : topRatedProducts.slice(0, 8);
     }
     
-    return trending;
-  }, [products, featuredProducts, topRatedProducts]);
+    return filterPricedProducts(trending as Product[]);
+  }, [pricedProducts, featuredProducts, topRatedProducts]);
+
+  const categoryDealsData = useMemo(() => {
+    const pool = categories.length > 0 ? categories.slice(0, 8) : [];
+    return pool.map((cat, index) => ({
+      id: cat._id,
+      categoryId: cat._id,
+      name: cat.name,
+      image:
+        cat.image?.startsWith('http')
+          ? cat.image
+          : cat.image
+            ? `${API_URL}${cat.image.startsWith('/') ? '' : '/'}${cat.image}`
+            : `https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=400&sig=${index}`,
+      discount: 'Shop now',
+      itemCount: Math.max(12, (index + 1) * 40),
+    }));
+  }, [categories]);
   const [currentPromoIndex, setCurrentPromoIndex] = useState(0);
   const promoFlatListRef = useRef<FlatList>(null);
   const promoScrollX = useRef(new Animated.Value(0)).current;
@@ -169,6 +197,7 @@ const HomeScreen: React.FC = () => {
       title2: 'LIMITED TIME',
       subtitle: 'QUICK DEALS',
       badge: '60% OFF',
+      link: 'zuba://flash-sale',
       emoji: '⚡',
       emoji2: '🔥',
       emoji3: '✨',
@@ -180,6 +209,7 @@ const HomeScreen: React.FC = () => {
       title2: 'FRESH STOCK',
       subtitle: 'LATEST COLLECTION',
       badge: 'FREE SHIPPING',
+      link: 'zuba://new-arrivals',
       emoji: '🆕',
       emoji2: '⭐',
       emoji3: '🎉',
@@ -574,7 +604,7 @@ const HomeScreen: React.FC = () => {
 
 
   const handleProductPress = useCallback((product: Product) => {
-    navigation.navigate('ProductDetail', { productId: product._id });
+    navigateToProductDetail(navigation, product._id);
   }, [navigation]);
 
   const handleCategoryPress = useCallback((category: Category) => {
@@ -674,17 +704,22 @@ const HomeScreen: React.FC = () => {
     />
   ), [handleProductPress]);
 
-  const renderSectionHeader = (title: string, subtitle?: string, showSeeAll: boolean = true) => (
+  const renderSectionHeader = (
+    title: string,
+    subtitle?: string,
+    showSeeAll: boolean = true,
+    onSeeAll?: () => void
+  ) => (
     <View style={styles.sectionHeader}>
       <View style={styles.sectionHeaderLeft}>
         <Text style={styles.sectionTitle}>{title}</Text>
         {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
       </View>
-      {showSeeAll && (
-        <TouchableOpacity>
-          <Text style={styles.seeAllText}>See All →</Text>
+      {showSeeAll && onSeeAll ? (
+        <TouchableOpacity onPress={onSeeAll} activeOpacity={0.7}>
+          <Text style={styles.seeAllText}>{t('common.seeAll')} →</Text>
         </TouchableOpacity>
-      )}
+      ) : null}
     </View>
   );
 
@@ -702,15 +737,20 @@ const HomeScreen: React.FC = () => {
 
   // Render horizontal product scroll section - optimized
   // Note: Cannot use hooks inside this function since it's called conditionally
-  const renderHorizontalProductSection = (title: string, subtitle: string, products: Product[]) => {
-    if (products.length === 0) return null;
-
-    // Simple slice - no hooks needed here
-    const displayProducts = products.slice(0, 10);
+  const renderHorizontalProductSection = (
+    title: string,
+    subtitle: string,
+    sectionProducts: Product[],
+    listParams?: Parameters<typeof navigateToProductList>[1]
+  ) => {
+    const displayProducts = filterPricedProducts(sectionProducts).slice(0, 10);
+    if (displayProducts.length === 0) return null;
 
     return (
       <View style={styles.horizontalSection}>
-        {renderSectionHeader(title, subtitle)}
+        {renderSectionHeader(title, subtitle, true, () =>
+          navigateToProductList(navigation, listParams ?? { title, subtitle })
+        )}
         <FlatList
           data={displayProducts}
           renderItem={renderHorizontalProductItem}
@@ -718,10 +758,10 @@ const HomeScreen: React.FC = () => {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.horizontalProductsList}
-          removeClippedSubviews={true}
+          removeClippedSubviews={false}
           initialNumToRender={3}
-          maxToRenderPerBatch={5}
-          windowSize={5}
+          maxToRenderPerBatch={4}
+          windowSize={3}
           getItemLayout={(data, index) => ({
             length: SCREEN_WIDTH * 0.48 + 8,
             offset: (SCREEN_WIDTH * 0.48 + 8) * index,
@@ -748,10 +788,11 @@ const HomeScreen: React.FC = () => {
         onPress={() => {
           setSelectedTab(tab.name);
           if (tab.id) {
-            setSelectedCategory(tab.id);
-            setSearchQuery('');
-            InteractionManager.runAfterInteractions(() => {
-              loadProducts(tab.id);
+            navigateToProductList(navigation, {
+              categoryId: tab.id,
+              categoryName: tab.name,
+              categoryFilter: tab.name,
+              title: tab.name,
             });
           } else {
             handleResetToHome();
@@ -774,10 +815,7 @@ const HomeScreen: React.FC = () => {
       <TouchableOpacity 
         style={styles.promoBanner}
         activeOpacity={0.9}
-        onPress={() => {
-          setSelectedCategory(null);
-          loadProducts();
-        }}
+        onPress={() => openBannerAction(navigation, item)}
       >
         {/* Background Gradient Layer */}
         <View style={styles.promoBannerGradient} />
@@ -805,7 +843,11 @@ const HomeScreen: React.FC = () => {
             </View>
           </View>
           <View style={styles.promoBannerRight}>
-            <TouchableOpacity style={styles.promoBannerCtaButton} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.promoBannerCtaButton}
+              activeOpacity={0.8}
+              onPress={() => openBannerAction(navigation, item)}
+            >
               <Text style={styles.promoBannerCtaText}>SHOP NOW</Text>
               <View style={{ marginLeft: 6 }}>
                 <Ionicons name="arrow-forward" size={16} color={Colors.primary} />
@@ -873,7 +915,7 @@ const HomeScreen: React.FC = () => {
       <SearchBar
         onSearch={handleSearch}
         onCategorySelect={handleCategorySelect}
-        placeholder="Search products..."
+        placeholder={t('home.searchPlaceholder')}
         navigateToSearch={true}
         onFocus={() => navigation.navigate('Search')}
       />
@@ -887,6 +929,13 @@ const HomeScreen: React.FC = () => {
             contentContainerStyle={styles.categoryTabsContent}
           >
             {categoryTabs.map(tab => renderCategoryTab(tab))}
+            <TouchableOpacity
+              style={[styles.categoryTab, styles.categoryTabMore]}
+              onPress={() => navigateToCategories(navigation)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.categoryTabText}>See All</Text>
+            </TouchableOpacity>
           </ScrollView>
         </View>
       )}
@@ -912,37 +961,40 @@ const HomeScreen: React.FC = () => {
         {!selectedCategory && <DailyCheckIn />}
 
         {/* Flash Sale - TEMU Style */}
-        {!selectedCategory && products.length > 0 && (
+        {!selectedCategory && pricedProducts.length > 0 && (
           <FlashSale 
-            products={products} 
-            title="Flash Sale"
+            products={pricedProducts} 
+            title={t('home.flashSale')}
           />
         )}
 
         {/* Deal of the Day - TEMU Style */}
-        {!selectedCategory && featuredProducts.length > 0 && (
-          <DealOfTheDay product={featuredProducts[0]} />
+        {!selectedCategory && filterPricedProducts(featuredProducts).length > 0 && (
+          <DealOfTheDay product={filterPricedProducts(featuredProducts)[0]} />
         )}
 
         {/* Trends Section - Based on customer likes and purchases */}
         {!selectedCategory && trendingProducts.length > 0 && (
           <TrendingProducts 
             products={trendingProducts} 
-            title="Trends" 
+            title={t('home.trends')} 
           />
         )}
 
         {/* Category Deals - TEMU Style */}
-        {!selectedCategory && <CategoryDeals />}
+        {!selectedCategory && (
+          <CategoryDeals categories={categoryDealsData.length > 0 ? categoryDealsData : undefined} />
+        )}
 
         {/* Recently Viewed - TEMU Style */}
         {!selectedCategory && <RecentlyViewed />}
 
         {/* Featured Deals - Horizontal Scroll */}
         {!selectedCategory && featuredProducts.length > 0 && renderHorizontalProductSection(
-          'Featured Deals',
-          'Limited time offers',
-          featuredProducts
+          t('home.featuredDeals'),
+          t('home.limitedTimeOffers'),
+          featuredProducts,
+          { filter: 'featured', title: t('home.featuredDeals'), subtitle: t('home.limitedTimeOffers') }
         )}
 
         {/* Top Rated Products - Horizontal Scroll */}
@@ -955,7 +1007,14 @@ const HomeScreen: React.FC = () => {
         {/* New Arrivals Section */}
         {!selectedCategory && newArrivalsProducts.length > 0 && (
           <View style={styles.section}>
-            {renderSectionHeader('Just In: New Arrivals', 'Fresh picks for you')}
+            {renderSectionHeader(t('home.newArrivals'), t('home.newCollection'), true, () =>
+              navigateToProductList(navigation, {
+                filter: 'new-arrivals',
+                title: t('home.newArrivals'),
+                subtitle: t('home.newCollection'),
+                sortBy: 'newest',
+              })
+            )}
             <FlatList
               data={newArrivalsProducts}
               renderItem={renderProductItem}
@@ -965,6 +1024,8 @@ const HomeScreen: React.FC = () => {
               contentContainerStyle={styles.productsList}
               removeClippedSubviews={true}
               initialNumToRender={4}
+              maxToRenderPerBatch={8}
+              windowSize={5}
             />
           </View>
         )}
@@ -1173,6 +1234,11 @@ const styles = StyleSheet.create({
   },
   categoryTabActive: {
     backgroundColor: Colors.secondary,
+  },
+  categoryTabMore: {
+    borderWidth: 1,
+    borderColor: Colors.secondary,
+    borderStyle: 'dashed',
   },
   categoryTabText: {
     fontSize: 13,

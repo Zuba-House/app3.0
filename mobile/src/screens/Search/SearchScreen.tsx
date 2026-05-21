@@ -34,7 +34,7 @@ import SearchBar from '../../components/SearchBar';
 import { API_URL } from '../../constants/config';
 import { STORAGE_KEYS } from '../../constants/config';
 import { analyticsService } from '../../services/analytics.service';
-import { showError } from '../../utils/toast';
+import { showError, showSuccess, showWarning } from '../../utils/toast';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { setCart, addItem } from '../../store/slices/cartSlice';
 import { cartService } from '../../services/cart.service';
@@ -344,7 +344,7 @@ export default function SearchScreen() {
         subtotal: price,
       };
       dispatch(addItem(cartItem));
-      Alert.alert('', 'Added to cart');
+      showSuccess('Added to cart');
       return;
     }
     try {
@@ -352,7 +352,7 @@ export default function SearchScreen() {
       if (res.success) {
         const cartRes = await cartService.getCart();
         if (cartRes.success) dispatch(setCart(cartRes.data));
-        Alert.alert('', 'Added to cart');
+        showSuccess('Added to cart');
       } else showError(res.message || 'Failed to add');
     } catch (e: any) {
       showError(e?.message || 'Failed to add');
@@ -386,7 +386,7 @@ export default function SearchScreen() {
           setQuickAddProduct(item);
         } else {
           if (!isAuthenticated) {
-            Alert.alert('Login Required', 'Please login to add items to cart');
+            showWarning('Please login to add items to cart');
             return;
           }
           cartService.addToCart(item._id, 1, undefined, undefined, item)
@@ -394,7 +394,7 @@ export default function SearchScreen() {
               if (res.success) {
                 const cr = await cartService.getCart();
                 if (cr.success) dispatch(setCart(cr.data));
-                showError('Added to cart');
+                showSuccess('Added to cart');
               } else {
                 showError(res.message || 'Failed');
               }
@@ -554,7 +554,7 @@ export default function SearchScreen() {
         visible={!!quickAddProduct}
         product={quickAddProduct}
         onClose={() => setQuickAddProduct(null)}
-        onAdded={() => Alert.alert('', 'Added to cart')}
+        onAdded={() => showSuccess('Added to cart')}
       />
     </View>
   );

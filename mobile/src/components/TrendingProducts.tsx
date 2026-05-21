@@ -17,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { Product } from '../types/product.types';
 import Colors from '../constants/colors';
+import { filterPricedProducts, formatProductPrice } from '../utils/productDisplay';
+import { navigateToProductDetail, navigateToProductList } from '../navigation/navigationHelpers';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
@@ -32,10 +34,11 @@ const TrendingProducts: React.FC<TrendingProductsProps> = ({
 }) => {
   const navigation = useNavigation<any>();
 
-  if (!products || products.length === 0) return null;
+  const visible = filterPricedProducts(products ?? []);
+  if (visible.length === 0) return null;
 
   const handlePress = (productId: string) => {
-    navigation.navigate('ProductDetail', { productId });
+    navigateToProductDetail(navigation, productId);
   };
 
   const renderProduct = ({ item, index }: { item: Product; index: number }) => {
@@ -92,7 +95,14 @@ const TrendingProducts: React.FC<TrendingProductsProps> = ({
           <Text style={styles.productName} numberOfLines={2}>
             {item.name}
           </Text>
-          <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+          <Text
+            style={[
+              styles.productPrice,
+              formatProductPrice(item) === 'Price unavailable' && styles.priceUnavailable,
+            ]}
+          >
+            {formatProductPrice(item)}
+          </Text>
           
           {/* Views */}
           <View style={styles.viewsContainer}>
@@ -112,7 +122,16 @@ const TrendingProducts: React.FC<TrendingProductsProps> = ({
           <Ionicons name="trending-up" size={22} color="#FF5722" />
           <Text style={styles.title}>{title}</Text>
         </View>
-        <TouchableOpacity style={styles.seeAllButton}>
+        <TouchableOpacity
+          style={styles.seeAllButton}
+          onPress={() =>
+            navigateToProductList(navigation, {
+              filter: 'trending',
+              title: 'Trending Now',
+              sortBy: 'trending',
+            })
+          }
+        >
           <Text style={styles.seeAllText}>View All</Text>
           <Ionicons name="chevron-forward" size={16} color={Colors.secondary} />
         </TouchableOpacity>
@@ -120,7 +139,7 @@ const TrendingProducts: React.FC<TrendingProductsProps> = ({
 
       {/* Products Grid */}
       <FlatList
-        data={products.slice(0, 6)}
+        data={visible.slice(0, 6)}
         renderItem={renderProduct}
         keyExtractor={(item) => `trending-${item._id}`}
         numColumns={2}
@@ -226,6 +245,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: Colors.secondary,
+  },
+  priceUnavailable: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6b7280',
   },
   viewsContainer: {
     flexDirection: 'row',

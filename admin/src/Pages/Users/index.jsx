@@ -1,4 +1,5 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from "@mui/material";
 import { IoMdAdd } from "react-icons/io";
 
@@ -55,10 +56,78 @@ export const Users = () => {
     const [userTotalData, setUserTotalData] = useState([]);
     const [isLoading, setIsloading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [filterTab, setFilterTab] = useState('all');
 
     const [sortedIds, setSortedIds] = useState([]);
+    const navigate = useNavigate();
 
     const context = useContext(MyContext);
+
+    const FILTER_TABS = [
+        { id: 'all', label: 'All Users' },
+        { id: 'app', label: 'App Users' },
+        { id: 'web', label: 'Web Users' },
+        { id: 'google', label: 'Google Sign-in' },
+        { id: 'email', label: 'Email Sign-in' },
+        { id: 'week', label: 'New This Week' },
+        { id: 'month', label: 'New This Month' },
+    ];
+
+    const isAppUser = (u) =>
+        Boolean(u?.pushToken || u?.expoPushToken || u?.platform === 'mobile' || u?.source === 'app');
+
+    const applyFilter = (users) => {
+        if (!Array.isArray(users)) return [];
+        const now = Date.now();
+        const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+        const monthAgo = now - 30 * 24 * 60 * 60 * 1000;
+        return users.filter((u) => {
+            if (filterTab === 'app') return isAppUser(u);
+            if (filterTab === 'web') return !isAppUser(u);
+            if (filterTab === 'google')
+                return u?.loginMethod?.includes('google') || u?.googleId;
+            if (filterTab === 'email')
+                return !u?.loginMethod?.includes('google') && !u?.googleId;
+            if (filterTab === 'week')
+                return new Date(u.createdAt).getTime() >= weekAgo;
+            if (filterTab === 'month')
+                return new Date(u.createdAt).getTime() >= monthAgo;
+            return true;
+        });
+    };
+
+    const displayUsers = useMemo(
+        () => applyFilter(userData?.users || []),
+        [userData?.users, filterTab]
+    );
+
+    const userStats = useMemo(() => {
+        const all = userTotalData?.users || userData?.users || [];
+        const app = all.filter(isAppUser).length;
+        const push = all.filter((u) => u?.pushToken || u?.expoPushToken).length;
+        const verified = all.filter((u) => u?.isVerified || u?.emailVerified).length;
+        return {
+            total: all.length,
+            app,
+            web: all.length - app,
+            push,
+            verified,
+        };
+    }, [userTotalData, userData]);
+
+    const exportCsv = () => {
+        const rows = displayUsers.map((u) =>
+            [u.name, u.email, u.mobile, u.createdAt, isAppUser(u) ? 'app' : 'web'].join(',')
+        );
+        const blob = new Blob(
+            [['Name,Email,Phone,Created,Platform'].join(','), ...rows].join('\n'),
+            { type: 'text/csv' }
+        );
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'zuba-app-users.csv';
+        a.click();
+    };
 
 
 
@@ -221,8 +290,11 @@ export const Users = () => {
                 <div className="flex items-center w-full px-5 pb-4 justify-beetween">
                     <div className="col w-[40%]">
                         <h2 className="text-[18px] font-[600]">
-                            Users List
+                            App Users
                         </h2>
+                        <p className="text-xs text-gray-500 mt-1">
+                            Total: {userStats.total} | App: {userStats.app} | Web: {userStats.web} | Push: {userStats.push} | Verified: {userStats.verified}
+                        </p>
                     </div>
 
 
@@ -233,12 +305,28 @@ export const Users = () => {
                             sortedIds?.length !== 0 && <Button variant="contained" className="btn-sm" size="small" color="error"
                                 onClick={deleteMultiple}>Delete</Button>
                         }
+                        <Button variant="outlined" size="small" onClick={exportCsv}>
+                            Export CSV
+                        </Button>
                         <SearchBox
                             searchQuery={searchQuery}
                             setSearchQuery={setSearchQuery}
                         />
                     </div>
 
+                </div>
+
+                <div className="flex flex-wrap gap-2 px-5 pb-3">
+                    {FILTER_TABS.map((t) => (
+                        <Button
+                            key={t.id}
+                            size="small"
+                            variant={filterTab === t.id ? 'contained' : 'outlined'}
+                            onClick={() => setFilterTab(t.id)}
+                        >
+                            {t.label}
+                        </Button>
+                    ))}
                 </div>
 
                 <TableContainer sx={{ maxHeight: 440 }}>
@@ -264,10 +352,10 @@ export const Users = () => {
                         </TableHead>
                         <TableBody>
                             {
-                                isLoading === false ? userData?.users?.length !== 0 &&
-                                    userData?.users?.map((user, index) => {
+                                isLoading === false ? displayUsers?.length !== 0 &&
+                                    displayUsers?.map((user, index) => {
                                         return (
-                                            <TableRow key={index} className={user.checked === true ? '!bg-[#1976d21f]' : ''}>
+                                            <TableRow key={user._id || index} className={user.checked === true ? '!bg-[#1976d21f]' : ''}>
                                                 <TableCell style={{ minWidth: columns.minWidth }}>
                                                     <Checkbox {...label} size="small" checked={user.checked === true ? true : false}
                                                         onChange={(e) => handleCheckboxChange(e, user._id, index)}
@@ -275,11 +363,12 @@ export const Users = () => {
                                                 </TableCell>
                                                 <TableCell style={{ minWidth: columns.minWidth }}>
                                                     <div className="flex items-center gap-4 w-[300px]">
-                                                        <div class="img w-[45px] h-[45px] rounded-md overflow-hidden group">
+                                                        <div className="img w-[45px] h-[45px] rounded-md overflow-hidden group">
 
                                                                 <img
                                                                     src={user?.avatar !== "" && user?.avatar !== undefined ? user?.avatar : '/user.jpg'}
-                                                                    class="w-full group-hover:scale-105 transition-all"
+                                                                    className="w-full group-hover:scale-105 transition-all"
+                                                                    alt=""
                                                                 />
                                                           
                                                         </div>
@@ -340,7 +429,7 @@ export const Users = () => {
 
                                     <>
                                         <TableRow>
-                                            <TableCell colspan={8}>
+                                            <TableCell colSpan={8}>
                                                 <div className="flex items-center justify-center w-full min-h-[400px]">
                                                     <CircularProgress color="inherit" />
                                                 </div>
@@ -354,7 +443,7 @@ export const Users = () => {
                     </Table>
                 </TableContainer>
                 <TablePagination
-                    rowsPerPageOptions={[50, 100, 150, 200]}
+                    rowsPerPageOptions={[10, 25, 50, 100]}
                     component="div"
                     count={userData?.totalPages * rowsPerPage}
                     rowsPerPage={rowsPerPage}

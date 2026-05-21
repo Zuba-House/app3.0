@@ -4,6 +4,7 @@
  */
 
 import React, { memo } from 'react';
+import { useCurrency } from '../context/CurrencyContext';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Button } from 'react-native-paper';
 import { Image } from 'expo-image';
@@ -26,6 +27,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onAddToCart,
   style,
 }) => {
+  const { formatPrice } = useCurrency();
   // Resolve display price robustly:
   // some variable products have parent price=0 and valid variation prices.
   const parentSale = Number(product.salePrice ?? 0);
@@ -248,9 +250,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
         {/* Price Container - Temu Style */}
         <View style={styles.priceRow}>
           <View style={styles.priceContainer}>
-            <Text style={styles.price}>${displayPrice.toFixed(2)}</Text>
+            <Text style={styles.price}>{formatPrice(displayPrice)}</Text>
             {originalPrice && (
-              <Text style={styles.originalPrice}>${originalPrice.toFixed(2)}</Text>
+              <Text style={styles.originalPrice}>{formatPrice(originalPrice)}</Text>
             )}
           </View>
           

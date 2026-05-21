@@ -8,6 +8,8 @@ body{font-family: "Montserrat", serif; background: #f8f9fa;}
   --zuba-success: #27ae60;       /* Fresh green */
   --zuba-info: #3498db;          /* Bright blue */
   --zuba-background: #f8f9fa;    /* Light gray */
+  --admin-header-h: 3.5rem;
+  --admin-sidebar-w: 200px;
 }
 
 .MuiBadge-badge {background: #ff5252 !important;}
@@ -26,6 +28,178 @@ body{font-family: "Montserrat", serif; background: #f8f9fa;}
 .sidebar {
   background: linear-gradient(180deg, var(--zuba-primary) 0%, #1a252f 100%) !important;
   color: #ffffff !important;
+}
+
+/* Fixed sidebar — stays on screen; nav scrolls inside */
+.sidebar-fixed {
+  position: fixed;
+  top: var(--admin-header-h);
+  left: 0;
+  bottom: 0;
+  width: var(--admin-sidebar-w);
+  z-index: 52;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  will-change: transform;
+}
+
+.sidebar-fixed.is-closed {
+  transform: translateX(-100%);
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.sidebar-fixed.is-open {
+  transform: translateX(0);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+  pointer-events: auto;
+}
+
+.admin-header-bar.is-sidebar-open {
+  padding-left: var(--admin-sidebar-w);
+}
+
+.admin-header-logo-link {
+  max-width: min(130px, 42vw);
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+}
+
+.admin-header-logo {
+  display: block;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: 2.25rem;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.sidebar-logo-img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 2.5rem;
+  object-fit: contain;
+  object-position: left center;
+}
+
+@media (min-width: 600px) {
+  .admin-header-logo-link {
+    max-width: 150px;
+    height: 2.5rem;
+  }
+
+  .admin-header-logo {
+    max-height: 2.5rem;
+  }
+
+  .sidebar-logo-img {
+    max-height: 2.75rem;
+    max-width: 120px;
+  }
+}
+
+.admin-content-area {
+  margin-top: var(--admin-header-h);
+  min-height: calc(100dvh - var(--admin-header-h));
+  transition: margin-left 0.22s ease;
+  box-sizing: border-box;
+}
+
+.admin-content-area.with-sidebar {
+  margin-left: var(--admin-sidebar-w);
+}
+
+.admin-content-area.is-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: calc(100dvh - var(--admin-header-h));
+}
+
+/* Scrollable app activity lists (bell menu + activity page) */
+.app-activity-panel-scroll,
+.notifications-activity-scroll {
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app-activity-panel-scroll::-webkit-scrollbar,
+.notifications-activity-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.app-activity-panel-scroll::-webkit-scrollbar-thumb,
+.notifications-activity-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+/* Compact admin shell — fits 100% zoom on laptop screens */
+.admin-shell {
+  font-size: 13px;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+}
+
+.sidebar .MuiButton-root,
+.sidebar .sidebar-link {
+  min-height: 32px !important;
+  padding: 4px 8px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  gap: 8px !important;
+  line-height: 1.25 !important;
+  text-transform: none !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.sidebar .MuiButton-root:hover,
+.sidebar .sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.sidebar .sidebar-icon,
+.sidebar .MuiButton-root svg {
+  font-size: 16px !important;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.sidebar .sidebar-section-label {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+  padding: 6px 8px 2px;
+  display: block;
+}
+
+.sidebar ul .MuiButton-root[class*="!pl-9"] {
+  padding-left: 20px !important;
+  font-size: 11px !important;
+  min-height: 28px !important;
 }
 
 /* Card styling */
@@ -127,12 +301,15 @@ input[type=number]::-webkit-outer-spin-button {
 .smlBtn .swiper-button-prev,.smlBtn .swiper-button-next{width: 30px !important; height: 30px !important; min-width: 30px !important; top: 55% !important;}
 .smlBtn  .swiper-button-prev:after,.smlBtn  .swiper-button-next:after{font-size: 18px !important; color: #000;}
 
-.contentRight{padding-top: 75px !important;}
+.contentRight{
+  padding-top: 0 !important;
+  box-sizing: border-box;
+}
 
 .rsw-editor{min-height: 200px !important; background: #fff !important;}
 
 .sidebar ul{padding-right: 5px;}
 .sidebar ul::-webkit-scrollbar{width: 5px !important;}
 
-.contentRight {padding-left: 20px !important;}
+.contentRight { padding-left: 0 !important; }
 .uploadBox  h4{text-align: center;}

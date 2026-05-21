@@ -3,15 +3,21 @@
  * Main entry point
  */
 
-import React from 'react';
+import './src/i18n';
+import React, { useEffect } from 'react';
 import { Provider as ReduxProvider } from 'react-redux';
 import { Provider as PaperProvider } from 'react-native-paper';
+import Toast from 'react-native-toast-message';
 import { store } from './src/store/store';
 import RootNavigator from './src/navigation/RootNavigator';
 import Colors from './src/constants/colors';
 import { AuthProvider } from './src/core/auth/authGuards';
+import { ThemeProvider } from './src/context/ThemeContext';
+import { CurrencyProvider } from './src/context/CurrencyContext';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { toastConfig } from './src/components/toastConfig';
+import { initLanguage } from './src/i18n';
 
-// Custom theme for React Native Paper
 const theme = {
   colors: {
     primary: Colors.primary,
@@ -29,16 +35,42 @@ const theme = {
 };
 
 const App: React.FC = () => {
+  useEffect(() => {
+    initLanguage();
+  }, []);
+
+  useEffect(() => {
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('[UnhandledPromiseRejection]', event.reason);
+    };
+
+    const g = globalThis as typeof globalThis & {
+      onunhandledrejection?: ((event: PromiseRejectionEvent) => void) | null;
+    };
+    const previous = g.onunhandledrejection;
+    g.onunhandledrejection = onUnhandledRejection;
+
+    return () => {
+      g.onunhandledrejection = previous ?? null;
+    };
+  }, []);
+
   return (
-    <ReduxProvider store={store}>
-      <PaperProvider theme={theme}>
-        <AuthProvider>
-          <RootNavigator />
-        </AuthProvider>
-      </PaperProvider>
-    </ReduxProvider>
+    <ErrorBoundary>
+      <ReduxProvider store={store}>
+        <ThemeProvider>
+          <CurrencyProvider>
+            <PaperProvider theme={theme}>
+              <AuthProvider>
+                <RootNavigator />
+                <Toast config={toastConfig} />
+              </AuthProvider>
+            </PaperProvider>
+          </CurrencyProvider>
+        </ThemeProvider>
+      </ReduxProvider>
+    </ErrorBoundary>
   );
 };
 
 export default App;
-

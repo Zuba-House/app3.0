@@ -16,23 +16,24 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../constants/colors';
+import { SOCIAL_LINKS } from '../../constants/config';
+import * as WebBrowser from 'expo-web-browser';
 
 const AboutScreen: React.FC = () => {
   const navigation = useNavigation<any>();
 
   const handleWebsite = () => {
-    Linking.openURL('https://zubahouse.com');
+    void WebBrowser.openBrowserAsync(SOCIAL_LINKS.website);
   };
 
-  const handleSocialMedia = (platform: string) => {
-    const urls: Record<string, string> = {
-      facebook: 'https://facebook.com/zubahouse',
-      instagram: 'https://instagram.com/zubahouse',
-      twitter: 'https://twitter.com/zubahouse',
-    };
-    if (urls[platform]) {
-      Linking.openURL(urls[platform]);
-    }
+  const handleSocialMedia = (platform: 'instagram' | 'twitter' | 'facebook') => {
+    const url =
+      platform === 'instagram'
+        ? SOCIAL_LINKS.instagram
+        : platform === 'twitter'
+          ? SOCIAL_LINKS.twitter
+          : SOCIAL_LINKS.facebook;
+    if (url) void WebBrowser.openBrowserAsync(url);
   };
 
   return (

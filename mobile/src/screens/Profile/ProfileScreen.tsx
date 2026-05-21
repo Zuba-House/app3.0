@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -20,6 +21,7 @@ import Colors from '../../constants/colors';
 import { useAuthGate } from '../../core/auth/authGate';
 import { useAppSelector } from '../../store/hooks';
 import { selectCartCount } from '../../store/slices/cartSlice';
+import { pressNavigate } from '../../navigation/navigationHelpers';
 
 interface MenuItem {
   icon: string;
@@ -31,6 +33,7 @@ interface MenuItem {
 }
 
 const ProfileScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const { user, authStatus, logout } = useAuthState();
   const isAuthenticated = authStatus === 'authenticated';
@@ -39,12 +42,12 @@ const ProfileScreen: React.FC = () => {
 
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      t('auth.logout'),
+      t('account.logoutConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Logout',
+          text: t('auth.logout'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -61,22 +64,22 @@ const ProfileScreen: React.FC = () => {
   const orderMenuItems: MenuItem[] = [
     {
       icon: 'cube-outline',
-      title: 'My Orders',
-      subtitle: 'View order history',
+      title: t('account.myOrders'),
+      subtitle: t('account.orderHistory'),
       onPress: () => navigation.navigate('Orders'),
       showArrow: true,
     },
     {
       icon: 'heart-outline',
-      title: 'Wishlist',
-      subtitle: 'Saved items',
+      title: t('account.wishlist'),
+      subtitle: t('account.savedItems'),
       onPress: () => navigation.navigate('Wishlist'),
       showArrow: true,
     },
     {
       icon: 'location-outline',
-      title: 'Addresses',
-      subtitle: 'Manage shipping addresses',
+      title: t('account.addresses'),
+      subtitle: t('account.manageAddresses'),
       onPress: () => navigation.navigate('AddAddress'),
       showArrow: true,
     },
@@ -84,22 +87,29 @@ const ProfileScreen: React.FC = () => {
 
   const settingsMenuItems: MenuItem[] = [
     {
+      icon: 'settings-outline',
+      title: t('account.settings'),
+      subtitle: t('account.appPreferences'),
+      onPress: () => void pressNavigate(navigation, 'Settings'),
+      showArrow: true,
+    },
+    {
       icon: 'notifications-outline',
-      title: 'Notifications',
-      subtitle: 'Manage notifications',
-      onPress: () => navigation.navigate('Notifications'),
+      title: t('account.notifications'),
+      subtitle: t('account.manageNotifications'),
+      onPress: () => void pressNavigate(navigation, 'NotificationPreferences'),
       showArrow: true,
     },
     {
       icon: 'help-circle-outline',
-      title: 'Help & Support',
-      subtitle: 'FAQs and customer support',
+      title: t('account.helpSupport'),
+      subtitle: t('account.faqSupport'),
       onPress: () => navigation.navigate('HelpSupport'),
       showArrow: true,
     },
     {
       icon: 'information-circle-outline',
-      title: 'About Zuba House',
+      title: t('account.aboutZuba'),
       onPress: () => navigation.navigate('About'),
       showArrow: true,
     },
@@ -144,10 +154,8 @@ const ProfileScreen: React.FC = () => {
           <View style={styles.guestAvatarContainer}>
             <Ionicons name="person" size={48} color={Colors.white} />
           </View>
-          <Text style={styles.guestTitle}>Welcome to Zuba House</Text>
-          <Text style={styles.guestSubtitle}>
-            Sign in to access your account, orders, and wishlist
-          </Text>
+          <Text style={styles.guestTitle}>{t('account.welcome')}</Text>
+          <Text style={styles.guestSubtitle}>{t('account.signInPrompt')}</Text>
         </View>
 
         {/* Auth Buttons */}
@@ -157,20 +165,20 @@ const ProfileScreen: React.FC = () => {
             onPress={() => openAuth()}
           >
             <Ionicons name="log-in-outline" size={20} color={Colors.white} />
-            <Text style={styles.loginButtonText}>Sign In</Text>
+            <Text style={styles.loginButtonText}>{t('auth.signIn')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.registerButton}
             onPress={() => openAuth()}
           >
-            <Text style={styles.registerButtonText}>Create Account</Text>
+            <Text style={styles.registerButtonText}>{t('auth.createAccount')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Guest Menu */}
         <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>Quick Links</Text>
+          <Text style={styles.menuSectionTitle}>{t('account.quickLinks')}</Text>
           <View style={styles.menuCard}>
             {settingsMenuItems.map((item, index) =>
               renderMenuItem(item, index, index === settingsMenuItems.length - 1)
@@ -196,7 +204,10 @@ const ProfileScreen: React.FC = () => {
             <Text style={styles.userEmail}>{user?.email}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.editButton}>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => void pressNavigate(navigation, 'EditProfile')}
+        >
           <Ionicons name="create-outline" size={20} color={Colors.primary} />
         </TouchableOpacity>
       </View>
@@ -237,7 +248,7 @@ const ProfileScreen: React.FC = () => {
 
       {/* Order Section */}
       <View style={styles.menuSection}>
-        <Text style={styles.menuSectionTitle}>My Account</Text>
+        <Text style={styles.menuSectionTitle}>{t('account.myAccountSection')}</Text>
         <View style={styles.menuCard}>
           {orderMenuItems.map((item, index) =>
             renderMenuItem(item, index, index === orderMenuItems.length - 1)
@@ -247,7 +258,7 @@ const ProfileScreen: React.FC = () => {
 
       {/* Settings Section */}
       <View style={styles.menuSection}>
-        <Text style={styles.menuSectionTitle}>Settings & Support</Text>
+        <Text style={styles.menuSectionTitle}>{t('account.settingsSupportSection')}</Text>
         <View style={styles.menuCard}>
           {settingsMenuItems.map((item, index) =>
             renderMenuItem(item, index, index === settingsMenuItems.length - 1)

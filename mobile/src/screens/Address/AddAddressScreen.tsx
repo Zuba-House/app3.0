@@ -28,6 +28,7 @@ import { parsePhone as parsePhoneApi } from '../../services/phoneAutocomplete.se
 import { Address } from '../../types/address.types';
 import Colors from '../../constants/colors';
 import { useAuthState } from '../../core/auth/authGuards';
+import { showError, showWarning } from '../../utils/toast';
 import { useAuthGate } from '../../core/auth/authGate';
 import {
   COUNTRIES,
@@ -148,7 +149,7 @@ const AddAddressScreen: React.FC = () => {
             if (match) setPhoneCountryCode(match.code);
           }
         } catch {
-          Alert.alert('Address', 'Could not load address details. Try again or enter manually.');
+          showWarning('Could not load address details. Try again or enter manually.');
         } finally {
           setSearchingAddress(false);
         }
@@ -307,7 +308,7 @@ const AddAddressScreen: React.FC = () => {
         Alert.alert('Error', (response as any).message || 'Failed to save address');
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to save address');
+      showError(err.message || 'Failed to save address');
     } finally {
       setLoading(false);
     }

@@ -10,10 +10,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   Share,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/colors';
+import { showSuccess } from '../utils/toast';
 
 interface ReferralBannerProps {
   rewardAmount?: number;
@@ -30,8 +30,7 @@ const ReferralBanner: React.FC<ReferralBannerProps> = ({
       });
 
       if (result.action === Share.sharedAction) {
-        Alert.alert(
-          'Shared!',
+        showSuccess(
           `Thanks for sharing! You'll earn $${rewardAmount} when your friend makes their first purchase.`
         );
       }

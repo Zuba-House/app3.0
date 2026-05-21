@@ -4,6 +4,8 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useCurrency } from '../../context/CurrencyContext';
 import {
   View,
   Text,
@@ -17,22 +19,24 @@ import { orderService } from '../../services/order.service';
 import Colors from '../../constants/colors';
 import { useAuthState } from '../../core/auth/authGuards';
 import { useAuthGate } from '../../core/auth/authGate';
-
-interface Order {
-  _id: string;
-  orderNumber: string;
-  total: number;
-  status: string;
-  createdAt: string;
-  items: any[];
-}
+import {
+  formatOrderDate,
+  getOrderId,
+  getOrderItemCount,
+  getOrderNumber,
+  getOrderStatusLabel,
+  getOrderTotal,
+  type RawOrder,
+} from '../../utils/order.mappers';
 
 const OrdersScreen: React.FC = () => {
+  const { t } = useTranslation();
+  const { formatPrice } = useCurrency();
   const navigation = useNavigation<any>();
   const { authStatus } = useAuthState();
   const isAuthenticated = authStatus === 'authenticated';
   const { openAuth } = useAuthGate();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<RawOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,8 +53,7 @@ const OrdersScreen: React.FC = () => {
       setLoading(true);
       const response = await orderService.getOrders();
       if (response.success && response.data) {
-        const orderArray = Array.isArray(response.data) ? response.data : [];
-        setOrders(orderArray);
+        setOrders(response.data as unknown as RawOrder[]);
       }
     } catch (error) {
       console.error('Orders error:', error);
@@ -64,6 +67,7 @@ const OrdersScreen: React.FC = () => {
       case 'completed':
       case 'delivered':
         return Colors.secondary;
+      case 'received':
       case 'pending':
       case 'processing':
         return Colors.primary;
@@ -76,7 +80,7 @@ const OrdersScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Orders</Text>
+          <Text style={styles.headerTitle}>{t('orders.title')}</Text>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.secondary} />
@@ -89,7 +93,7 @@ const OrdersScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Orders</Text>
+          <Text style={styles.headerTitle}>{t('orders.title')}</Text>
         </View>
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>📦</Text>
@@ -112,27 +116,35 @@ const OrdersScreen: React.FC = () => {
 
       <FlatList
         data={orders}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.orderCard}
-            onPress={() => navigation.navigate('OrderDetail', { orderId: item._id })}
-          >
-            <View style={styles.orderHeader}>
-              <Text style={styles.orderNumber}>Order #{item.orderNumber || item._id.slice(-6)}</Text>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-                <Text style={styles.statusText}>{item.status || 'Pending'}</Text>
+        renderItem={({ item }) => {
+          const orderId = getOrderId(item);
+          const displayNumber = getOrderNumber(item);
+          const total = getOrderTotal(item);
+          const itemCount = getOrderItemCount(item);
+          const status = getOrderStatusLabel(item);
+
+          return (
+            <TouchableOpacity
+              style={styles.orderCard}
+              onPress={() => navigation.navigate('OrderDetail', { orderId })}
+            >
+              <View style={styles.orderHeader}>
+                <Text style={styles.orderNumber}>Order #{displayNumber}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(status) }]}>
+                  <Text style={styles.statusText}>{status}</Text>
+                </View>
               </View>
-            </View>
-            <Text style={styles.orderDate}>
-              {new Date(item.createdAt).toLocaleDateString()}
-            </Text>
-            <View style={styles.orderFooter}>
-              <Text style={styles.orderTotal}>${item.total?.toFixed(2) || '0.00'}</Text>
-              <Text style={styles.orderItems}>{item.items?.length || 0} items</Text>
-            </View>
-          </TouchableOpacity>
-        )}
-        keyExtractor={(item) => item._id}
+              <Text style={styles.orderDate}>{formatOrderDate(item.createdAt ?? item.date)}</Text>
+              <View style={styles.orderFooter}>
+                <Text style={styles.orderTotal}>{formatPrice(total)}</Text>
+                <Text style={styles.orderItems}>
+                  {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+        keyExtractor={(item) => getOrderId(item)}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>

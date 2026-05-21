@@ -11,7 +11,16 @@
       "**/*"
     ],
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-dev-client",
+      [
+        "expo-notifications",
+        {
+          "color": "#e8a87c",
+          "androidMode": "default",
+          "androidCollapsedTitle": "Zuba House"
+        }
+      ]
     ],
     "splash": {
       "image": "./assets/splash.png",
@@ -51,7 +60,7 @@
       "expoOwner": "olivierndev",
       "expoSlug": "zuba-mobile",
       "eas": {
-        "projectId": "zuba-house-019"
+        "projectId": "b1c36a7f-6753-42dd-a363-8c673e354a69"
       }
     }
   }

@@ -3,7 +3,7 @@
  * Handles Stripe payment with external browser
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,8 +19,13 @@ import { ActivityIndicator } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { checkoutService } from '../../services/checkout.service';
-import { API_URL } from '../../constants/config';
+import { orderService } from '../../services/order.service';
 import Colors from '../../constants/colors';
+import { needsOnlineStripePayment, type RawOrder } from '../../utils/order.mappers';
+import { cartService } from '../../services/cart.service';
+import { useAppDispatch } from '../../store/hooks';
+import { clearCart } from '../../store/slices/cartSlice';
+import { showError } from '../../utils/toast';
 
 interface PaymentScreenParams {
   orderId: string;
@@ -32,14 +37,51 @@ interface PaymentScreenParams {
 const PaymentScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const dispatch = useAppDispatch();
   const { orderId, amount, paymentMethod = 'stripe', onSuccess } = route.params as PaymentScreenParams;
 
   const [loading, setLoading] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [waitingForPayment, setWaitingForPayment] = useState(false);
+  const [orderAlreadyComplete, setOrderAlreadyComplete] = useState(false);
   const appState = useRef(AppState.currentState);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const finishPaymentSuccess = useCallback(() => {
+    setWaitingForPayment(false);
+    cartService.clearCart().catch(() => undefined);
+    dispatch(clearCart());
+    if (onSuccess) {
+      onSuccess();
+      return;
+    }
+    navigation.replace('OrderConfirmation', {
+      orderId,
+      total: amount,
+      paymentPending: false,
+    });
+  }, [amount, dispatch, navigation, onSuccess, orderId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await orderService.getOrderById(orderId);
+        if (cancelled || !res.data) return;
+        const raw = res.data as unknown as RawOrder;
+        if (!needsOnlineStripePayment(raw, paymentMethod)) {
+          setOrderAlreadyComplete(true);
+          finishPaymentSuccess();
+        }
+      } catch {
+        // User can still attempt Stripe payment manually.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [finishPaymentSuccess, orderId, paymentMethod]);
 
   useEffect(() => {
     // Listen for app state changes to detect when user returns from browser
@@ -85,9 +127,8 @@ const PaymentScreen: React.FC = () => {
     try {
       setLoading(true);
 
-      // Use API URL for callbacks
-      const successUrl = `${API_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}&orderId=${orderId}`;
-      const cancelUrl = `${API_URL}/payment-cancel?orderId=${orderId}`;
+      const successUrl = `zuba://payment-success?orderId=${encodeURIComponent(orderId)}&session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `zuba://payment-cancel?orderId=${encodeURIComponent(orderId)}`;
 
       const response = await checkoutService.createCheckoutSession(
         amount,
@@ -101,12 +142,12 @@ const PaymentScreen: React.FC = () => {
         setSessionId(response.data.sessionId);
         return response.data;
       } else {
-        Alert.alert('Error', 'Unable to create payment session. Please try again.');
+        showError('Unable to create payment session. Please try again.');
         return null;
       }
     } catch (error: any) {
       console.error('Error creating checkout session:', error);
-      Alert.alert('Error', error.message || 'Failed to initialize payment.');
+      showError(error.message || 'Failed to initialize payment.');
       return null;
     } finally {
       setLoading(false);
@@ -129,10 +170,10 @@ const PaymentScreen: React.FC = () => {
         if (canOpen) {
           await Linking.openURL(url);
         } else {
-          Alert.alert('Error', 'Unable to open payment page. Please try again.');
+          showError('Unable to open payment page. Please try again.');
         }
       } catch (error) {
-        Alert.alert('Error', 'Failed to open payment page.');
+        showError('Failed to open payment page.');
       }
     }
   };
@@ -154,18 +195,12 @@ const PaymentScreen: React.FC = () => {
           if (response.success && response.data) {
             if (response.data.paymentStatus === 'paid') {
               await confirmOrderAsPaid();
-              // Payment successful
-              setWaitingForPayment(false);
-              if (onSuccess) onSuccess();
-              navigation.replace('OrderConfirmation', {
-                orderId,
-                total: amount,
-              });
+              finishPaymentSuccess();
               return true;
             }
             
             if (response.data.status === 'expired') {
-              Alert.alert('Session Expired', 'Your payment session has expired. Please try again.');
+              showError('Your payment session has expired. Please try again.');
               setWaitingForPayment(false);
               setCheckoutUrl(null);
               setSessionId(null);
@@ -189,13 +224,7 @@ const PaymentScreen: React.FC = () => {
                 },
                 {
                   text: 'Yes, Continue',
-                  onPress: () => {
-                    if (onSuccess) onSuccess();
-                    navigation.replace('OrderConfirmation', {
-                      orderId,
-                      total: amount,
-                    });
-                  },
+                  onPress: () => finishPaymentSuccess(),
                 },
               ]
             );
@@ -262,14 +291,26 @@ const PaymentScreen: React.FC = () => {
             <Ionicons name="card" size={48} color={Colors.secondary} />
           </View>
           
-          <Text style={styles.title}>Complete Your Payment</Text>
+          <Text style={styles.title}>
+            {orderAlreadyComplete ? 'Payment complete' : 'Complete Your Payment'}
+          </Text>
           <Text style={styles.subtitle}>
-            {paymentMethod === 'apple_pay'
+            {orderAlreadyComplete
+              ? 'Your order is already placed. Taking you to confirmation…'
+              : paymentMethod === 'apple_pay'
               ? "You'll be redirected to Stripe checkout with Apple Pay enabled"
               : paymentMethod === 'google_pay'
               ? "You'll be redirected to Stripe checkout with Google Pay enabled"
               : "You'll be redirected to Stripe's secure checkout page"}
           </Text>
+
+          {__DEV__ && !orderAlreadyComplete ? (
+            <View style={styles.devNotice}>
+              <Text style={styles.devNoticeText}>
+                Stripe test mode: use card 4242 4242 4242 4242, any future expiry, any CVC.
+              </Text>
+            </View>
+          ) : null}
 
           {/* Order Summary */}
           <View style={styles.summaryBox}>
@@ -538,6 +579,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: Colors.primary,
+  },
+  devNotice: {
+    width: '100%',
+    backgroundColor: '#FFF8E1',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FFE082',
+  },
+  devNoticeText: {
+    fontSize: 12,
+    color: '#5D4037',
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });
 

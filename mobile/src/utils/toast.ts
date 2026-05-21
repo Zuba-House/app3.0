@@ -1,64 +1,40 @@
 /**
- * Toast Utility
- * Simple toast notifications for user feedback
+ * Toast notifications (non-blocking)
  */
 
-import { Alert, Platform } from 'react-native';
+import Toast from 'react-native-toast-message';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 interface ToastOptions {
   type?: ToastType;
+  text2?: string;
   duration?: number;
-  position?: 'top' | 'bottom';
 }
 
-/**
- * Show a toast message to the user
- * On mobile, uses Alert for now. Can be enhanced with a toast library later.
- */
 export const showToast = (message: string, options: ToastOptions = {}) => {
-  const { type = 'info' } = options;
-
-  // For now, use Alert for critical messages
-  // In the future, can integrate react-native-toast-message or similar
-  if (type === 'error') {
-    Alert.alert('Error', message, [{ text: 'OK' }]);
-  } else if (type === 'success') {
-    Alert.alert('Success', message, [{ text: 'OK' }]);
-  } else if (type === 'warning') {
-    Alert.alert('Warning', message, [{ text: 'OK' }]);
-  } else {
-    // For info, we can use a less intrusive method
-    // For now, just log it (can be enhanced later)
-    console.log(`[INFO] ${message}`);
-  }
+  const { type = 'info', text2, duration = 3200 } = options;
+  Toast.show({
+    type,
+    text1: message,
+    text2,
+    visibilityTime: duration,
+    position: 'top',
+  });
 };
 
-/**
- * Show error toast
- */
-export const showError = (message: string) => {
-  showToast(message, { type: 'error' });
+export const showError = (message: string, text2?: string) => {
+  showToast(message, { type: 'error', text2 });
 };
 
-/**
- * Show success toast
- */
-export const showSuccess = (message: string) => {
-  showToast(message, { type: 'success' });
+export const showSuccess = (message: string, text2?: string) => {
+  showToast(message, { type: 'success', text2 });
 };
 
-/**
- * Show warning toast
- */
-export const showWarning = (message: string) => {
-  showToast(message, { type: 'warning' });
+export const showWarning = (message: string, text2?: string) => {
+  showToast(message, { type: 'warning', text2 });
 };
 
-/**
- * Show info toast (non-intrusive)
- */
-export const showInfo = (message: string) => {
-  showToast(message, { type: 'info' });
+export const showInfo = (message: string, text2?: string) => {
+  showToast(message, { type: 'info', text2 });
 };

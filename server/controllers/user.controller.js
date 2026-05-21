@@ -14,6 +14,10 @@ import CartProductModel from '../models/cartProduct.modal.js';
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
 import ReviewModel from '../models/reviews.model.js';
+import {
+    buildCountryBreakdown,
+    collectUserCountriesFromDb,
+} from '../utils/geoBreakdown.js';
 
 cloudinary.config({
     cloud_name: env.cloudinaryCloudName,
@@ -1131,7 +1135,47 @@ export async function getAllUsers(request, response) {
     }
 }
 
+/** Country breakdown for admin analytics (saved addresses + order shipping). */
+export async function getGeoBreakdown(request, response) {
+    try {
+        if (request.userRole !== 'ADMIN') {
+            return sendError(response, 403, 'Unauthorized');
+        }
 
+        const userCountryMap = await collectUserCountriesFromDb(mongoose);
+        const { countries, total } = buildCountryBreakdown(userCountryMap);
+
+        return sendSuccess(response, 200, 'Geo breakdown', { countries, total });
+    } catch (error) {
+        console.error('Geo breakdown error:', error);
+        return sendError(response, 500, error.message || 'Failed to load geo breakdown');
+    }
+}
+
+/** Self-service account deletion for the authenticated user (mobile app). */
+export async function deleteOwnAccount(request, response) {
+    try {
+        const userId = request.userId;
+        if (!userId) {
+            return sendError(response, 401, 'Authentication required');
+        }
+
+        const user = await UserModel.findById(userId);
+        if (!user) {
+            return sendError(response, 404, 'User not found');
+        }
+
+        await CartProductModel.deleteMany({ userId });
+        const deletedUser = await UserModel.findByIdAndDelete(userId);
+        if (!deletedUser) {
+            return sendError(response, 500, 'Could not delete account');
+        }
+
+        return sendSuccess(response, 200, 'Account deleted successfully');
+    } catch (error) {
+        return sendError(response, 500, error?.message || 'Something went wrong');
+    }
+}
 
 export async function deleteUser(request, response) {
     const user = await UserModel.findById(request.params.id);

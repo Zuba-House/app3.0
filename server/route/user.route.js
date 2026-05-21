@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import {addReview, approveReview, changePasswordController, deleteMultiple, deleteUser, forgotPasswordController, getAllReviews, getAllUsers, getProductReviewsAdmin, getReviews, loginUserController, logoutController, markReviewAsSpam, refreshToken, registerUserController, rejectReview, removeImageFromCloudinary, resetpassword, updateUserDetails, userAvatarController, userDetails, verifyEmailController, verifyForgotPasswordOtp} from '../controllers/user.controller.js';
+import {addReview, approveReview, changePasswordController, deleteMultiple, deleteOwnAccount, deleteUser, forgotPasswordController, getAllReviews, getAllUsers, getGeoBreakdown, getProductReviewsAdmin, getReviews, loginUserController, logoutController, markReviewAsSpam, refreshToken, registerUserController, rejectReview, removeImageFromCloudinary, resetpassword, updateUserDetails, userAvatarController, userDetails, verifyEmailController, verifyForgotPasswordOtp} from '../controllers/user.controller.js';
 import auth, { optionalAuth } from '../middlewares/auth.js';
 import upload from '../middlewares/multer.js';
 import { basicRateLimit } from '../middlewares/basicRateLimit.js';
@@ -24,12 +24,14 @@ userRouter.post('/forgot-password/change-password',changePasswordController)
 userRouter.post('/refresh-token',refreshToken)
 userRouter.get('/user-details',auth,userDetails);
 userRouter.get('/me', auth, userDetails);
+userRouter.delete('/delete-account', auth, deleteOwnAccount);
 // Allow both guests and logged-in users to add reviews
 userRouter.post('/addReview', optionalAuth, addReview);
 userRouter.get('/getReviews',getReviews);
 userRouter.get('/getAllReviews',auth, getAllReviews); // Admin only
 userRouter.get('/getProductReviewsAdmin/:productId', auth, getProductReviewsAdmin); // Admin only - get reviews for specific product
 userRouter.get('/getAllUsers', auth, adminOnly, getAllUsers);
+userRouter.get('/geo-breakdown', auth, adminOnly, getGeoBreakdown);
 userRouter.delete('/deleteMultiple', auth, adminOnly, deleteMultiple);
 userRouter.delete('/deleteUser/:id', auth, adminOnly, deleteUser);
 // Admin review management routes
