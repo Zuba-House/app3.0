@@ -26,7 +26,13 @@ function normalizeResponse<T>(raw: any): ApiResponse<T> {
     raw?.data ?? raw?.product ?? raw?.products ?? raw?.result ?? raw?.user ?? raw?.address ?? null;
 
   if (data && typeof data === 'object' && !Array.isArray(data)) {
-    if (Array.isArray(data.products)) {
+    if (
+      data.product &&
+      typeof data.product === 'object' &&
+      !Array.isArray(data.product)
+    ) {
+      data = data.product;
+    } else if (Array.isArray(data.products)) {
       data = data.products;
     } else if (Array.isArray(data.orders)) {
       data = data.orders;
@@ -63,8 +69,12 @@ async function request<T>(url: string, config: RequestConfig = {}): Promise<ApiR
     }
     return request<T>(url, { ...config, _retryCount: retryCount + 1 });
   }
-  if (!response.ok || (json?.success === false && json?.error === true)) {
-    throw new Error(json?.message || 'Request failed');
+  if (!response.ok || json?.success === false || json?.error === true) {
+    const msg =
+      json?.message ||
+      (typeof json?.details === 'string' ? json.details : null) ||
+      'Request failed';
+    throw new Error(msg);
   }
   return normalizeResponse<T>(json);
 }

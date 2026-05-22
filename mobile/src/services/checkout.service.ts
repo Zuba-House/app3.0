@@ -14,6 +14,7 @@ export interface PaymentIntent {
 }
 
 export interface CreateOrderData {
+  userId?: string;
   shippingAddressId: string;
   billingAddressId?: string;
   shippingMethodId: string;

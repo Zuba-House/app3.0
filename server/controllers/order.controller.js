@@ -1,8 +1,52 @@
+import mongoose from 'mongoose';
 import OrderModel from "../models/order.model.js";
 import ProductModel from '../models/product.model.js';
 import UserModel from '../models/user.model.js';
 import AddressModel from "../models/address.model.js";
 import VendorModel from '../models/vendor.model.js';
+
+function resolveImageString(image) {
+    if (image == null) return '';
+    if (typeof image === 'string') return image.trim();
+    if (typeof image === 'object' && image.url) return String(image.url).trim();
+    return '';
+}
+
+function normalizeOrderProducts(products = []) {
+    if (!Array.isArray(products)) return [];
+    return products
+        .map((item) => {
+            const productId = String(item?.productId || item?._id || '').trim();
+            const quantity = Math.max(1, Number(item?.quantity) || 1);
+            const price = Number(item?.price) || 0;
+            const subTotal = Number(item?.subTotal ?? item?.subtotal ?? price * quantity) || 0;
+            const row = {
+                productId,
+                productTitle: String(item?.productTitle || item?.name || 'Product').trim() || 'Product',
+                quantity,
+                price,
+                subTotal,
+                image: resolveImageString(item?.image),
+                productType: item?.productType === 'variable' ? 'variable' : 'simple',
+                variationId: item?.variationId ? String(item.variationId) : null,
+            };
+            if (item?.variation && typeof item.variation === 'object') {
+                row.variation = {
+                    attributes: Array.isArray(item.variation.attributes) ? item.variation.attributes : [],
+                    sku: item.variation.sku ? String(item.variation.sku) : '',
+                    image: resolveImageString(item.variation.image),
+                };
+            }
+            if (item?.size) row.size = String(item.size);
+            if (item?.weight) row.weight = String(item.weight);
+            if (item?.ram) row.ram = String(item.ram);
+            if (item?.vendor) row.vendor = item.vendor;
+            if (item?.vendorId) row.vendorId = item.vendorId;
+            if (item?.vendorShopName) row.vendorShopName = String(item.vendorShopName);
+            return row;
+        })
+        .filter((row) => row.productId);
+}
 // PayPal removed - using Stripe for payments
 // import paypal from "@paypal/checkout-server-sdk";
 import OrderConfirmationEmail from "../utils/orderEmailTemplate.js";
@@ -14,16 +58,19 @@ import { sendVendorNewOrder } from "../utils/vendorEmails.js";
 
 export const createOrderController = async (request, response) => {
     try {
+        const userId = request.body.userId || request.userId || null;
+        const normalizedProducts = normalizeOrderProducts(request.body.products);
+
         console.log('📦 Order creation request received:', {
-            hasUserId: !!request.body.userId,
+            hasUserId: !!userId,
             isGuestOrder: !!request.body.guestCustomer,
-            productsCount: request.body.products?.length || 0,
+            productsCount: normalizedProducts.length,
             paymentId: request.body.paymentId || 'N/A',
             payment_status: request.body.payment_status || 'N/A'
         });
 
         // Validate required fields
-        if (!request.body.products || !Array.isArray(request.body.products) || request.body.products.length === 0) {
+        if (!normalizedProducts.length) {
             console.error('❌ Order creation failed: No products provided');
             return response.status(400).json({
                 error: true,
@@ -32,8 +79,10 @@ export const createOrderController = async (request, response) => {
             });
         }
 
-        // Handle guest checkout
-        const isGuestOrder = request.body.isGuestOrder || (!request.body.userId && request.body.guestCustomer);
+        // Handle guest checkout (authenticated users from JWT must not be treated as guests)
+        const isGuestOrder = userId
+            ? false
+            : Boolean(request.body.isGuestOrder ?? request.body.guestCustomer);
         
         // Validate guest customer data if it's a guest order
         if (isGuestOrder && !request.body.guestCustomer) {
@@ -47,9 +96,12 @@ export const createOrderController = async (request, response) => {
         
         // Calculate total amount including shipping
         const shippingCost = request.body.shippingCost || 0;
-        const productsTotal = request.body.products?.reduce((sum, item) => {
-            return sum + (parseFloat(item.price || item.subTotal || 0) * (item.quantity || 1));
-        }, 0) || 0;
+        const productsTotal = normalizedProducts.reduce((sum, item) => {
+            const lineTotal =
+                Number(item.subTotal) ||
+                Number(item.price || 0) * Number(item.quantity || 1);
+            return sum + lineTotal;
+        }, 0);
         const calculatedTotal = productsTotal + shippingCost;
         // Use provided totalAmt if it exists and is valid, otherwise calculate it
         const finalTotal = (request.body.totalAmt && request.body.totalAmt > 0) 
@@ -101,12 +153,17 @@ export const createOrderController = async (request, response) => {
             };
         }
 
+        let deliveryAddressId = request.body.delivery_address;
+        if (deliveryAddressId && !mongoose.Types.ObjectId.isValid(String(deliveryAddressId))) {
+            deliveryAddressId = null;
+        }
+
         let order = new OrderModel({
-            userId: request.body.userId || null,
-            products: request.body.products,
+            userId: userId || null,
+            products: normalizedProducts,
             paymentId: request.body.paymentId,
             payment_status: request.body.payment_status,
-            delivery_address: request.body.delivery_address,
+            delivery_address: deliveryAddressId,
             totalAmt: finalTotal, // Ensure shipping is included
             shippingCost: shippingCost,
             shippingRate: request.body.shippingRate || null,
@@ -118,8 +175,8 @@ export const createOrderController = async (request, response) => {
             deliveryNote: request.body.deliveryNote || '',
             date: request.body.date,
             // Guest checkout fields
-            isGuestOrder: isGuestOrder,
-            guestCustomer: request.body.guestCustomer || null,
+            isGuestOrder,
+            guestCustomer: isGuestOrder ? (request.body.guestCustomer || null) : null,
             // Discount information
             discounts: request.body.discounts || null,
             // Status tracking
@@ -140,8 +197,8 @@ export const createOrderController = async (request, response) => {
             return response.status(500).json({
                 error: true,
                 success: false,
-                message: 'Failed to save order to database',
-                details: process.env.NODE_ENV === 'development' ? saveError.message : undefined
+                message: saveError.message || 'Failed to save order to database',
+                details: saveError.message
             });
         }
 
@@ -150,13 +207,13 @@ export const createOrderController = async (request, response) => {
         // ========================================
         try {
             // Check if any products belong to vendors
-            const vendorProducts = request.body.products.filter(p => p.vendor || p.vendorId);
+            const vendorProducts = normalizedProducts.filter(p => p.vendor || p.vendorId);
             
             if (vendorProducts.length > 0) {
                 console.log('💰 Calculating vendor commissions for', vendorProducts.length, 'vendor products');
                 
                 // Calculate commissions for all order items
-                const commissionResult = await calculateOrderCommissions(request.body.products);
+                const commissionResult = await calculateOrderCommissions(normalizedProducts);
                 
                 // Update order products with commission info
                 for (let i = 0; i < order.products.length; i++) {
@@ -212,8 +269,8 @@ export const createOrderController = async (request, response) => {
         const shouldAffectInventory = paymentStatus !== 'FAILED';
         
         if (shouldAffectInventory) {
-            for (let i = 0; i < request.body.products.length; i++) {
-                const orderProduct = request.body.products[i];
+            for (let i = 0; i < normalizedProducts.length; i++) {
+                const orderProduct = normalizedProducts[i];
                 
                 // Get product from database
                 const product = await ProductModel.findById(orderProduct.productId);
@@ -294,8 +351,8 @@ export const createOrderController = async (request, response) => {
             let userName = null;
             let userInfo = null;
             
-            if (request.body.userId) {
-                const user = await UserModel.findOne({ _id: request.body.userId });
+            if (userId) {
+                const user = await UserModel.findOne({ _id: userId });
                 if (user?.email) {
                     userEmail = user.email;
                     userName = user.name;

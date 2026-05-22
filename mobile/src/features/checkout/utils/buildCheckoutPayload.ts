@@ -1,6 +1,7 @@
 import { CreateOrderData } from '../../../services/checkout.service';
 import { validateCheckoutCustomer } from '../validators/checkout.validators';
 import { CheckoutMode, CheckoutValidationIssue } from '../types/checkout.types';
+import { resolveImageUrl } from '../../../utils/productImages';
 
 interface BuildCheckoutPayloadInput {
   mode: CheckoutMode;
@@ -66,17 +67,27 @@ export function buildCheckoutPayload(input: BuildCheckoutPayloadInput): { ok: tr
 
   if (errors.length > 0) return { ok: false, errors };
 
-  const normalizedProducts = input.cartItems.map((item: any) => ({
-    productId: item.productId || item.product?._id,
-    productTitle: item.productTitle || item.product?.name || 'Product',
-    quantity: item.quantity,
-    price: item.price,
-    subTotal: item.subtotal || item.price * item.quantity,
-    image: item.image || item.product?.images?.[0] || '',
-    productType: item.productType || (item.variationId ? 'variable' : 'simple'),
-    variationId: item.variationId || item.variation?._id || null,
-    variation: item.variation || null,
-  }));
+  const normalizedProducts = input.cartItems.map((item: any) => {
+    const firstImage = item.product?.images?.[0];
+    const imageCandidate =
+      item.image ||
+      (typeof firstImage === 'object' ? firstImage?.url : firstImage) ||
+      item.product?.featuredImage;
+    return {
+      productId: String(item.productId || item.product?._id || '').trim(),
+      productTitle: item.productTitle || item.product?.name || 'Product',
+      quantity: item.quantity,
+      price: item.price,
+      subTotal: item.subtotal || item.price * item.quantity,
+      image: resolveImageUrl(imageCandidate) || '',
+      productType: item.productType || (item.variationId ? 'variable' : 'simple'),
+      variationId: item.variationId || item.variation?._id || null,
+      variation: item.variation || null,
+    };
+  }).filter((p) => p.productId);
+
+  const isAuthenticated = input.mode === 'authenticated';
+  const userId = input.user?._id || input.user?.id;
 
   const payload: CreateOrderData = {
     shippingAddressId: address?._id || '',
@@ -90,13 +101,7 @@ export function buildCheckoutPayload(input: BuildCheckoutPayloadInput): { ok: tr
     shippingAddress: address,
     delivery_address: address?._id,
     payment_status: 'pending',
-    isGuestOrder: input.mode === 'guest',
-    // Compatibility bridge while backend rollout completes.
-    guestCustomer: {
-      name: fullName,
-      email,
-      phone: safePhone,
-    },
+    isGuestOrder: !isAuthenticated,
     customerName: fullName,
     phone: safePhone,
     deliveryNote: String(input.deliveryNote || '').trim() || undefined,
@@ -104,6 +109,17 @@ export function buildCheckoutPayload(input: BuildCheckoutPayloadInput): { ok: tr
     couponCode: input.couponCode || undefined,
     giftCardCode: input.giftCardCode || undefined,
   };
+
+  if (isAuthenticated && userId) {
+    payload.userId = String(userId);
+    payload.isGuestOrder = false;
+  } else {
+    payload.guestCustomer = {
+      name: fullName,
+      email,
+      phone: safePhone,
+    };
+  }
 
   return {
     ok: true,
