@@ -4,6 +4,7 @@
  */
 
 import { fetchDataFromApi, postData } from './api';
+import { unwrapProductPayload } from '../utils/productImages';
 import { API_ENDPOINTS, PAGINATION } from '../constants/config';
 import { Product, ProductFilters, Category } from '../types/product.types';
 import { ApiResponse, PaginatedResponse } from '../types/api.types';
@@ -67,6 +68,10 @@ export const productService = {
     const response = await fetchDataFromApi<Product>(
       `${API_ENDPOINTS.GET_PRODUCT}/${productId}`
     );
+    const product = unwrapProductPayload(response.data);
+    if (product) {
+      return { ...response, data: product as Product };
+    }
     return response;
   },
 

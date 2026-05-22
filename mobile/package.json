@@ -8,7 +8,7 @@
     "start:lan": "npx expo start --lan --clear",
     "start:tunnel": "npx expo start --tunnel --clear",
     "start:dev-client": "npx expo start --dev-client --lan --clear",
-    "start:dev-client:tunnel": "npx expo start --dev-client --tunnel --clear",
+    "start:dev-client:tunnel": "powershell -ExecutionPolicy Bypass -File ./start-expo-tunnel.ps1 -DevClient",
     "start:dev-client:lan": "npx expo start --dev-client --lan --clear",
     "start:iphone": "powershell -ExecutionPolicy Bypass -File ./start-expo-iphone.ps1",
     "android": "npx expo run:android",

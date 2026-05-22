@@ -43,6 +43,7 @@ import {
 import { useAuthState } from '../../core/auth/authGuards';
 import { showError, showInfo, showSuccess, showWarning } from '../../utils/toast';
 import { FLATLIST_PERF, FLATLIST_PERF_HORIZONTAL } from '../../utils/flatListPerf';
+import { collectProductImageUrls, unwrapProductPayload } from '../../utils/productImages';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IMAGE_HEIGHT = SCREEN_WIDTH; // Square images for better display
@@ -380,13 +381,10 @@ const ProductDetailScreen: React.FC = () => {
       let productData: Product | null = null;
       
       if (response.success) {
-        if (response.data) {
-          productData = response.data as Product;
-        } else if ((response as any).product) {
-          productData = (response as any).product as Product;
-        } else if ((response as any).data?.product) {
-          productData = (response as any).data.product as Product;
-        }
+        productData =
+          unwrapProductPayload(response.data) ??
+          unwrapProductPayload((response as any).product) ??
+          (response.data as Product);
       }
       
       if (productData) {
@@ -401,21 +399,14 @@ const ProductDetailScreen: React.FC = () => {
         );
         
         // Add to recently viewed
-        const getImageUrl = (img: any): string | null => {
-          if (typeof img === 'string') return img;
-          if (img && typeof img === 'object' && img.url) return img.url;
-          return null;
-        };
-        const imageUrls = Array.isArray(cleanedProduct.images)
-          ? cleanedProduct.images.map(getImageUrl).filter((url): url is string => url !== null)
-          : [];
-        
+        const imageUrls = collectProductImageUrls(cleanedProduct);
+
         addToRecentlyViewed({
           _id: cleanedProduct._id,
           name: cleanedProduct.name,
           price: cleanedProduct.price,
           images: imageUrls,
-          featuredImage: cleanedProduct.featuredImage,
+          featuredImage: imageUrls[0] ?? cleanedProduct.featuredImage,
         });
       }
     } catch (error: any) {
@@ -577,8 +568,7 @@ const ProductDetailScreen: React.FC = () => {
 
           const productName = product.name || 'Product';
           const attrsText = product.productType === 'variable' ? formatSelectedAttributes(selectedVariation) : '';
-          const firstImg = product.images?.[0];
-          const imageUri = typeof firstImg === 'string' ? firstImg : (firstImg as any)?.url ?? (product as any).featuredImage ?? null;
+          const imageUri = collectProductImageUrls(product, selectedVariation)[0] ?? null;
           setAddedToCartModal({
             productName,
             imageUri,
@@ -622,8 +612,7 @@ const ProductDetailScreen: React.FC = () => {
 
         const productName = product.name || 'Product';
         const attrsText = product.productType === 'variable' ? formatSelectedAttributes(selectedVariation) : '';
-        const firstImg = product.images?.[0];
-        const imageUri = typeof firstImg === 'string' ? firstImg : (firstImg as any)?.url ?? (product as any).featuredImage ?? null;
+        const imageUri = collectProductImageUrls(product, selectedVariation)[0] ?? null;
         setAddedToCartModal({
           productName,
           imageUri,
@@ -689,23 +678,7 @@ const ProductDetailScreen: React.FC = () => {
 
   const getImageUrls = (): string[] => {
     if (!product) return [];
-    
-    const getImageUrl = (image: any): string | null => {
-      if (!image) return null;
-      if (typeof image === 'object' && image.url) return image.url;
-      if (typeof image === 'string') return image;
-      return null;
-    };
-
-    const imageUrls = product.images
-      ? product.images.map(getImageUrl).filter((url): url is string => url !== null)
-      : [];
-
-    if (imageUrls.length === 0 && (product as any).featuredImage) {
-      imageUrls.push((product as any).featuredImage);
-    }
-
-    return imageUrls;
+    return collectProductImageUrls(product, selectedVariation);
   };
 
   const renderImageItem = ({ item, index }: { item: string; index: number }) => (
