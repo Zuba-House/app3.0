@@ -3,7 +3,7 @@
     "name": "Zuba",
     "owner": "olivierndev",
     "slug": "zuba-mobile",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "scheme": "zuba",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -30,7 +30,8 @@
     "ios": {
       "supportsTablet": true,
       "useFrameworks": "static",
-      "bundleIdentifier": "com.zubahouse.customer",
+      "bundleIdentifier": "ninja.wpapp.appzubahousecom",
+      "buildNumber": "2",
       "googleServicesFile": "./GoogleService-Info.plist",
       "splash": {
         "image": "./assets/splash.png",
@@ -44,7 +45,8 @@
       }
     },
     "android": {
-      "package": "com.zubahouse.customer",
+      "package": "appzubahousecom.wpapp",
+      "versionCode": 2,
       "enableProguardInReleaseBuilds": true,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
