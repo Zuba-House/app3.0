@@ -19,6 +19,7 @@ import { categoryService, Category } from '../../services/category.service';
 import Colors from '../../constants/colors';
 import { API_URL } from '../../constants/config';
 import { navigateToProductList, pressNavigate } from '../../navigation/navigationHelpers';
+import { FLATLIST_PERF } from '../../utils/flatListPerf';
 
 const CategoriesScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -62,11 +63,13 @@ const CategoriesScreen: React.FC = () => {
         <ActivityIndicator style={{ marginTop: 40 }} size="large" color={Colors.secondary} />
       ) : (
         <FlatList
+          {...FLATLIST_PERF}
           data={categories}
           keyExtractor={(item) => item._id}
           numColumns={2}
           contentContainerStyle={styles.list}
           columnWrapperStyle={styles.row}
+          onEndReachedThreshold={0.1}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}

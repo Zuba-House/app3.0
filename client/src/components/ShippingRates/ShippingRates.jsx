@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './ShippingRates.css';
 
-const VITE_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const VITE_API_URL = import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com';
 
 const ShippingRates = ({ cartItems, shippingAddress, onRateSelected }) => {
   const [rates, setRates] = useState([]);

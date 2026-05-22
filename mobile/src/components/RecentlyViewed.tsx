@@ -21,6 +21,7 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../constants/colors';
 import { navigateToProductDetail } from '../navigation/navigationHelpers';
+import { FLATLIST_PERF_HORIZONTAL } from '../utils/flatListPerf';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_SIZE = 80;
@@ -58,8 +59,8 @@ const RecentlyViewed: React.FC<RecentlyViewedProps> = ({ maxItems = 10 }) => {
           .slice(0, maxItems);
         setRecentProducts(sorted);
       }
-    } catch (error) {
-      console.error('Error loading recent products:', error);
+    } catch {
+      // Non-critical
     }
   };
 
@@ -77,8 +78,8 @@ const RecentlyViewed: React.FC<RecentlyViewedProps> = ({ maxItems = 10 }) => {
           try {
             await AsyncStorage.removeItem('recentlyViewed');
             setRecentProducts([]);
-          } catch (error) {
-            console.error('Error clearing recent products:', error);
+          } catch {
+            // Non-critical
           }
         },
       },
@@ -102,6 +103,7 @@ const RecentlyViewed: React.FC<RecentlyViewedProps> = ({ maxItems = 10 }) => {
 
       {/* Products List */}
       <FlatList
+        {...FLATLIST_PERF_HORIZONTAL}
         data={recentProducts}
         renderItem={({ item }) => (
           <TouchableOpacity
@@ -114,6 +116,7 @@ const RecentlyViewed: React.FC<RecentlyViewedProps> = ({ maxItems = 10 }) => {
                 source={{ uri: item.image }}
                 style={styles.productImage}
                 contentFit="cover"
+                cachePolicy="memory-disk"
                 transition={200}
               />
             ) : (
@@ -171,8 +174,8 @@ export const addToRecentlyViewed = async (product: {
     products = products.slice(0, 20);
 
     await AsyncStorage.setItem('recentlyViewed', JSON.stringify(products));
-  } catch (error) {
-    console.error('Error saving to recently viewed:', error);
+  } catch {
+    // Non-critical
   }
 };
 

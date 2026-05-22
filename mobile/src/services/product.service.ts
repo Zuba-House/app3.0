@@ -110,16 +110,13 @@ export const productService = {
       
       return response;
     } catch (error: any) {
-      console.error('Search error:', error);
-      // Fallback: try GET with query params
       try {
         const fallbackResponse = await fetchDataFromApi<Product[]>(
           API_ENDPOINTS.GET_ALL_PRODUCTS,
           { search: query, query: query, name: query, limit: 50 }
         );
         return fallbackResponse;
-      } catch (fallbackError) {
-        console.error('Fallback search also failed:', fallbackError);
+      } catch {
         throw error;
       }
     }
@@ -182,16 +179,13 @@ export const productService = {
         message: response?.message || 'Failed to fetch products',
       };
     } catch (error: any) {
-      console.error('Error fetching products by brand:', error);
-      // Fallback: try GET with brand query param
       try {
         const fallbackResponse = await fetchDataFromApi<Product[]>(
           API_ENDPOINTS.GET_ALL_PRODUCTS,
           { brand, page, limit }
         );
         return fallbackResponse;
-      } catch (fallbackError) {
-        console.error('Fallback brand filter also failed:', fallbackError);
+      } catch {
         throw error;
       }
     }

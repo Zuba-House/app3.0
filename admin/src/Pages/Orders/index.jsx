@@ -5,6 +5,7 @@ import Badge from "../../Components/Badge";
 import SearchBox from '../../Components/SearchBox';
 import { FaAngleUp } from "react-icons/fa6";
 import { deleteData, editData, fetchDataFromApi } from '../../utils/api';
+import { isApiSuccess } from '../../utils/apiResponse';
 import Pagination from "@mui/material/Pagination";
 
 import MenuItem from '@mui/material/MenuItem';
@@ -67,8 +68,8 @@ export const Orders = () => {
         context.alertBox("success", response?.message || "Order status updated successfully");
         // Refresh orders list immediately
         fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
-          if (res?.error === false) {
-            setOrdersData(res?.data)
+          if (isApiSuccess(res)) {
+            setOrdersData(Array.isArray(res?.data) ? res.data : []);
             setOrderStatus(''); // Reset to trigger useEffect refresh
           }
         })
@@ -88,13 +89,15 @@ export const Orders = () => {
   useEffect(() => {
     context?.setProgress(50);
     fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
-      if (res?.error === false) {
-        setOrdersData(res?.data)
+      if (isApiSuccess(res)) {
+        setOrdersData(Array.isArray(res?.data) ? res.data : []);
         context?.setProgress(100);
+      } else {
+        setOrdersData([]);
       }
     })
     fetchDataFromApi(`/api/order/order-list`).then((res) => {
-      if (res?.error === false) {
+      if (isApiSuccess(res)) {
         setTotalOrdersData(res)
       }
     })
@@ -114,9 +117,11 @@ export const Orders = () => {
       setOrdersData(filteredOrders)
     } else {
       fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
-        if (res?.error === false) {
+        if (isApiSuccess(res)) {
           setOrders(res)
-          setOrdersData(res?.data)
+          setOrdersData(Array.isArray(res?.data) ? res.data : []);
+        } else {
+          setOrdersData([]);
         }
       })
     }
@@ -128,15 +133,15 @@ export const Orders = () => {
           if (context?.userData?.role === "ADMIN") {
               deleteData(`/api/order/deleteOrder/${id}`).then((res) => {
                 fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
-                  if (res?.error === false) {
-                    setOrdersData(res?.data)
+                  if (isApiSuccess(res)) {
+                    setOrdersData(Array.isArray(res?.data) ? res.data : []);
                     context?.setProgress(100);
                     context.alertBox("success", "Order Delete successfully!");
                   }
                 })
 
                 fetchDataFromApi(`/api/order/order-list`).then((res) => {
-                  if (res?.error === false) {
+                  if (isApiSuccess(res)) {
                     setTotalOrdersData(res)
                   }
                 })

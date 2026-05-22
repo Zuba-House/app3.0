@@ -35,7 +35,8 @@ const Login = () => {
 
   useEffect(() => {
     fetchDataFromApi("/api/logo").then((res) => {
-      localStorage.setItem('logo', res?.logo[0]?.logo)
+      const logoUrl = res?.logo?.[0]?.logo ?? res?.data?.[0]?.logo;
+      if (logoUrl) localStorage.setItem('logo', logoUrl);
     })
   }, [])
 
@@ -162,12 +163,20 @@ const Login = () => {
         // The signed-in user info.
         const user = result.user;
 
+        const provider = user?.providerData?.[0];
+        if (!provider?.email) {
+          context.alertBox("error", "Google sign-in did not return account details. Try again.");
+          setLoadingGoogle(false);
+          setIsLoading(false);
+          return;
+        }
+
         const fields = {
-          name: user.providerData[0].displayName,
-          email: user.providerData[0].email,
+          name: provider.displayName,
+          email: provider.email,
           password: null,
-          avatar: user.providerData[0].photoURL,
-          mobile: user.providerData[0].phoneNumber,
+          avatar: provider.photoURL,
+          mobile: provider.phoneNumber,
           role: "USER"
         };
 

@@ -21,7 +21,8 @@ const VerifyAccount = () => {
 
   useEffect(() => {
     fetchDataFromApi("/api/logo").then((res) => {
-      localStorage.setItem('logo', res?.logo[0]?.logo)
+      const logoUrl = res?.logo?.[0]?.logo ?? res?.data?.[0]?.logo;
+      if (logoUrl) localStorage.setItem('logo', logoUrl);
     })
   }, [])
 

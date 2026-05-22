@@ -19,6 +19,7 @@ import ProductCard from '../../components/ProductCard';
 import Colors from '../../constants/colors';
 import { useAuthState } from '../../core/auth/authGuards';
 import { useAuthGate } from '../../core/auth/authGate';
+import { FLATLIST_PERF } from '../../utils/flatListPerf';
 
 const WishlistScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -46,8 +47,8 @@ const WishlistScreen: React.FC = () => {
         const local = await wishlistService.getLocalWishlist();
         setProducts(local);
       }
-    } catch (error) {
-      console.error('Wishlist error:', error);
+    } catch {
+      // Wishlist load failed silently
     } finally {
       setLoading(false);
     }
@@ -87,6 +88,7 @@ const WishlistScreen: React.FC = () => {
       )}
 
       <FlatList
+        {...FLATLIST_PERF}
         data={products}
         renderItem={({ item }) => (
           <ProductCard

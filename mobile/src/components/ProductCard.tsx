@@ -187,6 +187,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             source={{ uri: imageUrl }}
             style={styles.image}
             contentFit="cover"
+            cachePolicy="memory-disk"
             placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
             transition={200}
             onError={() => {

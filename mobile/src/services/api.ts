@@ -1,6 +1,7 @@
 import { API_URL } from '../constants/config';
 import { authManager } from '../core/auth/authManager';
 import { ApiResponse } from '../types/api.types';
+import { getCachedGet, setCachedGet } from '../utils/apiCache';
 
 type RequestConfig = RequestInit & { _retryCount?: number };
 const REQUEST_TIMEOUT_MS = 10000;
@@ -21,9 +22,21 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
 }
 
 function normalizeResponse<T>(raw: any): ApiResponse<T> {
-  const data = raw?.data ?? raw?.product ?? raw?.products ?? raw?.result ?? raw?.user ?? raw?.address ?? null;
+  let data =
+    raw?.data ?? raw?.product ?? raw?.products ?? raw?.result ?? raw?.user ?? raw?.address ?? null;
+
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    if (Array.isArray(data.products)) {
+      data = data.products;
+    } else if (Array.isArray(data.orders)) {
+      data = data.orders;
+    } else if (Array.isArray(data.users)) {
+      data = data.users;
+    }
+  }
+
   return {
-    success: raw?.success !== false,
+    success: raw?.success !== false && raw?.error !== true,
     error: raw?.error === true,
     message: raw?.message,
     data: (data ?? raw) as T,
@@ -51,9 +64,6 @@ async function request<T>(url: string, config: RequestConfig = {}): Promise<ApiR
     return request<T>(url, { ...config, _retryCount: retryCount + 1 });
   }
   if (!response.ok || (json?.success === false && json?.error === true)) {
-    if (__DEV__ && response.status >= 400) {
-      console.error('[API Error]', url, response.status, json?.message);
-    }
     throw new Error(json?.message || 'Request failed');
   }
   return normalizeResponse<T>(json);
@@ -127,7 +137,20 @@ export const deleteDataOptional = async <T = unknown>(
 
 export const fetchDataFromApi = async <T = unknown>(url: string, params?: Record<string, string | number | boolean>): Promise<ApiResponse<T>> => {
   const queryString = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
-  return request<T>(`${url}${queryString}`, { method: 'GET' });
+  const fullUrl = `${url}${queryString}`;
+  const cached = getCachedGet<ApiResponse<T>>(fullUrl);
+  if (cached) {
+    return cached;
+  }
+  try {
+    const result = await request<T>(fullUrl, { method: 'GET' });
+    setCachedGet(fullUrl, result);
+    return result;
+  } catch (error) {
+    const stale = getCachedGet<ApiResponse<T>>(fullUrl);
+    if (stale) return stale;
+    throw error;
+  }
 };
 
 export const postData = async <T = unknown>(url: string, data?: unknown): Promise<ApiResponse<T>> => {

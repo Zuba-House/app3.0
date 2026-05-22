@@ -21,6 +21,7 @@ import { Product } from '../types/product.types';
 import Colors from '../constants/colors';
 import { filterPricedProducts, getSoldPercent, isAlmostGone } from '../utils/productDisplay';
 import { navigateToProductDetail, navigateToProductList } from '../navigation/navigationHelpers';
+import { FLATLIST_PERF_HORIZONTAL } from '../utils/flatListPerf';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.38;
@@ -305,6 +306,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({
 
       {/* Products List */}
       <FlatList
+        {...FLATLIST_PERF_HORIZONTAL}
         data={dataToRender}
         renderItem={({ item, index }) => (
           <FlashSaleCard product={item} index={index} />
@@ -313,6 +315,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        onEndReachedThreshold={0.1}
       />
     </View>
   );
@@ -494,4 +497,4 @@ const styles = StyleSheet.create({
   endedText: { fontSize: 14, fontWeight: '600', color: '#6b7280' },
 });
 
-export default FlashSale;
+export default React.memo(FlashSale);

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { toLegacyApiResponse } from "./apiResponse.js";
 
 const rawBase =
     import.meta.env.VITE_API_URL || "https://zuba-api.onrender.com";
@@ -119,12 +120,16 @@ export const postData = async (url, formData) => {
 
 
         if (response.ok) {
-            const data = await response.json();
+            const data = toLegacyApiResponse(await response.json());
             return { ...data, httpStatus: response.status, ok: true };
         }
         let errorData = { success: false, message: response.statusText };
         try {
-            errorData = { ...(await response.json()), httpStatus: response.status, ok: false };
+            errorData = toLegacyApiResponse({
+                ...(await response.json()),
+                httpStatus: response.status,
+                ok: false,
+            });
         } catch {
             errorData = { success: false, message: response.statusText, httpStatus: response.status, ok: false };
         }
@@ -156,15 +161,18 @@ export const fetchDataFromApi = async (url, options = {}) => {
         };
 
         const { data } = await axios.get(apiUrl + url, params);
-        return data;
+        return toLegacyApiResponse(data);
     } catch (error) {
         const status = error.response?.status;
         if (!silent) {
             if (status && status >= 500) {
                 console.warn('[API]', status, url, error.message);
+            } else if (status === 401 || status === 403) {
+                console.warn('[API]', status, url, error.response?.data?.message || error.message);
             }
         }
-        return null;
+        const errBody = error.response?.data;
+        return errBody ? toLegacyApiResponse({ ...errBody, success: false, error: true }) : null;
     }
 };
 
@@ -179,7 +187,7 @@ export const uploadImage = async (url, updatedData ) => {
         
         } 
         const res = await axios.put(apiUrl + url, updatedData, params);
-        return res.data;
+        return toLegacyApiResponse(res.data);
     } catch (error) {
         console.error('Upload error:', error);
         // Return error in the same format as success response
@@ -203,7 +211,7 @@ export const uploadImages = async (url, formData ) => {
         
         } 
         const res = await axios.post(apiUrl + url, formData, params);
-        return res.data;
+        return toLegacyApiResponse(res.data);
     } catch (error) {
         console.error('Upload error:', error);
         // Return error in the same format as success response
@@ -227,7 +235,7 @@ export const editData = async (url, updatedData ) => {
     
     } 
     const res = await axios.put(apiUrl + url, updatedData, params);
-    return res.data;
+    return toLegacyApiResponse(res.data);
    
 }
 
@@ -249,7 +257,7 @@ export const deleteImages = async (url,image ) => {
     
     } 
     const res = await axios.delete(apiUrl + url, params);
-    return res.data;
+    return toLegacyApiResponse(res.data);
 }
 
 
@@ -262,7 +270,7 @@ export const deleteData = async (url ) => {
     
     } 
     const res = await axios.delete(apiUrl + url, params);
-    return res.data;
+    return toLegacyApiResponse(res.data);
 }
 
 export const deleteMultipleData = async (url,data ) => {
@@ -275,5 +283,5 @@ export const deleteMultipleData = async (url,data ) => {
     } 
     // Axios delete with payload: put data under `data` in config
     const res = await axios.delete(apiUrl + url, { data, ...params });
-    return res.data;
+    return toLegacyApiResponse(res.data);
 }

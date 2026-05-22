@@ -19,6 +19,7 @@ import { Product } from '../types/product.types';
 import Colors from '../constants/colors';
 import { filterPricedProducts, formatProductPrice } from '../utils/productDisplay';
 import { navigateToProductDetail, navigateToProductList } from '../navigation/navigationHelpers';
+import { FLATLIST_PERF } from '../utils/flatListPerf';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
@@ -139,6 +140,7 @@ const TrendingProducts: React.FC<TrendingProductsProps> = ({
 
       {/* Products Grid */}
       <FlatList
+        {...FLATLIST_PERF}
         data={visible.slice(0, 6)}
         renderItem={renderProduct}
         keyExtractor={(item) => `trending-${item._id}`}
@@ -146,6 +148,7 @@ const TrendingProducts: React.FC<TrendingProductsProps> = ({
         scrollEnabled={false}
         contentContainerStyle={styles.gridContent}
         columnWrapperStyle={styles.columnWrapper}
+        onEndReachedThreshold={0.1}
       />
     </View>
   );
@@ -264,4 +267,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default TrendingProducts;
+export default React.memo(TrendingProducts);

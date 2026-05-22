@@ -27,6 +27,7 @@ import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectCartItems, selectCartTotal, setCart, updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { CartItem } from '../../types/cart.types';
 import Colors from '../../constants/colors';
+import { FLATLIST_PERF } from '../../utils/flatListPerf';
 import { FREE_SHIPPING_THRESHOLD, API_URL } from '../../constants/config';
 import { showError, showWarning } from '../../utils/toast';
 import { STORAGE_KEYS } from '../../constants/config';
@@ -299,10 +300,12 @@ const CartScreen: React.FC = () => {
 
       {/* Cart Items */}
       <FlatList
+        {...FLATLIST_PERF}
         data={cartItems}
         renderItem={renderCartItem}
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContent}
+        onEndReachedThreshold={0.1}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 

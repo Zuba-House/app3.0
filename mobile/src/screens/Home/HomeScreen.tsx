@@ -48,14 +48,18 @@ import CategoryDeals from '../../components/CategoryDeals';
 import ReferralBanner from '../../components/ReferralBanner';
 import TrendingProducts from '../../components/TrendingProducts';
 import { FLATLIST_PERF, FLATLIST_PERF_HORIZONTAL } from '../../utils/flatListPerf';
+import { useDeferredReady } from '../../hooks/useDeferredReady';
 
 const { width: SCREEN_WIDTH, width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 36) / 2; // 2 columns with tighter spacing (12px padding each side + 12px gap)
 
 
+const HOME_GRID_PREVIEW = 8;
+
 const HomeScreen: React.FC = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<any>();
+  const sectionsReady = useDeferredReady(120);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
@@ -336,16 +340,13 @@ const HomeScreen: React.FC = () => {
       if (products.length === 0) {
         setLoading(true);
       }
-      await Promise.allSettled([
-        loadProducts(null, undefined),
-        loadCategories(),
-        loadFeaturedProducts(),
-      ]);
-      
-      // Update cache
+      // Products first so the feed paints quickly; categories/featured load after.
+      await loadProducts(null, undefined);
+      setLoading(false);
+      void Promise.allSettled([loadCategories(), loadFeaturedProducts()]);
+
       dataCacheRef.current.lastLoad = Date.now();
-    } catch (error) {
-      console.error('Error loading data:', error);
+    } catch {
       showError('Failed to load data. Please pull down to refresh.');
     } finally {
       setLoading(false);
@@ -421,8 +422,7 @@ const HomeScreen: React.FC = () => {
         }
         setHasMore(false);
       }
-    } catch (error) {
-      console.error('Error loading products:', error);
+    } catch {
       if (!append) {
         setFilteredProducts([]);
         showError('Failed to load products. Please try again.');
@@ -435,14 +435,6 @@ const HomeScreen: React.FC = () => {
     }
   };
   
-  // Load more products (for infinite scroll)
-  const loadMoreProducts = useCallback(() => {
-    if (!loadingMore && hasMore && !loading) {
-      const nextPage = currentPage + 1;
-      loadProducts(selectedCategory, searchQuery, nextPage, true);
-    }
-  }, [currentPage, hasMore, loadingMore, loading, selectedCategory, searchQuery]);
-
   useEffect(() => {
     // Reset pagination when filters change
     setCurrentPage(1);
@@ -488,9 +480,8 @@ const HomeScreen: React.FC = () => {
       } else {
         setCategories([]);
       }
-    } catch (error) {
-      console.error('Error loading categories:', error);
-      setCategories([]); // Set empty array on error
+    } catch {
+      setCategories([]);
       // Don't show error for categories - it's not critical
     }
   };
@@ -524,9 +515,8 @@ const HomeScreen: React.FC = () => {
         // Update cache
         dataCacheRef.current.featuredProducts = featured;
       }
-    } catch (error) {
-      console.error('Error loading featured products:', error);
-      // Don't show error for featured products - it's not critical
+    } catch {
+      // Featured products are non-critical
     }
   };
 
@@ -581,8 +571,7 @@ const HomeScreen: React.FC = () => {
       } else {
         setFilteredProducts([]);
       }
-    } catch (error) {
-      console.error('Search error:', error);
+    } catch {
       showError('Search failed. Please try again.');
       // Fallback: load all products
       loadProducts();
@@ -689,11 +678,10 @@ const HomeScreen: React.FC = () => {
               source={{ uri: categoryImageUrl }}
               style={styles.categoryImage}
               contentFit="cover"
+              cachePolicy="memory-disk"
               placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
               transition={200}
-              onError={(error) => {
-                console.error('Category image load error:', error);
-              }}
+              onError={() => {}}
             />
           ) : (
             <Ionicons name="grid-outline" size={24} color={Colors.secondary} />
@@ -958,55 +946,47 @@ const HomeScreen: React.FC = () => {
         {/* Promotional Banner - Minimalist Design */}
         {!selectedCategory && renderPromoBanner()}
 
-        {/* Daily Check-In Banner - TEMU Style */}
-        {!selectedCategory && <DailyCheckIn />}
-
-        {/* Flash Sale - TEMU Style */}
+        {/* Flash Sale — above the fold */}
         {!selectedCategory && pricedProducts.length > 0 && (
-          <FlashSale 
-            products={pricedProducts} 
+          <FlashSale
+            products={pricedProducts}
             title={t('home.flashSale')}
           />
         )}
 
-        {/* Deal of the Day - TEMU Style */}
-        {!selectedCategory && filterPricedProducts(featuredProducts).length > 0 && (
+        {sectionsReady && !selectedCategory && (
+          <>
+        <DailyCheckIn />
+
+        {filterPricedProducts(featuredProducts).length > 0 && (
           <DealOfTheDay product={filterPricedProducts(featuredProducts)[0]} />
         )}
 
-        {/* Trends Section - Based on customer likes and purchases */}
-        {!selectedCategory && trendingProducts.length > 0 && (
-          <TrendingProducts 
-            products={trendingProducts} 
-            title={t('home.trends')} 
+        {trendingProducts.length > 0 && (
+          <TrendingProducts
+            products={trendingProducts}
+            title={t('home.trends')}
           />
         )}
 
-        {/* Category Deals - TEMU Style */}
-        {!selectedCategory && (
-          <CategoryDeals categories={categoryDealsData.length > 0 ? categoryDealsData : undefined} />
-        )}
+        <CategoryDeals categories={categoryDealsData.length > 0 ? categoryDealsData : undefined} />
 
-        {/* Recently Viewed - TEMU Style */}
-        {!selectedCategory && <RecentlyViewed />}
+        <RecentlyViewed />
 
-        {/* Featured Deals - Horizontal Scroll */}
-        {!selectedCategory && featuredProducts.length > 0 && renderHorizontalProductSection(
+        {featuredProducts.length > 0 && renderHorizontalProductSection(
           t('home.featuredDeals'),
           t('home.limitedTimeOffers'),
           featuredProducts,
           { filter: 'featured', title: t('home.featuredDeals'), subtitle: t('home.limitedTimeOffers') }
         )}
 
-        {/* Top Rated Products - Horizontal Scroll */}
-        {!selectedCategory && topRatedProducts.length > 0 && renderHorizontalProductSection(
+        {topRatedProducts.length > 0 && renderHorizontalProductSection(
           'Top Rated Finds',
           '4+ star products',
           topRatedProducts
         )}
 
-        {/* New Arrivals Section */}
-        {!selectedCategory && newArrivalsProducts.length > 0 && (
+        {newArrivalsProducts.length > 0 && (
           <View style={styles.section}>
             {renderSectionHeader(t('home.newArrivals'), t('home.newCollection'), true, () =>
               navigateToProductList(navigation, {
@@ -1028,16 +1008,16 @@ const HomeScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Customer Favorites - Horizontal Scroll */}
-        {!selectedCategory && customerFavoritesProducts.length > 0 && renderHorizontalProductSection(
+        {customerFavoritesProducts.length > 0 && renderHorizontalProductSection(
           'Customer Favorites',
           'Most loved products',
           customerFavoritesProducts
         )}
 
 
-        {/* Referral Banner - TEMU Style */}
-        {!selectedCategory && <ReferralBanner rewardAmount={10} />}
+        <ReferralBanner rewardAmount={10} />
+          </>
+        )}
 
         {/* All Products Grid - Only show if category selected or search active */}
         {(selectedCategory || searchQuery) && (
@@ -1085,36 +1065,23 @@ const HomeScreen: React.FC = () => {
           </View>
         )}
 
-        {/* All Products Grid - Show when no filters */}
         {!selectedCategory && !searchQuery && products.length > 0 && (
           <View style={styles.section}>
-            {renderSectionHeader('Shop All Products', 'Discover amazing deals')}
+            {renderSectionHeader(
+              'Shop All Products',
+              'Discover amazing deals',
+              true,
+              () => navigateToProductList(navigation, { title: 'Shop All Products' })
+            )}
             <FlatList
               {...FLATLIST_PERF}
-              data={products}
+              data={products.slice(0, HOME_GRID_PREVIEW)}
               renderItem={renderProductItem}
               keyExtractor={(item) => item._id}
               numColumns={2}
               scrollEnabled={false}
               contentContainerStyle={styles.productsList}
-              onEndReached={loadMoreProducts}
-              onEndReachedThreshold={0.5}
-              ListEmptyComponent={
-                loading ? (
-                  <View style={styles.loadingMoreContainer}>
-                    <ActivityIndicator size="large" color={Colors.secondary} />
-                    <Text style={styles.loadingMoreText}>Loading products...</Text>
-                  </View>
-                ) : null
-              }
-              ListFooterComponent={
-                loadingMore ? (
-                  <View style={styles.loadingMoreContainer}>
-                    <ActivityIndicator size="small" color={Colors.secondary} />
-                    <Text style={styles.loadingMoreText}>Loading more...</Text>
-                  </View>
-                ) : null
-              }
+              onEndReachedThreshold={0.1}
               getItemLayout={(data, index) => ({
                 length: CARD_WIDTH + 12,
                 offset: (CARD_WIDTH + 12) * Math.floor(index / 2),

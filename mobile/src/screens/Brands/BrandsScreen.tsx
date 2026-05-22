@@ -22,6 +22,7 @@ import { Product } from '../../types/product.types';
 import ProductCard from '../../components/ProductCard';
 import Colors from '../../constants/colors';
 import { InteractionManager } from 'react-native';
+import { FLATLIST_PERF } from '../../utils/flatListPerf';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BRAND_SIZE = (SCREEN_WIDTH - 64) / 3; // 3 columns with padding
@@ -269,16 +270,14 @@ const BrandsScreen: React.FC = () => {
           </View>
         ) : products.length > 0 ? (
           <FlatList
+            {...FLATLIST_PERF}
             data={products}
             renderItem={renderProductItem}
             keyExtractor={(item) => item._id}
             numColumns={2}
             contentContainerStyle={styles.productsList}
             showsVerticalScrollIndicator={false}
-            removeClippedSubviews={true}
-            initialNumToRender={6}
-            maxToRenderPerBatch={10}
-            windowSize={10}
+            onEndReachedThreshold={0.1}
             getItemLayout={(data, index) => ({
               length: CARD_WIDTH + 12,
               offset: (CARD_WIDTH + 12) * Math.floor(index / 2),
@@ -321,16 +320,14 @@ const BrandsScreen: React.FC = () => {
 
       {/* Brands Grid */}
       <FlatList
+        {...FLATLIST_PERF}
         data={ALL_BRANDS}
         renderItem={renderBrandItem}
         keyExtractor={(item) => item.id}
         numColumns={3}
         contentContainerStyle={styles.brandsList}
         showsVerticalScrollIndicator={false}
-        removeClippedSubviews={true}
-        initialNumToRender={9}
-        maxToRenderPerBatch={6}
-        windowSize={5}
+        onEndReachedThreshold={0.1}
       />
     </View>
   );

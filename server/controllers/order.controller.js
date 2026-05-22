@@ -422,7 +422,7 @@ export async function getOrderDetailsController(request, response) {
 
         const orderlist = await OrderModel.find().sort({ createdAt: -1 }).populate('delivery_address userId').skip((page - 1) * limit).limit(parseInt(limit));
 
-        const total = await OrderModel.countDocuments(orderlist);
+        const total = await OrderModel.countDocuments();
 
         return response.json({
             message: "order list",

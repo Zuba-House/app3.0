@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../constants/colors';
 import { navigateToCategories, navigateToProductList } from '../navigation/navigationHelpers';
+import { FLATLIST_PERF_HORIZONTAL } from '../utils/flatListPerf';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -90,6 +91,7 @@ const CategoryDeals: React.FC<CategoryDealsProps> = ({
         source={{ uri: item.image }}
         style={styles.categoryImage}
         contentFit="cover"
+        cachePolicy="memory-disk"
         transition={200}
       />
       <View style={styles.overlay} />
@@ -117,12 +119,14 @@ const CategoryDeals: React.FC<CategoryDealsProps> = ({
       </View>
 
       <FlatList
+        {...FLATLIST_PERF_HORIZONTAL}
         data={categories}
         renderItem={renderCategory}
         keyExtractor={(item) => `cat-deal-${item.id}`}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        onEndReachedThreshold={0.1}
       />
     </View>
   );
@@ -210,4 +214,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CategoryDeals;
+export default React.memo(CategoryDeals);

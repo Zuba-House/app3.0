@@ -1,4 +1,5 @@
 import axios from "axios";
+import { toLegacyApiResponse } from "./apiResponse.js";
 
 const rawBase =
     import.meta.env.VITE_API_URL || "https://zuba-api.onrender.com";
@@ -36,10 +37,10 @@ export const postData = async (url, formData) => {
 
 
         if (response.ok) {
-            const data = await response.json();
+            const data = toLegacyApiResponse(await response.json());
             return data;
         } else {
-            const errorData = await response.json();
+            const errorData = toLegacyApiResponse(await response.json());
             return handleAuthError(response.status, errorData);
         }
 
@@ -64,7 +65,7 @@ export const fetchDataFromApi = async (url) => {
         } 
 
         const { data } = await axios.get(apiUrl + url, params);
-        return data;
+        return toLegacyApiResponse(data);
     } catch (error) {
         console.log('API Error:', error?.response?.status, error?.response?.data?.message || error.message);
         
@@ -85,7 +86,10 @@ export const fetchDataFromApi = async (url) => {
         }
         
         // Return error data for other errors (including 404)
-        return error?.response?.data || { 
+        const errBody = error?.response?.data;
+        return errBody
+            ? toLegacyApiResponse({ ...errBody, success: false, error: true })
+            : {
             success: false,
             error: true, 
             message: error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Request failed' 

@@ -15,6 +15,7 @@ import {
   Platform,
   FlatList,
   Animated,
+  InteractionManager,
   Share,
   Modal,
 } from 'react-native';
@@ -41,6 +42,7 @@ import {
 } from '../../utils/productStock';
 import { useAuthState } from '../../core/auth/authGuards';
 import { showError, showInfo, showSuccess, showWarning } from '../../utils/toast';
+import { FLATLIST_PERF, FLATLIST_PERF_HORIZONTAL } from '../../utils/flatListPerf';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IMAGE_HEIGHT = SCREEN_WIDTH; // Square images for better display
@@ -214,8 +216,7 @@ const cleanProductData = (product: any): Product => {
     if (product.updatedAt) cleaned.updatedAt = product.updatedAt;
     
     return cleaned as Product;
-  } catch (error) {
-    console.warn('Error cleaning product data:', error);
+  } catch {
     const fallback: any = {
       _id: product._id || '',
       name: product.name || 'Unknown Product',
@@ -347,10 +348,12 @@ const ProductDetailScreen: React.FC = () => {
   }, [productId]);
 
   useEffect(() => {
-    if (product) {
-      loadRelatedProducts();
-    }
-  }, [product]);
+    if (!product) return;
+    const task = InteractionManager.runAfterInteractions(() => {
+      void loadRelatedProducts();
+    });
+    return () => task.cancel();
+  }, [product?._id]);
 
   useEffect(() => {
     if (addedToCartModal) {
@@ -416,7 +419,6 @@ const ProductDetailScreen: React.FC = () => {
         });
       }
     } catch (error: any) {
-      console.error('Error loading product:', error);
       showError(error.message || 'Failed to load product');
     } finally {
       setLoading(false);
@@ -480,8 +482,8 @@ const ProductDetailScreen: React.FC = () => {
       
       const filtered = candidates.slice(0, maxRelated).map((p: any) => cleanProductData(p));
       setRelatedProducts(filtered);
-    } catch (error) {
-      console.error('Error loading related products:', error);
+    } catch {
+      // Related products are optional
     } finally {
       setLoadingRelated(false);
     }
@@ -563,14 +565,14 @@ const ProductDetailScreen: React.FC = () => {
             if (cartResponse.success && Array.isArray(cartResponse.data)) {
               dispatch(setCart(cartResponse.data));
             }
-          } catch (cartError) {
-            console.error('Error refreshing cart:', cartError);
+          } catch {
+            // Cart refresh is best-effort
           }
 
           try {
             analyticsService.addToCart(product._id, product.name, price, quantity);
-          } catch (analyticsError) {
-            console.error('Error tracking analytics:', analyticsError);
+          } catch {
+            // Analytics is non-blocking
           }
 
           const productName = product.name || 'Product';
@@ -614,8 +616,8 @@ const ProductDetailScreen: React.FC = () => {
 
         try {
           analyticsService.addToCart(product._id, product.name, price, quantity);
-        } catch (analyticsError) {
-          console.error('Error tracking analytics:', analyticsError);
+        } catch {
+          // Analytics is non-blocking
         }
 
         const productName = product.name || 'Product';
@@ -630,8 +632,6 @@ const ProductDetailScreen: React.FC = () => {
         });
       }
     } catch (error: any) {
-      console.error('Add to cart error:', error);
-      
       // Handle network errors
       if (error.message?.includes('network') || error.message?.includes('fetch')) {
         showError('Unable to connect to server. Please check your internet connection and try again.');
@@ -920,6 +920,7 @@ const ProductDetailScreen: React.FC = () => {
             </View>
           ) : (
             <FlatList
+              {...FLATLIST_PERF}
               data={relatedProducts}
               renderItem={renderRecommendProduct}
               keyExtractor={(item) => item._id}
@@ -927,6 +928,7 @@ const ProductDetailScreen: React.FC = () => {
               columnWrapperStyle={styles.recommendRow}
               contentContainerStyle={styles.recommendList}
               showsVerticalScrollIndicator={false}
+              onEndReachedThreshold={0.1}
               ListFooterComponent={<View style={{ height: 100 }} />}
             />
           )}
@@ -1006,6 +1008,7 @@ const ProductDetailScreen: React.FC = () => {
           {imageUrls.length > 0 ? (
             <>
               <FlatList
+                {...FLATLIST_PERF_HORIZONTAL}
                 ref={imageScrollRef}
                 data={imageUrls}
                 renderItem={renderImageItem}
@@ -1021,7 +1024,6 @@ const ProductDetailScreen: React.FC = () => {
                   const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
                   setSelectedImageIndex(index);
                 }}
-                scrollEventThrottle={16}
               />
 
               {/* Top-right badge (e.g. verified / material) */}
@@ -1457,15 +1459,14 @@ const ProductDetailScreen: React.FC = () => {
               ) : (
                 <View style={styles.relatedListWrapper}>
                   <FlatList
+                    {...FLATLIST_PERF_HORIZONTAL}
                     data={relatedProducts}
                     renderItem={renderRelatedProduct}
                     keyExtractor={(item) => item._id}
                     horizontal
                     showsHorizontalScrollIndicator={true}
                     contentContainerStyle={styles.relatedList}
-                    removeClippedSubviews={false}
-                    initialNumToRender={6}
-                    maxToRenderPerBatch={10}
+                    onEndReachedThreshold={0.1}
                   />
                 </View>
               )}

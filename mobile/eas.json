@@ -18,7 +18,10 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://zuba-api.onrender.com"
+      }
     }
   },
   "submit": {
