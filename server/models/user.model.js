@@ -1,20 +1,90 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema(
-  {
-    name: String,
-    email: { type: String, lowercase: true },
-    password: String,
-    role: { type: String, default: 'USER', enum: ['USER', 'ADMIN', 'VENDOR'] },
-    status: { type: String, default: 'active' },
-    avatar: String,
-    mobile: String,
-    vendorId: mongoose.Schema.Types.ObjectId,
-    pushTokens: { type: [String], default: [] },
-    refreshTokens: [String],
-    lastActiveAt: { type: Date, index: true },
-  },
-  { timestamps: true }
-);
+const userSchema = mongoose.Schema({
+    name: {
+        type: String,
+        required: [true, "Provide name"]
+    },
+    email: {
+        type: String,
+        required: [true, "Provide email"],
+        unique: true
+    },
+    password: {
+        type: String,
+        required: [true, "Provide password"]
+    },
+    avatar: {
+        type: String,
+        default: ""
+    },
+    mobile: {
+        type: Number,
+        default: null
+    },
+    verify_email: {
+        type: Boolean,
+        default: false
+    },
+    access_token: {
+        type: String,
+        default: ''
+    },
+    refresh_token: {
+        type: String,
+        default: ''
+    },
+    last_login_date: {
+        type: Date,
+        default: ""
+    },
+    status: {
+        type: String,
+        enum: ["Active", "Inactive", "Suspended"],
+        default: "Active"
+    },
+    address_details: [
+        {
+            type: mongoose.Schema.ObjectId,
+            ref: 'address'
+        }
+    ],
+    orderHistory: [
+        {
+            type: mongoose.Schema.ObjectId,
+            ref: 'order'
+        }
+    ],
+    otp:{
+        type:String
+    },
+    otpExpires:{
+        type:Date
+    },
+    role: {
+        type: String,
+        enum: ['ADMIN', 'USER', 'VENDOR'],
+        default: "USER"
+    },
+    vendor: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Vendor',
+        default: null
+    },
+    vendorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Vendor',
+        default: null
+    },
+    signUpWithGoogle:{
+        type:Boolean,
+        default:false
+    }
+},
+    { timestamps: true }
+)
 
-export default mongoose.models.User || mongoose.model('User', userSchema);
+
+const UserModel = mongoose.model("User",userSchema);
+
+export default UserModel

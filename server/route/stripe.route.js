@@ -1,4 +1,12 @@
-import { Router } from 'express';
+import express from "express";
+import { createPaymentIntent, stripeHealth, getStripeAccountInfo } from "../controllers/payment.controller.js";
 
-/** Placeholder router — sync with production API when full handlers are restored. */
-export default Router();
+const router = express.Router();
+
+router.post("/create-payment-intent", createPaymentIntent);
+router.get("/health", stripeHealth);
+router.get("/account-info", getStripeAccountInfo);
+
+export default router;
+
+

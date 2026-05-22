@@ -1,7 +1,6 @@
 import AddressModel from "../models/address.model.js";
 import UserModel from "../models/user.model.js";
 import axios from 'axios';
-import { env } from "../config/env.js";
 
 /**
  * Advanced Address Controller
@@ -364,14 +363,7 @@ export const validateAddress = async (request, response) => {
         }
 
         // Use Google Places API to validate
-        const googleApiKey = env.googleMapsApiKey;
-        if (!googleApiKey) {
-            return response.status(500).json({
-                success: false,
-                message: 'Google Maps API key is not configured',
-                error: true
-            });
-        }
+        const googleApiKey = process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyAXshkwQXMY74fgEi0e02sTz8sKNphLM_U';
         
         const googleResponse = await axios.get(
             `https://maps.googleapis.com/maps/api/place/details/json`,

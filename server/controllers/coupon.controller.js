@@ -1,127 +1,320 @@
-import Coupon from '../models/coupon.model.js';
-import { sendError, sendSuccess } from '../utils/response.js';
+import CouponModel from '../models/coupon.model.js';
+import * as discountService from '../services/discount.service.js';
 
-function normalizePlatform(platform) {
-  const p = String(platform || 'web').toLowerCase();
-  return p === 'mobile' || p === 'ios' || p === 'android' ? 'mobile' : 'web';
-}
-
-function checkPlatformAllowed(coupon, platform) {
-  const channels = coupon.allowedChannels?.length ? coupon.allowedChannels : ['web', 'mobile'];
-  const normalized = normalizePlatform(platform);
-  if (!channels.includes(normalized)) {
-    return {
-      ok: false,
-      message: 'This coupon is not valid for this platform',
-      code: 'PLATFORM_MISMATCH',
-    };
-  }
-  return { ok: true };
-}
-
+/**
+ * Validate coupon code
+ * POST /api/coupons/validate
+ */
 export const validateCoupon = async (req, res) => {
   try {
-    const code = String(req.body.code || '').trim().toUpperCase();
-    const coupon = await Coupon.findOne({ code, isActive: true });
-    if (!coupon) return sendError(res, 400, 'Invalid coupon code');
+    const { code } = req.body;
+    const userId = req.userId || null;
+    const userEmail = req.user?.email || req.body.email || null;
 
-    const platformCheck = checkPlatformAllowed(coupon, req.body.platform);
-    if (!platformCheck.ok) {
+    if (!code || typeof code !== 'string') {
       return res.status(400).json({
         success: false,
-        error: true,
-        message: platformCheck.message,
-        code: platformCheck.code,
+        error: 'Coupon code is required'
       });
     }
 
-    return sendSuccess(res, 200, 'Coupon valid', {
+    const result = await discountService.validateCoupon(code, userId, userEmail);
+
+    if (!result.valid) {
+      return res.status(200).json({
+        success: false,
+        valid: false,
+        error: result.error
+      });
+    }
+
+    return res.json({
+      success: true,
       valid: true,
-      coupon: {
-        code: coupon.code,
-        discountType: coupon.discountType,
-        discountAmount: coupon.discountAmount,
-        minimumAmount: coupon.minimumAmount,
-        freeShipping: coupon.freeShipping,
-        allowedChannels: coupon.allowedChannels,
-      },
+      coupon: result.coupon
     });
-  } catch (e) {
-    return sendError(res, 500, e.message);
+
+  } catch (error) {
+    console.error('Validate coupon error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to validate coupon'
+    });
   }
 };
 
+/**
+ * Apply coupon to cart
+ * POST /api/coupons/apply
+ */
 export const applyCoupon = async (req, res) => {
   try {
-    const code = String(req.body.code || '').trim().toUpperCase();
-    const cartTotal = Number(req.body.cartTotal || 0);
-    const coupon = await Coupon.findOne({ code, isActive: true });
-    if (!coupon) return sendError(res, 400, 'Invalid coupon code');
+    const { code, cartItems, cartTotal } = req.body;
+    const userId = req.userId || null;
+    const userEmail = req.user?.email || req.body.email || null;
 
-    const platformCheck = checkPlatformAllowed(coupon, req.body.platform);
-    if (!platformCheck.ok) {
+    if (!code || typeof code !== 'string') {
       return res.status(400).json({
         success: false,
-        error: true,
-        message: platformCheck.message,
-        code: platformCheck.code,
+        error: 'Coupon code is required'
       });
     }
 
-    let discount = 0;
-    if (coupon.discountType === 'percentage') {
-      discount = (cartTotal * coupon.discountAmount) / 100;
-    } else {
-      discount = coupon.discountAmount;
-    }
-    if (coupon.maximumAmount && discount > coupon.maximumAmount) {
-      discount = coupon.maximumAmount;
+    if (!cartItems || !Array.isArray(cartItems)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cart items are required'
+      });
     }
 
-    return sendSuccess(res, 200, 'Coupon applied', {
-      discount,
-      type: coupon.discountType,
-      freeShipping: coupon.freeShipping,
+    const cartTotalValue = parseFloat(cartTotal) || 0;
+
+    const result = await discountService.applyCoupon({
+      code,
+      cartItems,
+      cartTotal: cartTotalValue,
+      userId,
+      userEmail
     });
-  } catch (e) {
-    return sendError(res, 500, e.message);
+
+    if (!result.success) {
+      return res.status(200).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+    return res.json({
+      success: true,
+      coupon: result.coupon,
+      discount: result.discount,
+      freeShipping: result.freeShipping
+    });
+
+  } catch (error) {
+    console.error('Apply coupon error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to apply coupon'
+    });
   }
 };
 
-export const listCoupons = async (req, res) => {
+/**
+ * Get all active coupons (public)
+ * GET /api/coupons
+ */
+export const getActiveCoupons = async (req, res) => {
   try {
-    const coupons = await Coupon.find().sort({ createdAt: -1 }).lean();
-    return sendSuccess(res, 200, 'Coupons list', { coupons });
-  } catch (e) {
-    return sendError(res, 500, e.message);
+    const now = new Date();
+    
+    const coupons = await CouponModel.find({
+      isActive: true,
+      startDate: { $lte: now },
+      $or: [
+        { endDate: null },
+        { endDate: { $gte: now } }
+      ]
+    })
+    .select('code description discountType discountAmount minimumAmount freeShipping startDate endDate')
+    .limit(50)
+    .sort({ createdAt: -1 });
+
+    return res.json({
+      success: true,
+      coupons
+    });
+
+  } catch (error) {
+    console.error('Get active coupons error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get coupons'
+    });
   }
 };
 
+/**
+ * Create coupon (Admin only)
+ * POST /api/coupons
+ */
 export const createCoupon = async (req, res) => {
   try {
-    const payload = { ...req.body, code: String(req.body.code || '').toUpperCase() };
-    const coupon = await Coupon.create(payload);
-    return sendSuccess(res, 201, 'Coupon created', { coupon });
-  } catch (e) {
-    return sendError(res, 500, e.message);
+    const {
+      code,
+      description,
+      discountType,
+      discountAmount,
+      startDate,
+      endDate,
+      usageLimit,
+      usageLimitPerUser,
+      minimumAmount,
+      maximumAmount,
+      productIds,
+      excludedProductIds,
+      categoryIds,
+      excludedCategoryIds,
+      allowedEmails,
+      excludedEmails,
+      individualUse,
+      excludeSaleItems,
+      freeShipping,
+      isActive
+    } = req.body;
+
+    // Validate required fields
+    if (!code || !discountType || discountAmount === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Code, discount type, and discount amount are required'
+      });
+    }
+
+    // Check if code already exists
+    const existingCoupon = await CouponModel.findOne({ code: code.toUpperCase().trim() });
+    if (existingCoupon) {
+      return res.status(400).json({
+        success: false,
+        error: 'Coupon code already exists'
+      });
+    }
+
+    const coupon = new CouponModel({
+      code: code.toUpperCase().trim(),
+      description: description || '',
+      discountType,
+      discountAmount: parseFloat(discountAmount),
+      startDate: startDate ? new Date(startDate) : new Date(),
+      endDate: endDate ? new Date(endDate) : null,
+      usageLimit: usageLimit || null,
+      usageLimitPerUser: usageLimitPerUser || 1,
+      minimumAmount: minimumAmount || 0,
+      maximumAmount: maximumAmount || null,
+      productIds: productIds || [],
+      excludedProductIds: excludedProductIds || [],
+      categoryIds: categoryIds || [],
+      excludedCategoryIds: excludedCategoryIds || [],
+      allowedEmails: allowedEmails || [],
+      excludedEmails: excludedEmails || [],
+      individualUse: individualUse || false,
+      excludeSaleItems: excludeSaleItems || false,
+      freeShipping: freeShipping || false,
+      isActive: isActive !== undefined ? isActive : true
+    });
+
+    await coupon.save();
+
+    return res.status(201).json({
+      success: true,
+      message: 'Coupon created successfully',
+      coupon
+    });
+
+  } catch (error) {
+    console.error('Create coupon error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to create coupon'
+    });
   }
 };
 
+/**
+ * Get all coupons (Admin only)
+ * GET /api/coupons/all
+ */
+export const getAllCoupons = async (req, res) => {
+  try {
+    const coupons = await CouponModel.find()
+      .sort({ createdAt: -1 })
+      .populate('productIds', 'name')
+      .populate('categoryIds', 'name');
+
+    return res.json({
+      success: true,
+      coupons
+    });
+
+  } catch (error) {
+    console.error('Get all coupons error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get coupons'
+    });
+  }
+};
+
+/**
+ * Update coupon (Admin only)
+ * PUT /api/coupons/:id
+ */
 export const updateCoupon = async (req, res) => {
   try {
-    const coupon = await Coupon.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!coupon) return sendError(res, 404, 'Coupon not found');
-    return sendSuccess(res, 200, 'Coupon updated', { coupon });
-  } catch (e) {
-    return sendError(res, 500, e.message);
+    const { id } = req.params;
+    const updateData = req.body;
+
+    // Don't allow updating code
+    if (updateData.code) {
+      delete updateData.code;
+    }
+
+    const coupon = await CouponModel.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    if (!coupon) {
+      return res.status(404).json({
+        success: false,
+        error: 'Coupon not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Coupon updated successfully',
+      coupon
+    });
+
+  } catch (error) {
+    console.error('Update coupon error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to update coupon'
+    });
   }
 };
 
+/**
+ * Delete coupon (Admin only)
+ * DELETE /api/coupons/:id
+ */
 export const deleteCoupon = async (req, res) => {
   try {
-    await Coupon.findByIdAndDelete(req.params.id);
-    return sendSuccess(res, 200, 'Coupon deleted');
-  } catch (e) {
-    return sendError(res, 500, e.message);
+    const { id } = req.params;
+
+    const coupon = await CouponModel.findByIdAndDelete(id);
+
+    if (!coupon) {
+      return res.status(404).json({
+        success: false,
+        error: 'Coupon not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Coupon deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete coupon error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to delete coupon'
+    });
   }
 };
+

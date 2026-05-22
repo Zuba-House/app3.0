@@ -1,4 +1,11 @@
-import { Router } from 'express';
+import { Router } from "express";
+import auth from "../middlewares/auth.js";
+import { addToMyListController, deleteToMyListController, getMyListController } from "../controllers/mylist.controller.js";
 
-/** Placeholder router — sync with production API when full handlers are restored. */
-export default Router();
+const myListRouter = Router();
+
+myListRouter.post('/add',auth,addToMyListController)
+myListRouter.get('/',auth,getMyListController)
+myListRouter.delete('/:id',auth,deleteToMyListController)
+
+export default myListRouter;

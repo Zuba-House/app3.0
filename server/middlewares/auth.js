@@ -1,29 +1,8 @@
 import jwt from 'jsonwebtoken'
-import UserModel from '../models/user.model.js';
-import { env } from '../config/env.js';
-
-function readBearerToken(request) {
-    const authHeader = request?.headers?.authorization;
-    const cookieToken = request?.cookies?.accessToken;
-    if (cookieToken) return cookieToken;
-    if (!authHeader) return null;
-    if (authHeader.startsWith('Bearer ')) {
-        return authHeader.substring(7).trim();
-    }
-    const parts = authHeader.split(' ');
-    return parts.length > 1 ? parts[1].trim() : authHeader.trim();
-}
-
-function attachResolvedAuth(request, user) {
-    request.user = user || null;
-    request.userId = user?._id ? String(user._id) : null;
-    request.userRole = user?.role || 'USER';
-    request.vendorId = user?.vendorId || user?.vendor || null;
-}
 
 const auth = async(request, response, next) => {
     try {
-        const token = readBearerToken(request);
+        const token = request.cookies.accessToken || request?.headers?.authorization?.split(" ")[1];
 
         if(!token){
             return response.status(401).json({
@@ -33,7 +12,7 @@ const auth = async(request, response, next) => {
             })
         }
 
-        const decode = jwt.verify(token, env.jwtAccessSecret);
+        const decode = await jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN);
 
         if(!decode){
             return response.status(401).json({
@@ -44,16 +23,12 @@ const auth = async(request, response, next) => {
         }
 
         // Get user details to include role and vendorId
-        const user = await UserModel.findById(decode.id).select('role vendorId status');
-        if (!user) {
-            return response.status(401).json({
-                error: true,
-                success: false,
-                message: "User not found for this token"
-            })
-        }
+        const UserModel = (await import('../models/user.model.js')).default;
+        const user = await UserModel.findById(decode.id).select('role vendorId');
         
-        attachResolvedAuth(request, user);
+        request.userId = decode.id;
+        request.userRole = user?.role || 'USER';
+        request.vendorId = user?.vendorId || null;
         next()
 
     } catch (error) {
@@ -86,21 +61,37 @@ const auth = async(request, response, next) => {
 // Optional auth - attaches user if token exists, but doesn't require it
 export const optionalAuth = async (request, response, next) => {
     try {
-        const token = readBearerToken(request);
-        request.authResolved = false;
-        request.authTokenPresent = Boolean(token);
-        attachResolvedAuth(request, null);
+        // Try multiple ways to get the token
+        let token = request.cookies?.accessToken;
+        
+        // Check Authorization header (Bearer token)
+        if (!token && request?.headers?.authorization) {
+            const authHeader = request.headers.authorization;
+            if (authHeader.startsWith('Bearer ')) {
+                token = authHeader.substring(7);
+            } else if (authHeader.includes(' ')) {
+                token = authHeader.split(' ')[1];
+            } else {
+                token = authHeader;
+            }
+        }
 
         if (token) {
             try {
-                const decode = jwt.verify(token, env.jwtAccessSecret);
+                const decode = await jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN);
                 if (decode && decode.id) {
+                    request.userId = decode.id;
+                    request.userRole = decode.role || 'USER';
+                    request.vendorId = decode.vendorId || null;
+                    
                     // Get user details to include role and vendorId
                     try {
+                        const UserModel = (await import('../models/user.model.js')).default;
                         const user = await UserModel.findById(decode.id).select('role vendor vendorId');
                         if (user) {
-                            attachResolvedAuth(request, user);
-                            request.authResolved = true;
+                            request.userId = user._id.toString();
+                            request.userRole = user.role || 'USER';
+                            request.vendorId = user.vendorId || user.vendor || null;
                         }
                     } catch (userError) {
                         // If user lookup fails, continue with token data
@@ -113,15 +104,7 @@ export const optionalAuth = async (request, response, next) => {
                 console.log('Optional auth - invalid token, continuing as guest:', error.message);
             }
         }
-
-        if (env.nodeEnv !== 'production') {
-            console.log('[optionalAuth]', {
-                tokenPresent: request.authTokenPresent,
-                authResolved: request.authResolved,
-                userId: request.userId || null,
-            });
-        }
-
+        
         // Continue regardless of auth status
         next();
     } catch (error) {
