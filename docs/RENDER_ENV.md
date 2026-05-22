@@ -55,6 +55,7 @@ Optional on Render (only if you add server-side Google code exchange later):
 | `NODE_VERSION` | `20.18.0` or `22` (18.x is EOL) |
 | `API_URL` | `https://zuba-api.onrender.com` |
 | `ADMIN_EMAIL` | `sales@zubahouse.com` |
+| `ADMIN_EMAILS` | `olivier.niyo250@gmail.com` (comma-separated bootstrap admins) |
 
 ## MongoDB Atlas
 

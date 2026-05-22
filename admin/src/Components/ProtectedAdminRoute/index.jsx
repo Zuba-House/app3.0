@@ -4,6 +4,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import { MyContext } from '../../App';
 import { fetchDataFromApi } from '../../utils/api';
+import { getUserFromApiResponse } from '../../utils/apiResponse';
 
 const PUBLIC_PATHS = ['/login', '/sign-up', '/forgot-password', '/verify-account', '/change-password', '/unauthorized'];
 
@@ -31,7 +32,7 @@ const ProtectedAdminRoute = ({ children }) => {
 
     fetchDataFromApi('/api/user/user-details')
       .then((res) => {
-        const user = res?.data;
+        const user = getUserFromApiResponse(res);
         if (user) {
           context?.setUserData?.(user);
         }

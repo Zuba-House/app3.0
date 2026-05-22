@@ -24,6 +24,7 @@ import ChangePassword from "./Pages/ChangePassword";
 
 import toast, { Toaster } from 'react-hot-toast';
 import { fetchDataFromApi } from "./utils/api";
+import { getUserFromApiResponse } from "./utils/apiResponse";
 import { useEffect } from "react";
 import Profile from "./Pages/Profile";
 import ProductDetails from "./Pages/Products/productDetails";
@@ -326,7 +327,8 @@ function App() {
       setIsLogin(true);
 
       fetchDataFromApi(`/api/user/user-details`).then((res) => {
-        setUserData(res.data);
+        const user = getUserFromApiResponse(res);
+        if (user) setUserData(user);
         if (res?.response?.data?.message === "You have not login") {
           localStorage.removeItem("accessToken");
           localStorage.removeItem("refreshToken");

@@ -12,6 +12,7 @@ import { FaRegEye } from "react-icons/fa";
 import { FaEyeSlash } from "react-icons/fa";
 import CircularProgress from '@mui/material/CircularProgress';
 import { fetchDataFromApi, postData } from "../../utils/api";
+import { getAuthTokensFromResponse, getUserFromApiResponse } from "../../utils/apiResponse";
 import { useContext } from "react";
 import { MyContext } from "../../App.jsx";
 
@@ -82,17 +83,26 @@ const Login = () => {
   }
 
   const completeAdminLogin = async (res, clearForm) => {
-    if (res?.error === true) {
-      context.alertBox("error", res?.message);
+    if (res?.error === true || res?.success === false) {
+      context.alertBox("error", res?.message || "Login failed");
       return false;
     }
 
-    localStorage.setItem("accessToken", res?.data?.accesstoken);
-    localStorage.setItem("refreshToken", res?.data?.refreshToken);
+    const { accessToken, refreshToken } = getAuthTokensFromResponse(res);
+    if (!accessToken) {
+      context.alertBox("error", "Login succeeded but no access token was returned.");
+      return false;
+    }
+
+    localStorage.setItem("accessToken", accessToken);
+    if (refreshToken) {
+      localStorage.setItem("refreshToken", refreshToken);
+    }
 
     try {
       const details = await fetchDataFromApi("/api/user/user-details");
-      const role = details?.data?.role;
+      const user = getUserFromApiResponse(details);
+      const role = user?.role;
       if (role !== "ADMIN") {
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
@@ -100,7 +110,7 @@ const Login = () => {
         context.alertBox("error", "This account does not have admin access.");
         return false;
       }
-      context.setUserData(details.data);
+      context.setUserData(user);
       context.setIsLogin(true);
       context.alertBox("success", res?.message || "Login successful");
       if (clearForm) {
@@ -177,7 +187,6 @@ const Login = () => {
           password: null,
           avatar: provider.photoURL,
           mobile: provider.phoneNumber,
-          role: "USER"
         };
 
 

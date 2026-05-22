@@ -51,3 +51,27 @@ export function isApiSuccess(res) {
   }
   return false;
 }
+
+/** Auth tokens from login / Google (legacy + normalized API shapes). */
+export function getAuthTokensFromResponse(res) {
+  return {
+    accessToken:
+      res?.accessToken ??
+      res?.accesstoken ??
+      res?.data?.accessToken ??
+      res?.data?.accesstoken ??
+      null,
+    refreshToken:
+      res?.refreshToken ?? res?.data?.refreshToken ?? null,
+  };
+}
+
+/** User profile from /api/user/user-details (legacy + normalized). */
+export function getUserFromApiResponse(res) {
+  if (!res || typeof res !== 'object') return null;
+  if (res.role != null || res.email != null) return res;
+  if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+    return res.data;
+  }
+  return null;
+}

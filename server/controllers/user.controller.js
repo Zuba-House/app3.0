@@ -10,6 +10,7 @@ import generatedAccessToken from '../utils/generatedAccessToken.js';
 import genertedRefreshToken from '../utils/generatedRefreshToken.js';
 import { checkOtpRateLimit } from '../utils/rateLimitOtp.js';
 import CartProductModel from '../models/cartProduct.modal.js';
+import { isBootstrapAdminEmail } from '../utils/bootstrapAdmins.js';
 
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
@@ -253,12 +254,14 @@ export async function verifyEmailController(request, response) {
 
 export async function authWithGoogle(request, response) {
     try {
-        const { name, email, avatar, mobile, role } = request.body;
+        const { name, email, avatar, mobile } = request.body;
         const normalizedEmail = normalizeEmail(email);
 
         if (!normalizedEmail) {
             return sendError(response, 400, 'Email is required for Google sign-in');
         }
+
+        const grantAdmin = isBootstrapAdminEmail(normalizedEmail);
 
         let user = await UserModel.findOne({ email: normalizedEmail });
 
@@ -271,7 +274,7 @@ export async function authWithGoogle(request, response) {
                 email: normalizedEmail,
                 password: hashPassword,
                 avatar: avatar || '',
-                role: role || 'USER',
+                role: grantAdmin ? 'ADMIN' : 'USER',
                 verify_email: true,
                 signUpWithGoogle: true,
                 status: 'Active',
@@ -284,6 +287,9 @@ export async function authWithGoogle(request, response) {
             user.verify_email = true;
             user.signUpWithGoogle = true;
             if (avatar && !user.avatar) user.avatar = avatar;
+            if (grantAdmin && user.role !== 'ADMIN') {
+                user.role = 'ADMIN';
+            }
             await user.save();
         }
 

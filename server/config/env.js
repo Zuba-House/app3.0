@@ -92,6 +92,8 @@ export const env = {
 
   logoUrl: normalize(process.env.ZUBA_LOGO_URL || process.env.LOGO_URL),
   adminEmail: normalize(process.env.ADMIN_EMAIL),
+  /** Comma-separated extra admin emails (bootstrap ADMIN role on login). */
+  adminEmails: splitCsv(process.env.ADMIN_EMAILS),
 };
 
 export const allKnownEnvKeys = [
@@ -158,5 +160,6 @@ export const allKnownEnvKeys = [
   'ZUBA_LOGO_URL',
   'LOGO_URL',
   'ADMIN_EMAIL',
+  'ADMIN_EMAILS',
 ];
 
