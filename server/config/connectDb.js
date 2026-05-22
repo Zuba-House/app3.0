@@ -12,18 +12,22 @@ function printAtlasHints() {
     console.log('- See: https://www.mongodb.com/docs/atlas/atlas-access/');
 }
 
-if (!PRIMARY_URI && !LOCAL_FALLBACK) {
-    throw new Error(
-        "No MongoDB connection string found. Please set MONGODB_URI (Atlas) or MONGODB_LOCAL_URI (local) in the .env file"
-    )
-}
+const MONGO_OPTIONS = {
+    serverSelectionTimeoutMS: 10000,
+};
 
 async function connectDB() {
+    if (!PRIMARY_URI && !LOCAL_FALLBACK) {
+        throw new Error(
+            'No MongoDB connection string found. Set MONGODB_URI (Atlas) or MONGODB_LOCAL_URI in Render Environment.'
+        );
+    }
+
     // Try primary Atlas URI first (if provided)
     if (PRIMARY_URI) {
         try {
             console.log('Attempting MongoDB connection to PRIMARY (Atlas)...');
-            await mongoose.connect(PRIMARY_URI);
+            await mongoose.connect(PRIMARY_URI, MONGO_OPTIONS);
             console.log('MongoDB connected (PRIMARY)');
             return;
         } catch (err) {
@@ -36,7 +40,7 @@ async function connectDB() {
     if (LOCAL_FALLBACK) {
         try {
             console.log('Attempting MongoDB connection to LOCAL fallback...');
-            await mongoose.connect(LOCAL_FALLBACK);
+            await mongoose.connect(LOCAL_FALLBACK, MONGO_OPTIONS);
             console.log('MongoDB connected (LOCAL_FALLBACK)');
             return;
         } catch (err) {
@@ -44,8 +48,9 @@ async function connectDB() {
         }
     }
 
-    console.error('\nCould not connect to any MongoDB instance. Exiting.');
-    process.exit(1);
+    throw new Error(
+        'Could not connect to MongoDB. Check MONGODB_URI and Atlas Network Access (allow 0.0.0.0/0 for Render).'
+    );
 }
 
 export default connectDB;

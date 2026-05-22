@@ -38,8 +38,6 @@ import orderTrackingRoutes from './route/orderTracking.route.js';
 import logoRoutes from './route/logo.route.js';
 import searchRoutes from './route/search.route.js';
 
-validateEnv();
-
 const app = express();
 const PORT = env.port;
 
@@ -237,23 +235,35 @@ app.use((err, req, res, next) => {
 
 // Start Server
 const startServer = async () => {
-  try {
-    // Connect to MongoDB
-    await connectDB();
-    console.log('✅ MongoDB connected successfully');
+  console.log('Starting Zuba House API v3.0.0...');
+  validateEnv();
 
-    // Start Express server
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📍 Environment: ${env.nodeEnv}`);
-      console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
-    });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
+  await connectDB();
+  console.log('✅ MongoDB connected successfully');
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📍 Environment: ${env.nodeEnv}`);
+    console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+  });
 };
 
-startServer();
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ Unhandled rejection during startup:', reason);
+  process.exit(1);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught exception during startup:', error);
+  process.exit(1);
+});
+
+startServer().catch((error) => {
+  console.error('❌ Failed to start server:', error?.message || error);
+  if (error?.stack) {
+    console.error(error.stack);
+  }
+  process.exit(1);
+});
 
 export default app;

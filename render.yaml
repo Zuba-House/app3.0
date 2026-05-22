@@ -7,16 +7,36 @@ services:
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: NODE_VERSION
-        value: 18.19.0
-      # Public Web client ID (same as mobile app.json extra.expoClientId)
+        value: "20.18.0"
+      # --- Set secrets in Render Dashboard (sync: false); copy from server/.env ---
+      - key: MONGODB_URI
+        sync: false
+      - key: SECRET_KEY_ACCESS_TOKEN
+        sync: false
+      - key: SECRET_KEY_REFRESH_TOKEN
+        sync: false
+      - key: JSON_WEB_TOKEN_SECRET_KEY
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: cloudinary_Config_Cloud_Name
+        sync: false
+      - key: cloudinary_Config_api_key
+        sync: false
+      - key: cloudinary_Config_api_secret
+        sync: false
       - key: GOOGLE_CLIENT_ID
         value: 435369151234-8e7sb5ferci9ti2472vdmf6ose5e6nss.apps.googleusercontent.com
-      # Set in Render Dashboard → Environment (never commit). If leaked, rotate in Google Cloud.
       - key: GOOGLE_CLIENT_SECRET
         sync: false
-      # Fallback redirect_uri for Google token exchange (must match app: zuba://redirect)
       - key: GOOGLE_OAUTH_REDIRECT_URI
         value: "zuba://redirect"
+      - key: API_URL
+        value: https://zuba-api.onrender.com
     plan: free
 

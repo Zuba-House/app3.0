@@ -20,7 +20,10 @@ export const env = {
   port: parseNumber(process.env.PORT, 5000),
   nodeEnv: normalize(process.env.NODE_ENV) || 'development',
 
-  mongodbUri: normalize(process.env.MONGODB_URI),
+  mongodbUri:
+    normalize(process.env.MONGODB_URI) ||
+    normalize(process.env.MONGODB_URL) ||
+    normalize(process.env.MONGO_URI),
   mongodbLocalUri: normalize(process.env.MONGODB_LOCAL_URI),
 
   jwtAccessSecret: normalize(process.env.SECRET_KEY_ACCESS_TOKEN),
