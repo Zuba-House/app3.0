@@ -19,6 +19,12 @@ jest.mock('./authDevice', () => ({
   clearDeviceSessionMemory: jest.fn(),
 }));
 
+jest.mock('../../services/wishlist.service', () => ({
+  wishlistService: {
+    mergeLocalWishlistToCloud: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
 describe('auth integration', () => {
   const { authStorage } = jest.requireMock('./authStorage') as {
     authStorage: {

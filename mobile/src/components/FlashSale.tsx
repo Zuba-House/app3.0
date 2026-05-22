@@ -20,6 +20,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Product } from '../types/product.types';
 import Colors from '../constants/colors';
 import { filterPricedProducts, getSoldPercent, isAlmostGone } from '../utils/productDisplay';
+import { getSaleInfo } from '../utils/productSaleInfo';
 import { navigateToProductDetail, navigateToProductList } from '../navigation/navigationHelpers';
 import { FLATLIST_PERF_HORIZONTAL } from '../utils/flatListPerf';
 
@@ -37,51 +38,6 @@ interface TimeLeft {
   minutes: number;
   seconds: number;
 }
-
-const getSaleInfo = (p: any) => {
-  const basePrice = Number(p?.price ?? 0);
-  const explicitSale = Number(p?.salePrice ?? 0);
-  const oldPrice = Number(p?.oldPrice ?? 0);
-  const explicitDiscount = Number(p?.discount ?? 0);
-
-  // Case 1: canonical backend shape
-  if (explicitSale > 0 && basePrice > explicitSale) {
-    return {
-      isOnSale: true,
-      displayPrice: explicitSale,
-      originalPrice: basePrice,
-      discountPercent: Math.round(((basePrice - explicitSale) / basePrice) * 100),
-    };
-  }
-
-  // Case 2: list item carries oldPrice + current price (common in mixed payloads)
-  if (oldPrice > 0 && basePrice > 0 && oldPrice > basePrice) {
-    return {
-      isOnSale: true,
-      displayPrice: basePrice,
-      originalPrice: oldPrice,
-      discountPercent: Math.round(((oldPrice - basePrice) / oldPrice) * 100),
-    };
-  }
-
-  // Case 3: explicit percentage discount provided by API
-  if (explicitDiscount > 0 && basePrice > 0) {
-    const original = basePrice / (1 - explicitDiscount / 100);
-    return {
-      isOnSale: true,
-      displayPrice: basePrice,
-      originalPrice: original,
-      discountPercent: Math.round(explicitDiscount),
-    };
-  }
-
-  return {
-    isOnSale: false,
-    displayPrice: basePrice,
-    originalPrice: null as number | null,
-    discountPercent: 0,
-  };
-};
 
 const FlashSaleTimer: React.FC<{ endTime: Date }> = ({ endTime }) => {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({ hours: 0, minutes: 0, seconds: 0 });
@@ -295,7 +251,6 @@ const FlashSale: React.FC<FlashSaleProps> = ({
             navigateToProductList(navigation, {
               filter: 'flash-sale',
               title: 'Flash Sale',
-              sortBy: 'sale',
             })
           }
         >

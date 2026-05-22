@@ -32,11 +32,7 @@ export const cartService = {
    */
   getCart: async (): Promise<ApiResponse<any[]>> => {
     invalidateApiCache('/api/cart');
-    const response = await fetchDataFromApi<CartApiPayload>(
-      API_ENDPOINTS.GET_CART,
-      undefined,
-      { skipCache: true }
-    );
+    const response = await fetchDataFromApi<CartApiPayload>(API_ENDPOINTS.GET_CART);
     const items = extractCartItems(response.data);
     return { ...response, data: items };
   },

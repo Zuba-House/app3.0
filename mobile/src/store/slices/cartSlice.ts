@@ -4,7 +4,12 @@
  */
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { CartItem, Cart } from '../../types/cart.types';
+import { CartItem } from '../../types/cart.types';
+import {
+  normalizeCartItems,
+  calculateTotals,
+  mergeCartLineItem,
+} from './cartNormalize';
 
 interface CartState {
   items: CartItem[];
@@ -16,42 +21,6 @@ interface CartState {
   error: string | null;
 }
 
-const normalizeCartItems = (input: any): CartItem[] => {
-  if (!Array.isArray(input)) return [];
-  return input.map((item: any) => {
-    const price = Number(item?.price ?? 0);
-    const quantity = Number(item?.quantity ?? 1);
-    const subtotal = Number(item?.subtotal ?? item?.subTotal ?? price * quantity);
-    const productObj =
-      item?.product && typeof item.product === 'object'
-        ? item.product
-        : {
-            _id: String(item?.productId ?? ''),
-            name: String(item?.productTitle ?? 'Product'),
-            images: item?.image ? [item.image] : [],
-            featuredImage: item?.image || '',
-          };
-    const pid = item?.productId != null ? String(item.productId) : undefined;
-    const vid =
-      item?.variationId != null
-        ? String(item.variationId)
-        : item?.variation?._id != null
-          ? String(item.variation._id)
-          : undefined;
-    return {
-      _id: String(item?._id ?? `${item?.productId ?? 'item'}_${Math.random()}`),
-      product: productObj,
-      variation: item?.variation,
-      quantity,
-      price,
-      subtotal,
-      productId: pid,
-      variationId: vid ?? null,
-      productTitle: item?.productTitle ? String(item.productTitle) : undefined,
-    } as CartItem;
-  });
-};
-
 const initialState: CartState = {
   items: [],
   subtotal: 0,
@@ -60,15 +29,6 @@ const initialState: CartState = {
   total: 0,
   loading: false,
   error: null,
-};
-
-const calculateTotals = (items: CartItem[]) => {
-  const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-  const shipping = 0; // Calculated at checkout
-  const discount = 0; // Applied coupon discount
-  const total = subtotal + shipping - discount;
-
-  return { subtotal, shipping, discount, total };
 };
 
 const cartSlice = createSlice({
@@ -87,38 +47,7 @@ const cartSlice = createSlice({
       state.total = totals.total;
     },
     addItem: (state, action: PayloadAction<CartItem>) => {
-      const payloadPid =
-        action.payload.productId ??
-        (typeof action.payload.product === 'object' ? action.payload.product._id : null);
-      const payloadVid =
-        action.payload.variationId ??
-        (typeof action.payload.variation === 'object' ? action.payload.variation?._id : null) ??
-        null;
-
-      const existingIndex = state.items.findIndex((item) => {
-        if (item._id === action.payload._id) return true;
-        const itemPid =
-          item.productId ??
-          (typeof item.product === 'object' ? item.product._id : null);
-        const itemVid =
-          item.variationId ??
-          (typeof item.variation === 'object' ? item.variation?._id : null) ??
-          null;
-        if (payloadPid && itemPid && String(payloadPid) === String(itemPid)) {
-          return String(payloadVid ?? '') === String(itemVid ?? '');
-        }
-        return false;
-      });
-
-      if (existingIndex >= 0) {
-        const existingItem = state.items[existingIndex];
-        existingItem.quantity += action.payload.quantity;
-        existingItem.subtotal = existingItem.price * existingItem.quantity;
-        state.items.splice(existingIndex, 1);
-        state.items.unshift(existingItem);
-      } else {
-        state.items.unshift(action.payload);
-      }
+      state.items = mergeCartLineItem(state.items, action.payload);
 
       const totals = calculateTotals(state.items);
       state.subtotal = totals.subtotal;

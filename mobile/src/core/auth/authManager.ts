@@ -9,6 +9,7 @@ import { authMonitor } from './authMonitor';
 import { clearDeviceSessionMemory, getDeviceSessionId } from './authDevice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../../constants/config';
+import { wishlistService } from '../../services/wishlist.service';
 const AUTH_REQUEST_TIMEOUT_MS = 15000;
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = AUTH_REQUEST_TIMEOUT_MS): Promise<Response> {
@@ -82,7 +83,6 @@ async function applyAuthenticatedSession(session: ExternalAuthInput): Promise<vo
   await authStorage.setUserCache(user);
   await mergeGuestCart(session.accessToken);
   await syncServerCartToRedux();
-  const { wishlistService } = await import('../../services/wishlist.service');
   await wishlistService.mergeLocalWishlistToCloud();
 }
 

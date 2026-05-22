@@ -1,54 +1,45 @@
-import cartReducer, { addItem, setCart, selectCartCount } from './cartSlice';
+import {
+  normalizeCartItems,
+  calculateTotals,
+  mergeCartLineItem,
+  countCartQuantity,
+} from './cartNormalize';
 
-describe('cartSlice', () => {
-  it('setCart normalizes API-shaped line items', () => {
-    const state = cartReducer(
-      undefined,
-      setCart([
-        {
-          _id: 'cart1',
-          productId: 'p1',
-          productTitle: 'Test Product',
-          image: '/img.jpg',
-          price: 10,
-          quantity: 2,
-          subTotal: 20,
-        },
-      ])
-    );
-    expect(state.items).toHaveLength(1);
-    expect(state.items[0].quantity).toBe(2);
-    expect(state.total).toBe(20);
-    expect(selectCartCount({ cart: state })).toBe(2);
+describe('cartNormalize', () => {
+  it('normalizeCartItems maps API-shaped line items', () => {
+    const items = normalizeCartItems([
+      {
+        _id: 'cart1',
+        productId: 'p1',
+        productTitle: 'Test Product',
+        image: '/img.jpg',
+        price: 10,
+        quantity: 2,
+        subTotal: 20,
+      },
+    ]);
+    expect(items).toHaveLength(1);
+    expect(items[0].quantity).toBe(2);
+    expect(items[0].subtotal).toBe(20);
+    const totals = calculateTotals(items);
+    expect(totals.total).toBe(20);
+    expect(countCartQuantity(items)).toBe(2);
   });
 
-  it('addItem merges guest lines with same product and variation', () => {
-    let state = cartReducer(
-      undefined,
-      addItem({
-        _id: 'guest_p1_simple',
-        productId: 'p1',
-        variationId: null,
-        product: { _id: 'p1', name: 'A' } as any,
-        quantity: 1,
-        price: 5,
-        subtotal: 5,
-      })
-    );
-    state = cartReducer(
-      state,
-      addItem({
-        _id: 'guest_p1_simple',
-        productId: 'p1',
-        variationId: null,
-        product: { _id: 'p1', name: 'A' } as any,
-        quantity: 1,
-        price: 5,
-        subtotal: 5,
-      })
-    );
-    expect(state.items).toHaveLength(1);
-    expect(state.items[0].quantity).toBe(2);
-    expect(state.total).toBe(10);
+  it('mergeCartLineItem merges guest lines with same product and variation', () => {
+    const line = {
+      _id: 'guest_p1_simple',
+      productId: 'p1',
+      variationId: null,
+      product: { _id: 'p1', name: 'A' } as any,
+      quantity: 1,
+      price: 5,
+      subtotal: 5,
+    };
+    let items = mergeCartLineItem([], line);
+    items = mergeCartLineItem(items, { ...line, quantity: 1, subtotal: 5 });
+    expect(items).toHaveLength(1);
+    expect(items[0].quantity).toBe(2);
+    expect(calculateTotals(items).total).toBe(10);
   });
 });

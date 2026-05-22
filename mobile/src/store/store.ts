@@ -13,8 +13,9 @@ import cartReducer, {
 import shippingLocationReducer from './slices/shippingLocationSlice';
 import { authManager } from '../core/auth/authManager';
 import { persistGuestCart } from '../utils/guestCart';
+import type { CartItem } from '../types/cart.types';
 
-const guestCartPersistListener = (storeApi: { getState: () => { cart: { items: unknown[] } } }) => {
+const guestCartPersistListener = (storeApi: { getState: () => { cart: { items: CartItem[] } } }) => {
   return (next: (action: unknown) => unknown) => (action: unknown) => {
     const result = next(action);
     if (

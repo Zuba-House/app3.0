@@ -2,7 +2,7 @@
  * Filtered product listing (categories, flash sale, trending, etc.)
  */
 
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,90 +15,20 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { productService } from '../../services/product.service';
-import { categoryService, Category } from '../../services/category.service';
+import { categoryService } from '../../services/category.service';
 import type { ProductListParams } from '../../constants/routes';
 import type { Product } from '../../types/product.types';
 import ProductCard from '../../components/ProductCard';
 import { FLATLIST_PERF } from '../../utils/flatListPerf';
 import Colors from '../../constants/colors';
 import { PAGINATION } from '../../constants/config';
-import { filterPricedProducts } from '../../utils/productDisplay';
+import { applyListFilter, listNeedsCatalogScan } from '../../utils/productListFilters';
 import { navigateToProductDetail, pressNavigate } from '../../navigation/navigationHelpers';
 
 type RouteParams = { ProductList: ProductListParams };
 
-function getSaleInfo(p: Product) {
-  const base = Number(p.price ?? 0);
-  const sale = Number(p.salePrice ?? 0);
-  const old = Number((p as unknown as Record<string, unknown>).oldPrice ?? 0);
-  if (sale > 0 && base > sale) return true;
-  if (old > base && base > 0) return true;
-  return false;
-}
-
-function applyListFilter(products: Product[], params: ProductListParams): Product[] {
-  let list = filterPricedProducts(products);
-  const name = (params.categoryName || params.categoryFilter || '').trim().toLowerCase();
-
-  if (params.categoryId) {
-    list = list.filter((p) => {
-      const cat = p.category;
-      const id = typeof cat === 'object' ? (cat as Category)._id : String(cat ?? '');
-      if (id === params.categoryId) return true;
-      if (Array.isArray(p.categories)) {
-        return p.categories.some((c) => String(c) === params.categoryId);
-      }
-      return false;
-    });
-  } else if (name) {
-    list = list.filter((p) => {
-      const cat = p.category;
-      const catName =
-        typeof cat === 'object' ? String((cat as Category).name ?? '').toLowerCase() : '';
-      return catName.includes(name) || name.includes(catName);
-    });
-  }
-
-  switch (params.filter) {
-    case 'flash-sale':
-    case 'sale':
-      list = list.filter(getSaleInfo);
-      break;
-    case 'featured':
-      list = list.filter((p) => Boolean(p.featured) || getSaleInfo(p));
-      break;
-    case 'new-arrivals':
-      list = [...list].sort((a, b) => {
-        const ta = new Date(a.createdAt ?? 0).getTime();
-        const tb = new Date(b.createdAt ?? 0).getTime();
-        return tb - ta;
-      });
-      break;
-    case 'trending':
-      list = [...list].sort((a, b) => {
-        const score = (p: Product) => {
-          const row = p as unknown as Record<string, unknown>;
-          return (
-            Number(row.wishlistCount ?? 0) * 2 +
-            Number(row.totalSales ?? 0) * 3 +
-            Number(row.views ?? 0)
-          );
-        };
-        return score(b) - score(a);
-      });
-      break;
-    default:
-      break;
-  }
-
-  if (params.sortBy === 'newest') {
-    list = [...list].sort(
-      (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
-    );
-  }
-
-  return list;
-}
+const FILTER_MIN_ITEMS = 8;
+const FILTER_MAX_PAGES = 8;
 
 function mergeUniqueProducts(prev: Product[], next: Product[]): Product[] {
   const seen = new Set(prev.map((p) => p._id));
@@ -118,6 +48,7 @@ const ProductListScreen: React.FC = () => {
   const [resolvedCategoryId, setResolvedCategoryId] = useState<string | undefined>(
     params.categoryId
   );
+  const catalogRawRef = useRef<Product[]>([]);
 
   const title = params.title || params.categoryName || params.categoryFilter || 'Products';
 
@@ -137,7 +68,7 @@ const ProductListScreen: React.FC = () => {
         setLoading(true);
       }
       try {
-        let categoryId = params.categoryId;
+        let categoryId = params.categoryId ?? resolvedCategoryId;
         if (!categoryId && (params.categoryName || params.categoryFilter)) {
           const cats = await categoryService.getCategories();
           const needle = (params.categoryName || params.categoryFilter || '').toLowerCase();
@@ -146,28 +77,56 @@ const ProductListScreen: React.FC = () => {
           setResolvedCategoryId(categoryId);
         }
 
-        const response = await productService.getAllProducts({
-          category: categoryId,
-          sort: params.sortBy === 'newest' ? 'newest' : undefined,
-          page,
-          limit: PAGINATION.LIST_PAGE_SIZE,
-        });
+        const scanCatalog = listNeedsCatalogScan({ ...params, categoryId });
+        const listParams = { ...params, categoryId };
+        let lastPage = page;
+        let totalPages = 1;
 
-        const payload = response.data;
-        const raw = Array.isArray(payload)
-          ? payload
-          : payload && typeof payload === 'object' && Array.isArray((payload as { products?: Product[] }).products)
-            ? (payload as { products: Product[] }).products
-            : [];
+        if (!append) {
+          catalogRawRef.current = [];
+        }
 
-        const filtered = applyListFilter(raw, { ...params, categoryId });
-        setProducts((prev) => (append ? mergeUniqueProducts(prev, filtered) : filtered));
+        const startPage = append ? page : 1;
+        const endPage = !append && scanCatalog ? FILTER_MAX_PAGES : startPage;
 
-        const totalPages = response.totalPages;
+        for (let p = startPage; p <= endPage; p++) {
+          const response = await productService.getAllProducts({
+            category: categoryId,
+            sort:
+              params.sortBy === 'newest' || params.filter === 'new-arrivals'
+                ? 'newest'
+                : undefined,
+            page: p,
+            limit: PAGINATION.LIST_PAGE_SIZE,
+          });
+
+          const payload = response.data;
+          const raw = Array.isArray(payload)
+            ? payload
+            : payload &&
+                typeof payload === 'object' &&
+                Array.isArray((payload as { products?: Product[] }).products)
+              ? (payload as { products: Product[] }).products
+              : [];
+
+          catalogRawRef.current = mergeUniqueProducts(catalogRawRef.current, raw);
+          lastPage = p;
+          totalPages =
+            typeof response.totalPages === 'number' ? response.totalPages : totalPages;
+
+          if (!scanCatalog || append) break;
+          const filteredSoFar = applyListFilter(catalogRawRef.current, listParams);
+          if (filteredSoFar.length >= FILTER_MIN_ITEMS || p >= totalPages) break;
+        }
+
+        setProducts(applyListFilter(catalogRawRef.current, listParams));
+
         setHasMore(
-          typeof totalPages === 'number' ? page < totalPages : raw.length >= PAGINATION.LIST_PAGE_SIZE
+          typeof totalPages === 'number'
+            ? lastPage < totalPages
+            : catalogRawRef.current.length >= PAGINATION.LIST_PAGE_SIZE
         );
-        setCurrentPage(page);
+        setCurrentPage(lastPage);
       } catch {
         if (!append) setProducts([]);
         setHasMore(false);
@@ -176,7 +135,14 @@ const ProductListScreen: React.FC = () => {
         setLoadingMore(false);
       }
     },
-    [params.categoryId, params.categoryName, params.categoryFilter, params.filter, params.sortBy]
+    [
+      params.categoryId,
+      params.categoryName,
+      params.categoryFilter,
+      params.filter,
+      params.sortBy,
+      resolvedCategoryId,
+    ]
   );
 
   useEffect(() => {

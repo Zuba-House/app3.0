@@ -53,7 +53,7 @@ export function seededShuffle<T>(items: T[], seed: number): T[] {
 function getSaleDiscount(p: Product): number {
   const base = Number(p.price ?? 0);
   const sale = Number(p.salePrice ?? 0);
-  const old = Number((p as Record<string, unknown>).oldPrice ?? 0);
+  const old = Number((p as unknown as Record<string, unknown>).oldPrice ?? 0);
   if (sale > 0 && base > sale) return ((base - sale) / base) * 100;
   if (old > base && base > 0) return ((old - base) / old) * 100;
   return 0;
@@ -67,8 +67,8 @@ function pickHighlight(products: Product[], variant: PromoVariant): Product | un
     case 'hidden_gems':
       return [...products].sort(
         (a, b) =>
-          Number((a as Record<string, unknown>).views ?? 0) -
-          Number((b as Record<string, unknown>).views ?? 0)
+          Number((a as unknown as Record<string, unknown>).views ?? 0) -
+          Number((b as unknown as Record<string, unknown>).views ?? 0)
       )[0];
     case 'fresh_drop':
       return [...products].sort(
@@ -83,12 +83,45 @@ function pickHighlight(products: Product[], variant: PromoVariant): Product | un
 /**
  * Interleave product pairs with promo strips and occasional horizontal rows.
  */
+/** New + established + older catalog items in one shuffled stream for the home feed. */
+export function buildDiscoveryMix(products: Product[], seed = daySeed()): Product[] {
+  const unique = Array.from(
+    new Map(filterPricedProducts(products).map((p) => [p._id, p])).values()
+  );
+  if (unique.length <= 4) return seededShuffle(unique, seed);
+
+  const byNewest = [...unique].sort(
+    (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+  );
+  const newCount = Math.max(4, Math.floor(unique.length * 0.28));
+  const oldCount = Math.max(3, Math.floor(unique.length * 0.18));
+  const newSlice = byNewest.slice(0, newCount);
+  const oldSlice = byNewest.slice(-oldCount);
+  const picked = new Set([...newSlice, ...oldSlice].map((p) => p._id));
+  const rest = seededShuffle(
+    unique.filter((p) => !picked.has(p._id)),
+    seed + 1
+  );
+
+  const out: Product[] = [];
+  let ni = 0;
+  let oi = 0;
+  let ri = 0;
+  while (out.length < unique.length) {
+    if (ni < newSlice.length) out.push(newSlice[ni++]);
+    if (ri < rest.length) out.push(rest[ri++]);
+    if (oi < oldSlice.length) out.push(oldSlice[oi++]);
+    if (ni >= newSlice.length && oi >= oldSlice.length && ri >= rest.length) break;
+  }
+  return out;
+}
+
 export function buildMixedFeedBlocks(products: Product[], seed = daySeed()): FeedBlock[] {
   const priced = filterPricedProducts(products);
   const unique = Array.from(new Map(priced.map((p) => [p._id, p])).values());
   if (unique.length === 0) return [];
 
-  const mixed = seededShuffle(unique, seed);
+  const mixed = buildDiscoveryMix(unique, seed);
   const blocks: FeedBlock[] = [];
   let promoIndex = 0;
   let horizontalIndex = 0;

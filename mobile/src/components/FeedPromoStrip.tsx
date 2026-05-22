@@ -57,6 +57,7 @@ const FILTER_MAP: Partial<Record<PromoVariant, 'flash-sale' | 'new-arrivals' | '
   fresh_drop: 'new-arrivals',
   ai_picks: 'trending',
   best_value: 'flash-sale',
+  hidden_gems: 'trending',
 };
 
 interface FeedPromoStripProps {
