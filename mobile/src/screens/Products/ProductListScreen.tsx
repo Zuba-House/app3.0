@@ -19,6 +19,7 @@ import { categoryService, Category } from '../../services/category.service';
 import type { ProductListParams } from '../../constants/routes';
 import type { Product } from '../../types/product.types';
 import ProductCard from '../../components/ProductCard';
+import { FLATLIST_PERF } from '../../utils/flatListPerf';
 import Colors from '../../constants/colors';
 import { filterPricedProducts } from '../../utils/productDisplay';
 import { navigateToProductDetail, pressNavigate } from '../../navigation/navigationHelpers';
@@ -207,6 +208,7 @@ const ProductListScreen: React.FC = () => {
           numColumns={2}
           contentContainerStyle={styles.list}
           columnWrapperStyle={styles.row}
+          {...FLATLIST_PERF}
         />
       )}
     </View>

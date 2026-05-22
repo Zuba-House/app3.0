@@ -11,12 +11,10 @@ export const store = configureStore({
     cart: cartReducer,
     shippingLocation: shippingLocationReducer,
   },
+  devTools: __DEV__,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: {
-        // Ignore these action types
-        ignoredActions: ['persist/PERSIST'],
-      },
+      serializableCheck: false,
     }),
 });
 

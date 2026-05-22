@@ -16,7 +16,7 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { CurrencyProvider } from './src/context/CurrencyContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { toastConfig } from './src/components/toastConfig';
-import { initLanguage } from './src/i18n';
+import { loadSavedLanguage } from './src/i18n';
 
 const theme = {
   colors: {
@@ -36,7 +36,7 @@ const theme = {
 
 const App: React.FC = () => {
   useEffect(() => {
-    initLanguage();
+    loadSavedLanguage();
   }, []);
 
   useEffect(() => {

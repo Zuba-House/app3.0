@@ -21,15 +21,21 @@ async function getOrCreateSessionId(): Promise<string> {
 }
 
 export function useAppSessionHeartbeat(): void {
-  const { user } = useAuthState();
+  const { user, authStatus } = useAuthState();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    if (authStatus !== 'authenticated') return;
+
     let cancelled = false;
 
     const sendHeartbeat = async () => {
       const prefs = await loadPrivacySettings();
-      if (!prefs.analyticsUsage) return;
+      if (!prefs.analyticsUsage) {
+        analyticsService.setEnabled(false);
+        return;
+      }
+      analyticsService.setEnabled(true);
 
       const sessionId = await getOrCreateSessionId();
       if (cancelled) return;
@@ -75,5 +81,5 @@ export function useAppSessionHeartbeat(): void {
       stopInterval();
       sub.remove();
     };
-  }, [user?._id]);
+  }, [authStatus, user?._id]);
 }

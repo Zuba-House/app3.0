@@ -8,7 +8,6 @@ import React, {
   useState,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Localization from 'expo-localization';
 import { STORAGE_KEYS } from '../constants/config';
 import {
   AppCurrency,
@@ -27,13 +26,13 @@ type CurrencyContextValue = {
   isAutoDetected: boolean;
 };
 
-const defaultDetected = detectCurrency();
+const FALLBACK_CURRENCY: AppCurrency = 'CAD';
 
 const defaultContext: CurrencyContextValue = {
-  currency: defaultDetected,
+  currency: FALLBACK_CURRENCY,
   setCurrency: async () => {},
   resetToAutoDetect: async () => {},
-  formatPrice: (priceCAD) => formatPriceWithRates(priceCAD, defaultDetected, DEFAULT_RATES),
+  formatPrice: (priceCAD) => formatPriceWithRates(priceCAD, FALLBACK_CURRENCY, DEFAULT_RATES),
   isAutoDetected: true,
 };
 
@@ -70,7 +69,7 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       void (async () => {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 5000);
+          const timeoutId = setTimeout(() => controller.abort(), 2000);
           const res = await fetch('https://api.exchangerate-api.com/v4/latest/CAD', {
             signal: controller.signal,
           });

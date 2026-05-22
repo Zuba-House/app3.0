@@ -17,7 +17,9 @@ import {
   TextInput,
   Alert,
   Keyboard,
+  InteractionManager,
 } from 'react-native';
+import { FLATLIST_PERF, FLATLIST_PERF_HORIZONTAL } from '../../utils/flatListPerf';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -169,31 +171,40 @@ export default function SearchScreen() {
   }, []);
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        setLoading(true);
-        await loadRecentSearches();
-        const res = await productService.getAllProducts({ limit: 100 });
-        if ((res as any).success !== false && res.data) {
-          const arr = Array.isArray(res.data) ? res.data : (res.data as any).products || [];
-          const normalized = arr.map(normalizeProduct);
-          setAllProducts(normalized);
-          setProducts(normalized);
-          await loadCategories(normalized);
-        } else {
-          setAllProducts([]);
-          setProducts([]);
-          await loadCategories([]);
+    let cancelled = false;
+    const task = InteractionManager.runAfterInteractions(() => {
+      void (async () => {
+        try {
+          await loadRecentSearches();
+          if (cancelled) return;
+          const res = await productService.getAllProducts({ limit: 40 });
+          if (cancelled) return;
+          if ((res as any).success !== false && res.data) {
+            const arr = Array.isArray(res.data) ? res.data : (res.data as any).products || [];
+            const normalized = arr.map(normalizeProduct);
+            setAllProducts(normalized);
+            setProducts(normalized);
+            await loadCategories(normalized);
+          } else {
+            setAllProducts([]);
+            setProducts([]);
+            await loadCategories([]);
+          }
+        } catch {
+          if (!cancelled) {
+            setAllProducts([]);
+            setProducts([]);
+            await loadCategories([]);
+          }
+        } finally {
+          if (!cancelled) setLoading(false);
         }
-      } catch {
-        setAllProducts([]);
-        setProducts([]);
-        await loadCategories([]);
-      } finally {
-        setLoading(false);
-      }
+      })();
+    });
+    return () => {
+      cancelled = true;
+      task.cancel();
     };
-    init();
   }, [loadCategories, loadRecentSearches]);
 
   const runSearch = useCallback(async (query: string) => {
@@ -491,6 +502,7 @@ export default function SearchScreen() {
             <ActivityIndicator size="small" color={Colors.secondary} style={styles.categoryLoading} />
           ) : (
             <FlatList
+              {...FLATLIST_PERF_HORIZONTAL}
               data={categories}
               renderItem={renderCategoryItem}
               keyExtractor={(item) => item._id}
@@ -522,6 +534,7 @@ export default function SearchScreen() {
             </View>
           ) : (
             <FlatList
+              {...FLATLIST_PERF}
               data={displayProducts}
               renderItem={renderProductItem}
               keyExtractor={(item) => item._id}

@@ -29,6 +29,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "useFrameworks": "static",
       "bundleIdentifier": "com.zubahouse.customer",
       "googleServicesFile": "./GoogleService-Info.plist",
       "splash": {
@@ -44,6 +45,7 @@
     },
     "android": {
       "package": "com.zubahouse.customer",
+      "enableProguardInReleaseBuilds": true,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

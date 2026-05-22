@@ -20,6 +20,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { CommonActions } from '@react-navigation/native';
+import { rootNavigationRef } from '../../navigation/rootNavigationRef';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { useAppDispatch } from '../../store/hooks';
@@ -96,14 +98,43 @@ const SettingsScreen: React.FC = () => {
     setDeleteStep('processing');
     try {
       const result = await userService.deleteAccount();
-      if (!result.success) {
-        throw new Error(result.message || 'Deletion failed');
+
+      if (result.status === 404) {
+        setDeleteStep('confirm');
+        showError(
+          'Account deletion will be available after the next server update. Contact support@zubahouse.com to delete your account now.'
+        );
+        return;
       }
+
+      if (result.status === 401) {
+        setDeleteStep('confirm');
+        showError('Session expired. Please log in again and try.');
+        return;
+      }
+
+      if (!result.success) {
+        setDeleteStep('confirm');
+        showError(
+          result.message ||
+            'Could not delete account. Try again or contact support@zubahouse.com'
+        );
+        return;
+      }
+
       dispatch(clearCart());
       await authManager.purgeLocalAccountData();
       closeDeleteFlow();
       showSuccess(t('deleteAccount.deleted'));
-      navigation.navigate('MainTabs', { screen: 'Account' });
+
+      if (rootNavigationRef.isReady()) {
+        rootNavigationRef.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'AuthModal', params: { screen: 'Login' } }],
+          })
+        );
+      }
     } catch (e) {
       setDeleteStep('confirm');
       const msg = e instanceof Error ? e.message : 'Could not delete account';

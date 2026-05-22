@@ -1,4 +1,4 @@
-import * as Localization from 'expo-localization';
+import { getDeviceRegionCode } from './safeLocalization';
 
 export type AppCurrency = 'CAD' | 'USD' | 'EUR';
 
@@ -20,8 +20,7 @@ export const CURRENCY_SYMBOLS: Record<AppCurrency, string> = {
 };
 
 export function detectCurrency(): AppCurrency {
-  const locale = Localization.getLocales()[0];
-  const region = (locale?.regionCode || '').toUpperCase();
+  const region = getDeviceRegionCode() || '';
   if (region === 'CA') return 'CAD';
   if (EUR_COUNTRIES.has(region)) return 'EUR';
   return 'USD';
@@ -34,7 +33,7 @@ export function normalizeStoredCurrency(raw: string | null): AppCurrency | null 
 
 export async function fetchLiveRates(): Promise<Partial<Record<AppCurrency, number>>> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 4000);
+  const timeout = setTimeout(() => controller.abort(), 2000);
   try {
     const res = await fetch('https://api.exchangerate-api.com/v4/latest/CAD', {
       signal: controller.signal,

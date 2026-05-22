@@ -1,8 +1,8 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Localization from 'expo-localization';
 import { STORAGE_KEYS } from '../constants/config';
+import { getDeviceLocale } from '../utils/safeLocalization';
 import { saveAppLanguage } from '../utils/settingsStorage';
 import en from './locales/en.json';
 import fr from './locales/fr.json';
@@ -22,28 +22,33 @@ void i18n.use(initReactI18next).init({
   react: { useSuspense: false },
 });
 
-async function loadSavedLanguage(): Promise<void> {
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEYS.APP_LANGUAGE);
-    if (stored === 'en' || stored === 'fr') {
-      if (stored !== i18n.language) {
-        await i18n.changeLanguage(stored);
+/** Fire-and-forget — never block app startup. */
+export function loadSavedLanguage(): void {
+  void (async () => {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.APP_LANGUAGE);
+      if (stored === 'en' || stored === 'fr') {
+        if (stored !== i18n.language) {
+          void i18n.changeLanguage(stored).catch(() => {});
+        }
+        return;
       }
-      return;
+      const locale = getDeviceLocale();
+      const deviceLang: AppLang = locale?.languageCode?.toLowerCase().startsWith('fr')
+        ? 'fr'
+        : 'en';
+      if (deviceLang !== 'en') {
+        void i18n.changeLanguage(deviceLang).catch(() => {});
+      }
+    } catch {
+      // Keep English
     }
-    const locale = Localization.getLocales()[0];
-    const deviceLang: AppLang = locale?.languageCode?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
-    if (deviceLang !== 'en') {
-      await i18n.changeLanguage(deviceLang);
-    }
-  } catch {
-    // Keep English
-  }
+  })();
 }
 
-/** Non-blocking — call once from App.tsx useEffect */
+/** @deprecated Use loadSavedLanguage — kept for compatibility */
 export function initLanguage(): void {
-  void loadSavedLanguage();
+  loadSavedLanguage();
 }
 
 export async function changeLanguage(lang: AppLang): Promise<void> {

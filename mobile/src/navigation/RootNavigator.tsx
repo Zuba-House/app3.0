@@ -64,7 +64,7 @@ const RootNavigator: React.FC = () => {
   }, []);
 
   if (showSplash) {
-    return <SplashScreen onFinish={() => setShowSplash(false)} duration={1800} />;
+    return <SplashScreen onFinish={() => setShowSplash(false)} duration={1200} />;
   }
 
   return (

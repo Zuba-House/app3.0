@@ -1,5 +1,5 @@
 import { API_ENDPOINTS } from '../constants/config';
-import { editData, postData, deleteData, uploadImage } from './api';
+import { deleteDataOptional, editData, postData, uploadImage } from './api';
 import { authManager } from '../core/auth/authManager';
 import { authSession } from '../core/auth/authSession';
 import { authStorage } from '../core/auth/authStorage';
@@ -79,18 +79,16 @@ export const userService = {
     }
   },
 
-  async deleteAccount(): Promise<{ success: boolean; message?: string }> {
-    try {
-      const response = await deleteData(API_ENDPOINTS.DELETE_ACCOUNT);
-      return {
-        success: response.success !== false && response.error !== true,
-        message: response.message,
-      };
-    } catch (e) {
-      return {
-        success: false,
-        message: e instanceof Error ? e.message : 'Could not delete account',
-      };
-    }
+  async deleteAccount(): Promise<{
+    success: boolean;
+    message?: string;
+    status?: number;
+  }> {
+    const res = await deleteDataOptional(API_ENDPOINTS.DELETE_ACCOUNT);
+    return {
+      success: res.ok && res.success !== false,
+      message: res.message,
+      status: res.status,
+    };
   },
 };

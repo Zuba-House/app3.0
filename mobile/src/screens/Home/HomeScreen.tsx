@@ -47,6 +47,7 @@ import DealOfTheDay from '../../components/DealOfTheDay';
 import CategoryDeals from '../../components/CategoryDeals';
 import ReferralBanner from '../../components/ReferralBanner';
 import TrendingProducts from '../../components/TrendingProducts';
+import { FLATLIST_PERF, FLATLIST_PERF_HORIZONTAL } from '../../utils/flatListPerf';
 
 const { width: SCREEN_WIDTH, width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 36) / 2; // 2 columns with tighter spacing (12px padding each side + 12px gap)
@@ -58,7 +59,7 @@ const HomeScreen: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -240,7 +241,16 @@ const HomeScreen: React.FC = () => {
   ];
 
   useEffect(() => {
-    loadData();
+    const task = InteractionManager.runAfterInteractions(() => {
+      void loadData();
+    });
+    return () => task.cancel();
+  }, []);
+
+  // Never leave the home screen stuck on a full-screen loader
+  useEffect(() => {
+    const watchdog = setTimeout(() => setLoading(false), 8000);
+    return () => clearTimeout(watchdog);
   }, []);
 
   // Handle tab focus - reset filters and scroll to top when Home tab is pressed
@@ -323,9 +333,11 @@ const HomeScreen: React.FC = () => {
         return;
       }
 
-      setLoading(true);
-      await Promise.all([
-        loadProducts(null, undefined), // Load all products initially
+      if (products.length === 0) {
+        setLoading(true);
+      }
+      await Promise.allSettled([
+        loadProducts(null, undefined),
         loadCategories(),
         loadFeaturedProducts(),
       ]);
@@ -752,16 +764,13 @@ const HomeScreen: React.FC = () => {
           navigateToProductList(navigation, listParams ?? { title, subtitle })
         )}
         <FlatList
+          {...FLATLIST_PERF_HORIZONTAL}
           data={displayProducts}
           renderItem={renderHorizontalProductItem}
           keyExtractor={(item) => item._id}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.horizontalProductsList}
-          removeClippedSubviews={false}
-          initialNumToRender={3}
-          maxToRenderPerBatch={4}
-          windowSize={3}
           getItemLayout={(data, index) => ({
             length: SCREEN_WIDTH * 0.48 + 8,
             offset: (SCREEN_WIDTH * 0.48 + 8) * index,
@@ -863,6 +872,7 @@ const HomeScreen: React.FC = () => {
   const renderPromoBanner = () => (
     <View style={styles.promoCarouselContainer}>
       <FlatList
+        {...FLATLIST_PERF_HORIZONTAL}
         ref={promoFlatListRef}
         data={promoSlides}
         renderItem={renderPromoSlide}
@@ -899,15 +909,6 @@ const HomeScreen: React.FC = () => {
       />
     </View>
   );
-
-  if (loading && products.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.secondary} />
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -1016,16 +1017,13 @@ const HomeScreen: React.FC = () => {
               })
             )}
             <FlatList
+              {...FLATLIST_PERF}
               data={newArrivalsProducts}
               renderItem={renderProductItem}
               keyExtractor={(item) => item._id}
               numColumns={2}
               scrollEnabled={false}
               contentContainerStyle={styles.productsList}
-              removeClippedSubviews={true}
-              initialNumToRender={4}
-              maxToRenderPerBatch={8}
-              windowSize={5}
             />
           </View>
         )}
@@ -1052,16 +1050,13 @@ const HomeScreen: React.FC = () => {
               false
             )}
             <FlatList
+              {...FLATLIST_PERF}
               data={filteredProducts.length > 0 ? filteredProducts : products}
               renderItem={renderProductItem}
               keyExtractor={(item) => item._id}
               numColumns={2}
               scrollEnabled={false}
               contentContainerStyle={styles.productsList}
-              removeClippedSubviews={true}
-              initialNumToRender={6}
-              maxToRenderPerBatch={10}
-              windowSize={10}
               getItemLayout={(data, index) => ({
                 length: CARD_WIDTH + 12,
                 offset: (CARD_WIDTH + 12) * Math.floor(index / 2),
@@ -1095,18 +1090,23 @@ const HomeScreen: React.FC = () => {
           <View style={styles.section}>
             {renderSectionHeader('Shop All Products', 'Discover amazing deals')}
             <FlatList
+              {...FLATLIST_PERF}
               data={products}
               renderItem={renderProductItem}
               keyExtractor={(item) => item._id}
               numColumns={2}
               scrollEnabled={false}
               contentContainerStyle={styles.productsList}
-              removeClippedSubviews={true}
-              initialNumToRender={6}
-              maxToRenderPerBatch={10}
-              windowSize={10}
               onEndReached={loadMoreProducts}
               onEndReachedThreshold={0.5}
+              ListEmptyComponent={
+                loading ? (
+                  <View style={styles.loadingMoreContainer}>
+                    <ActivityIndicator size="large" color={Colors.secondary} />
+                    <Text style={styles.loadingMoreText}>Loading products...</Text>
+                  </View>
+                ) : null
+              }
               ListFooterComponent={
                 loadingMore ? (
                   <View style={styles.loadingMoreContainer}>

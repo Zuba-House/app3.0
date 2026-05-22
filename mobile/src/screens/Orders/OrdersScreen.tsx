@@ -3,7 +3,7 @@
  * User's order history
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCurrency } from '../../context/CurrencyContext';
 import {
@@ -17,6 +17,7 @@ import { ActivityIndicator } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { orderService } from '../../services/order.service';
 import Colors from '../../constants/colors';
+import { FLATLIST_PERF } from '../../utils/flatListPerf';
 import { useAuthState } from '../../core/auth/authGuards';
 import { useAuthGate } from '../../core/auth/authGate';
 import {
@@ -39,28 +40,28 @@ const OrdersScreen: React.FC = () => {
   const [orders, setOrders] = useState<RawOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setLoading(false);
-      setOrders([]);
-      return;
-    }
-    loadOrders();
-  }, [isAuthenticated]);
-
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
       const response = await orderService.getOrders();
       if (response.success && response.data) {
         setOrders(response.data as unknown as RawOrder[]);
       }
-    } catch (error) {
-      console.error('Orders error:', error);
+    } catch {
+      setOrders([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      setOrders([]);
+      return;
+    }
+    void loadOrders();
+  }, [isAuthenticated, loadOrders]);
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -115,6 +116,7 @@ const OrdersScreen: React.FC = () => {
       </View>
 
       <FlatList
+        {...FLATLIST_PERF}
         data={orders}
         renderItem={({ item }) => {
           const orderId = getOrderId(item);

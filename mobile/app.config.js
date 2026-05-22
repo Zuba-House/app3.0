@@ -104,7 +104,7 @@ module.exports = () => {
 
       },
 
-      plugins: [...(appJson.expo.plugins || []), 'expo-localization'],
+      plugins: [...(appJson.expo.plugins || [])],
 
       extra: {
 

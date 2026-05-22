@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
 import { rootNavigationRef } from '../navigation/rootNavigationRef';
 import { useAuthState } from '../core/auth/authGuards';
+import { setupPushNotifications } from '../services/pushNotification.service';
 import {
   notificationService,
   handleNotificationNavigation,
@@ -27,9 +28,8 @@ export function usePushNotifications(): void {
     (async () => {
       const { refreshNotificationPrefsCache } = await import('../utils/notificationPrefs');
       await refreshNotificationPrefsCache();
-      await notificationService.initialize();
       if (!mounted) return;
-      await notificationService.registerTokenWithBackend(user?._id);
+      void setupPushNotifications();
     })();
 
     notificationService.addListeners(

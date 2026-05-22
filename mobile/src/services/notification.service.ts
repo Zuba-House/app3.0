@@ -142,40 +142,17 @@ class NotificationService {
   }
 
   /**
-   * Register push token with backend
+   * Register push token with backend (silent — never logs errors to console.error)
    */
-  async registerTokenWithBackend(userId?: string): Promise<boolean> {
+  async registerTokenWithBackend(_userId?: string): Promise<boolean> {
     if (!this.expoPushToken) {
       await this.initialize();
     }
+    if (!this.expoPushToken) return false;
 
-    if (!this.expoPushToken) {
-      return false;
-    }
-
-    try {
-      const response = await postData(API_ENDPOINTS.REGISTER_PUSH_TOKEN, {
-        token: this.expoPushToken,
-        pushToken: this.expoPushToken,
-        platform: Platform.OS,
-        deviceType: Platform.OS,
-        deviceName: Device.deviceName || Device.modelName || 'Unknown',
-        userId,
-      });
-
-      if (__DEV__) {
-        if (response.success !== false) {
-          console.log('[Push] Token sent to server ✓');
-        } else {
-          console.warn('[Push] Failed to send token:', response.message);
-        }
-      }
-
-      return response.success !== false;
-    } catch (error) {
-      console.error('Error registering push token:', error);
-      return false;
-    }
+    const { sendTokenToServer } = await import('./pushNotification.service');
+    await sendTokenToServer(this.expoPushToken);
+    return true;
   }
 
   /**
@@ -284,15 +261,14 @@ class NotificationService {
 
   /** Remove token from server on logout */
   async unregisterFromBackend(): Promise<void> {
-    try {
-      if (!this.expoPushToken) return;
-      await deleteData(API_ENDPOINTS.UNREGISTER_PUSH_TOKEN, {
-        token: this.expoPushToken,
-        pushToken: this.expoPushToken,
-      });
-      if (__DEV__) console.log('[Push] Token unregistered from server');
-    } catch (err) {
-      if (__DEV__) console.warn('[Push] Unregister failed (non-critical):', err);
+    if (!this.expoPushToken) return;
+    const { deleteDataOptional } = await import('./api');
+    const res = await deleteDataOptional(API_ENDPOINTS.UNREGISTER_PUSH_TOKEN, {
+      token: this.expoPushToken,
+      pushToken: this.expoPushToken,
+    });
+    if (__DEV__ && (res.ok || res.status === 404)) {
+      console.log('[Push] Token unregistered from server');
     }
   }
 }

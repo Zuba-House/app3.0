@@ -3,7 +3,7 @@ import { authManager } from '../core/auth/authManager';
 import { ApiResponse } from '../types/api.types';
 
 type RequestConfig = RequestInit & { _retryCount?: number };
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = 10000;
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
@@ -40,24 +40,8 @@ async function request<T>(url: string, config: RequestConfig = {}): Promise<ApiR
   if (accessToken) {
     (headers as Record<string, string>).Authorization = `Bearer ${accessToken}`;
   }
-  if (__DEV__ && url.includes('/api/order/create')) {
-    console.info('[Checkout][request]', {
-      url,
-      method: config.method || 'GET',
-      hasAuthHeader: Boolean((headers as Record<string, string>).Authorization),
-      hasBody: Boolean(config.body),
-    });
-  }
   const response = await fetchWithTimeout(`${API_URL}${url}`, { ...config, headers });
   const json = await response.json().catch(() => ({}));
-  if (__DEV__ && url.includes('/api/order/create')) {
-    console.info('[Checkout][response]', {
-      url,
-      status: response.status,
-      ok: response.ok,
-      message: json?.message,
-    });
-  }
   if (response.status === 401 && retryCount < 1) {
     const refreshed = await authManager.refreshSession();
     if (!refreshed) {
@@ -67,10 +51,79 @@ async function request<T>(url: string, config: RequestConfig = {}): Promise<ApiR
     return request<T>(url, { ...config, _retryCount: retryCount + 1 });
   }
   if (!response.ok || (json?.success === false && json?.error === true)) {
+    if (__DEV__ && response.status >= 400) {
+      console.error('[API Error]', url, response.status, json?.message);
+    }
     throw new Error(json?.message || 'Request failed');
   }
   return normalizeResponse<T>(json);
 }
+
+/** Result for background calls that must not throw (e.g. push token, optional features). */
+export type ApiOptionalResult<T = unknown> = {
+  ok: boolean;
+  status: number;
+  success: boolean;
+  message?: string;
+  data?: T;
+};
+
+async function requestOptional<T>(
+  url: string,
+  config: RequestInit = {}
+): Promise<ApiOptionalResult<T>> {
+  try {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(config.headers || {}),
+    };
+    const accessToken = authManager.getAccessToken();
+    if (accessToken) {
+      (headers as Record<string, string>).Authorization = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetchWithTimeout(`${API_URL}${url}`, {
+      ...config,
+      headers,
+    });
+    const json = await response.json().catch(() => ({}));
+    const success =
+      response.ok && json?.success !== false && json?.error !== true;
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      success,
+      message: typeof json?.message === 'string' ? json.message : undefined,
+      data: (json?.data ?? json) as T,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      success: false,
+      message: err instanceof Error ? err.message : 'Network error',
+    };
+  }
+}
+
+export const postDataOptional = async <T = unknown>(
+  url: string,
+  data?: unknown
+): Promise<ApiOptionalResult<T>> =>
+  requestOptional<T>(url, {
+    method: 'POST',
+    body: JSON.stringify(data ?? {}),
+  });
+
+export const deleteDataOptional = async <T = unknown>(
+  url: string,
+  data?: unknown
+): Promise<ApiOptionalResult<T>> =>
+  requestOptional<T>(url, {
+    method: 'DELETE',
+    body: data != null ? JSON.stringify(data) : undefined,
+  });
 
 export const fetchDataFromApi = async <T = unknown>(url: string, params?: Record<string, string | number | boolean>): Promise<ApiResponse<T>> => {
   const queryString = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';

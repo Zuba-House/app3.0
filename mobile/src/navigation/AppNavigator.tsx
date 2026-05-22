@@ -3,13 +3,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/colors';
+import { lazyScreen } from './lazyScreen';
 
 import HomeScreen from '../screens/Home/HomeScreen';
-import SearchScreen from '../screens/Search/SearchScreen';
-import WishlistScreen from '../screens/Wishlist/WishlistScreen';
-import OrdersScreen from '../screens/Orders/OrdersScreen';
-import ProfileScreen from '../screens/Profile/ProfileScreen';
-import ProductDetailScreen from '../screens/Products/ProductDetailScreen';
 import BrandsScreen from '../screens/Brands/BrandsScreen';
 import CartScreen from '../screens/Cart/CartScreen';
 import CheckoutScreen from '../screens/Checkout/CheckoutScreen';
@@ -26,10 +22,16 @@ import SettingsScreen from '../screens/Settings/SettingsScreen';
 import EditProfileScreen from '../screens/Settings/EditProfileScreen';
 import ChangePasswordScreen from '../screens/Settings/ChangePasswordScreen';
 import PrivacySettingsScreen from '../screens/Settings/PrivacySettingsScreen';
-import OrderDetailScreen from '../screens/Orders/OrderDetailScreen';
 import ProductListScreen from '../screens/Products/ProductListScreen';
 import CategoriesScreen from '../screens/Categories/CategoriesScreen';
 import type { ProductListParams } from '../constants/routes';
+
+const SearchScreen = lazyScreen(() => import('../screens/Search/SearchScreen'));
+const WishlistScreen = lazyScreen(() => import('../screens/Wishlist/WishlistScreen'));
+const OrdersScreen = lazyScreen(() => import('../screens/Orders/OrdersScreen'));
+const ProfileScreen = lazyScreen(() => import('../screens/Profile/ProfileScreen'));
+const ProductDetailScreen = lazyScreen(() => import('../screens/Products/ProductDetailScreen'));
+const OrderDetailScreen = lazyScreen(() => import('../screens/Orders/OrderDetailScreen'));
 
 export type MainTabParamList = {
   Home: undefined;
@@ -76,7 +78,6 @@ const stackHeaderOptions = {
   headerBackTitleVisible: false,
 };
 
-// Tab Navigator
 const TabNavigator = () => {
   return (
     <Tab.Navigator
@@ -108,68 +109,48 @@ const TabNavigator = () => {
       }}
       backBehavior="firstRoute"
     >
-      <Tab.Screen 
-        name="Home" 
+      <Tab.Screen
+        name="Home"
         component={HomeScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'home' : 'home-outline'} 
-              size={24} 
-              color={color} 
-            />
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
           ),
         }}
       />
-      <Tab.Screen 
-        name="Search" 
+      <Tab.Screen
+        name="Search"
         component={SearchScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'search' : 'search-outline'} 
-              size={24} 
-              color={color} 
-            />
+            <Ionicons name={focused ? 'search' : 'search-outline'} size={24} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="Wishlist" 
+        name="Wishlist"
         component={WishlistScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'heart' : 'heart-outline'} 
-              size={24} 
-              color={color} 
-            />
+            <Ionicons name={focused ? 'heart' : 'heart-outline'} size={24} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="Orders" 
+        name="Orders"
         component={OrdersScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'bag' : 'bag-outline'} 
-              size={24} 
-              color={color} 
-            />
+            <Ionicons name={focused ? 'bag' : 'bag-outline'} size={24} color={color} />
           ),
         }}
       />
-      <Tab.Screen 
-        name="Account" 
+      <Tab.Screen
+        name="Account"
         component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'person' : 'person-outline'} 
-              size={24} 
-              color={color} 
-            />
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
           ),
         }}
       />
@@ -177,7 +158,6 @@ const TabNavigator = () => {
   );
 };
 
-// Main Navigator (Tabs + Product Detail + Checkout)
 const AppNavigator = () => {
   return (
     <MainStack.Navigator screenOptions={stackHeaderOptions}>

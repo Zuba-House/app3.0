@@ -1165,11 +1165,25 @@ export async function deleteOwnAccount(request, response) {
             return sendError(response, 404, 'User not found');
         }
 
-        await CartProductModel.deleteMany({ userId });
+        const cleanup = [
+            CartProductModel.deleteMany({ userId }),
+        ];
+
+        try {
+            const PushToken = (await import('../models/pushToken.model.js')).default;
+            cleanup.push(PushToken.deleteMany({ userId }));
+        } catch (pushErr) {
+            console.warn('[Account] PushToken cleanup skipped:', pushErr?.message);
+        }
+
+        await Promise.allSettled(cleanup);
+
         const deletedUser = await UserModel.findByIdAndDelete(userId);
         if (!deletedUser) {
             return sendError(response, 500, 'Could not delete account');
         }
+
+        console.log(`[Account] Deleted user: ${userId}`);
 
         return sendSuccess(response, 200, 'Account deleted successfully');
     } catch (error) {

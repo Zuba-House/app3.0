@@ -23,14 +23,6 @@ export const orderService = {
       `${API_ENDPOINTS.GET_ORDERS}?page=1&limit=50`
     );
     const orders = parseOrdersListPayload(response.data);
-    if (__DEV__) {
-      const sample = orders[0];
-      console.log('[Orders] list sample:', sample ? {
-        _id: sample._id,
-        totalAmt: sample.totalAmt,
-        products: Array.isArray(sample.products) ? sample.products.length : 0,
-      } : 'empty');
-    }
     return { ...response, data: orders as unknown as Order[] };
   },
 
@@ -49,9 +41,6 @@ export const orderService = {
     } catch (error) {
       if (!isRouteNotFoundError(error)) {
         throw error;
-      }
-      if (__DEV__) {
-        console.warn('[Orders] GET /api/order/:id unavailable — falling back to order list');
       }
       const listResponse = await orderService.getOrders();
       const list = parseOrdersListPayload(listResponse.data);

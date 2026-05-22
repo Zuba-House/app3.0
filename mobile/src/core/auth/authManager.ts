@@ -9,7 +9,6 @@ import { authMonitor } from './authMonitor';
 import { clearDeviceSessionMemory, getDeviceSessionId } from './authDevice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../../constants/config';
-import { wishlistService } from '../../services/wishlist.service';
 const AUTH_REQUEST_TIMEOUT_MS = 15000;
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = AUTH_REQUEST_TIMEOUT_MS): Promise<Response> {
@@ -68,6 +67,7 @@ async function applyAuthenticatedSession(session: ExternalAuthInput): Promise<vo
   authSession.setAuthenticated(user, session.accessToken);
   await authStorage.setUserCache(user);
   await mergeGuestCart(session.accessToken);
+  const { wishlistService } = await import('../../services/wishlist.service');
   await wishlistService.mergeLocalWishlistToCloud();
 }
 
@@ -112,28 +112,46 @@ export const authManager = {
   getRefreshToken: authSession.getRefreshToken.bind(authSession),
 
   async bootstrap(): Promise<void> {
+    const BOOTSTRAP_MAX_MS = 8000;
     const startedAt = Date.now();
     authSession.setState({ isLoading: true, authStatus: 'loading' });
-    const refreshToken = await authStorage.getRefreshToken();
-    authSession.setRefreshToken(refreshToken);
-    if (!refreshToken) {
-      authSession.setGuest(true);
-      authMonitor.emit('bootstrap_duration_ms', { duration: Date.now() - startedAt, restored: false });
-      return;
-    }
+
+    const runBootstrap = async (): Promise<void> => {
+      const refreshToken = await authStorage.getRefreshToken();
+      authSession.setRefreshToken(refreshToken);
+      if (!refreshToken) {
+        authSession.setGuest(true);
+        authMonitor.emit('bootstrap_duration_ms', { duration: Date.now() - startedAt, restored: false });
+        return;
+      }
+      try {
+        await this.refreshSession();
+        const user = await this.fetchCurrentUser();
+        const accessToken = authSession.getAccessToken();
+        if (!accessToken) throw new Error('Missing in-memory access token');
+        authSession.setAuthenticated(user, accessToken);
+        didEmitSessionExpired = false;
+        authEvents.emit(AUTH_EVENTS.SESSION_RESTORED, { source: 'bootstrap' });
+        authMonitor.emit('session_restored', { source: 'bootstrap' });
+        authMonitor.emit('bootstrap_duration_ms', { duration: Date.now() - startedAt, restored: true });
+      } catch {
+        authMonitor.emit('bootstrap_duration_ms', { duration: Date.now() - startedAt, restored: false });
+        await this.forceLogout('bootstrap_failed');
+      }
+    };
+
     try {
-      await this.refreshSession();
-      const user = await this.fetchCurrentUser();
-      const accessToken = authSession.getAccessToken();
-      if (!accessToken) throw new Error('Missing in-memory access token');
-      authSession.setAuthenticated(user, accessToken);
-      didEmitSessionExpired = false;
-      authEvents.emit(AUTH_EVENTS.SESSION_RESTORED, { source: 'bootstrap' });
-      authMonitor.emit('session_restored', { source: 'bootstrap' });
-      authMonitor.emit('bootstrap_duration_ms', { duration: Date.now() - startedAt, restored: true });
+      await Promise.race([
+        runBootstrap(),
+        new Promise<void>((_, reject) => {
+          setTimeout(() => reject(new Error('bootstrap_timeout')), BOOTSTRAP_MAX_MS);
+        }),
+      ]);
     } catch {
-      authMonitor.emit('bootstrap_duration_ms', { duration: Date.now() - startedAt, restored: false });
-      await this.forceLogout('bootstrap_failed');
+      if (authSession.getState().authStatus === 'loading') {
+        authSession.setGuest(true);
+        authMonitor.emit('bootstrap_duration_ms', { duration: Date.now() - startedAt, restored: false });
+      }
     }
   },
 

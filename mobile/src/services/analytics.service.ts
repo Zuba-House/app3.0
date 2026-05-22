@@ -3,8 +3,7 @@
  * Handles user behavior tracking and analytics
  */
 
-import { postData } from './api';
-import { API_URL } from '../constants/config';
+import { postDataOptional } from './api';
 
 export interface AnalyticsEvent {
   event: string;
@@ -16,7 +15,7 @@ export interface AnalyticsEvent {
 class AnalyticsService {
   private userId: string | null = null;
   private sessionId: string | null = null;
-  private enabled: boolean = true;
+  private enabled: boolean = false;
 
   /**
    * Initialize analytics
@@ -45,11 +44,12 @@ class AnalyticsService {
         userId: this.userId || undefined,
       };
 
-      // Send to backend analytics endpoint
-      await postData('/api/analytics/track', eventData);
-    } catch (error) {
-      // Don't block app if analytics fails
-      console.warn('Analytics tracking failed:', error);
+      const res = await postDataOptional('/api/analytics/track', eventData);
+      if (__DEV__ && !res.ok && res.status !== 404) {
+        console.log('[Analytics] skipped:', res.message || res.status);
+      }
+    } catch {
+      // Never block UI for analytics
     }
   }
 
