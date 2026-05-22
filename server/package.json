@@ -8,9 +8,12 @@
     "dev": "node --watch index.js"
   },
   "dependencies": {
+    "@sendgrid/mail": "^8.1.4",
+    "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
     "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.7",
     "cors": "^2.8.5",
     "expo-server-sdk": "^3.13.0",
     "express": "^4.21.2",
