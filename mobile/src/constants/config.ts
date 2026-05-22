@@ -117,6 +117,8 @@ export const API_ENDPOINTS = {
 
   GET_ALL_PRODUCTS: '/api/product/getAllProducts',
 
+  GET_FEATURED_PRODUCTS: '/api/product/getAllFeaturedProducts',
+
   GET_PRODUCT: '/api/product',
 
   SEARCH_PRODUCTS: '/api/product/getAllProducts',
@@ -256,6 +258,10 @@ export const PAGINATION = {
   DEFAULT_PAGE_SIZE: 50,
 
   MAX_PAGE_SIZE: 200,
+
+  HOME_PAGE_SIZE: 30,
+
+  LIST_PAGE_SIZE: 30,
 
 } as const;
 

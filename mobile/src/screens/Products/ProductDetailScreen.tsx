@@ -593,8 +593,11 @@ const ProductDetailScreen: React.FC = () => {
         }
       } else {
         // Guest user: Use local Redux store
+        const variationKey = variationId || 'simple';
         const cartItem = {
-          _id: `guest_${Date.now()}_${Math.random()}`,
+          _id: `guest_${product._id}_${variationKey}`,
+          productId: product._id,
+          variationId: variationId ?? null,
           product: product,
           variation: variationData || undefined,
           quantity: quantity,

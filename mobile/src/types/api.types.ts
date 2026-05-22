@@ -9,6 +9,10 @@ export interface ApiResponse<T = unknown> {
   data?: T;
   message?: string;
   details?: unknown;
+  page?: number;
+  total?: number;
+  totalPages?: number;
+  limit?: number;
 }
 
 export interface ApiError {

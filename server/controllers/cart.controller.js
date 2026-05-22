@@ -305,11 +305,28 @@ export const getCartItemController = async (request, response) => {
                                 v => v._id && v._id.toString() === item.variationId
                             );
                             if (variation) {
-                                currentStock = variation.stock || 0;
+                                if (variation.endlessStock) {
+                                    currentStock = item.countInStock > 0 ? item.countInStock : 999999;
+                                } else if (variation.stock !== undefined && variation.stock !== null) {
+                                    currentStock = Number(variation.stock) || 0;
+                                } else {
+                                    currentStock = item.countInStock;
+                                }
                             }
                         } else {
-                            // For simple products, check product stock
-                            currentStock = product.countInStock || product.inventory?.stock || 0;
+                            // For simple products — missing stock must not imply 0 (aligns with mobile productStock)
+                            if (product.inventory?.endlessStock) {
+                                currentStock = item.countInStock > 0 ? item.countInStock : 999999;
+                            } else {
+                                const rawStock =
+                                    product.inventory?.stock ??
+                                    product.countInStock;
+                                if (rawStock === undefined || rawStock === null) {
+                                    currentStock = item.countInStock;
+                                } else {
+                                    currentStock = Number(rawStock) || 0;
+                                }
+                            }
                         }
                         
                         // Update cart item if stock changed

@@ -247,7 +247,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({
     return copy;
   };
 
-  const displayProducts = shuffle(mixedPool).slice(0, 12);
+  const displayProducts = shuffle(mixedPool).slice(0, 16);
   const dataToRender = displayProducts.sort((a, b) => {
     const aInfo = getSaleInfo(a as any);
     const bInfo = getSaleInfo(b as any);

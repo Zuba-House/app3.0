@@ -1,6 +1,6 @@
 /**
  * Order Confirmation Screen
- * Success screen after payment completion
+ * Success screen after checkout / payment
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -12,7 +12,9 @@ import {
   Animated,
   Platform,
   Share,
+  ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../constants/colors';
@@ -28,6 +30,7 @@ interface OrderConfirmationParams {
 const OrderConfirmationScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const insets = useSafeAreaInsets();
   const {
     orderId,
     total,
@@ -36,29 +39,29 @@ const OrderConfirmationScreen: React.FC = () => {
     paymentMethod = 'stripe',
   } = route.params as OrderConfirmationParams;
 
-  // Animation values
+  const orderRef = orderId ? `#${orderId.slice(-8).toUpperCase()}` : '#—';
+
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
+  const slideAnim = useRef(new Animated.Value(24)).current;
 
   useEffect(() => {
-    // Success animation sequence
     Animated.sequence([
       Animated.spring(scaleAnim, {
         toValue: 1,
-        tension: 50,
-        friction: 7,
+        tension: 48,
+        friction: 8,
         useNativeDriver: true,
       }),
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 400,
+          duration: 380,
           useNativeDriver: true,
         }),
         Animated.timing(slideAnim, {
           toValue: 0,
-          duration: 400,
+          duration: 380,
           useNativeDriver: true,
         }),
       ]),
@@ -68,11 +71,11 @@ const OrderConfirmationScreen: React.FC = () => {
   const handleShareOrder = async () => {
     try {
       await Share.share({
-        message: `I just placed an order on Zuba House! Order #${orderId.slice(-8).toUpperCase()}`,
+        message: `I just placed an order on Zuba House! Order ${orderRef}`,
         title: 'My Zuba House Order',
       });
-    } catch (error) {
-      console.error('Error sharing:', error);
+    } catch {
+      /* ignore */
     }
   };
 
@@ -93,125 +96,182 @@ const OrderConfirmationScreen: React.FC = () => {
     });
   };
 
+  const handlePayNow = () => {
+    navigation.navigate('Payment', {
+      orderId,
+      amount: paymentAmount,
+      paymentMethod,
+      onSuccess: () => {
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: 'OrderConfirmation',
+              params: { orderId, total, paymentPending: false },
+            },
+          ],
+        });
+      },
+    });
+  };
+
   return (
-    <View style={styles.container}>
-      {/* Success Animation */}
-      <Animated.View
-        style={[
-          styles.iconContainer,
-          { transform: [{ scale: scaleAnim }] },
-        ]}
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
       >
-        <View style={styles.iconCircle}>
-          <Ionicons name="checkmark" size={60} color={Colors.white} />
-        </View>
-      </Animated.View>
+        <Animated.View
+          style={[
+            styles.hero,
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <Animated.View style={[styles.iconWrap, { transform: [{ scale: scaleAnim }] }]}>
+            <View style={styles.iconRing}>
+              <View style={styles.iconCircle}>
+                <Ionicons name="checkmark" size={52} color={Colors.white} />
+              </View>
+            </View>
+          </Animated.View>
 
-      {/* Content */}
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
-      >
-        <Text style={styles.title}>Order placed successfully! 🎉</Text>
-        <Text style={styles.subtitle}>
-          {paymentPending
-            ? 'Your order is received. Complete payment below when ready.'
-            : 'Thank you for shopping with Zuba House'}
-        </Text>
+          <Text style={styles.title}>Order placed!</Text>
+          <Text style={styles.subtitle}>
+            {paymentPending
+              ? 'We saved your order. Pay when you’re ready to confirm it.'
+              : 'Thank you for shopping with Zuba House.'}
+          </Text>
+        </Animated.View>
 
-        {/* Order Details Card */}
-        <View style={styles.orderCard}>
-          <View style={styles.orderRow}>
-            <Text style={styles.orderLabel}>Order Number</Text>
-            <Text style={styles.orderValue}>
-              #{orderId.slice(-8).toUpperCase()}
-            </Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.orderRow}>
-            <Text style={styles.orderLabel}>{paymentPending ? 'Order Total' : 'Total Paid'}</Text>
-            <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.orderRow}>
-            <Text style={styles.orderLabel}>Payment Status</Text>
-            <View style={[styles.statusBadge, paymentPending && styles.statusBadgePending]}>
-              <Text style={[styles.statusText, paymentPending && styles.statusTextPending]}>
-                {paymentPending ? 'Payment pending' : 'Paid'}
+        <Animated.View
+          style={[
+            styles.body,
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>ORDER SUMMARY</Text>
+            <View style={styles.summaryRow}>
+              <Text style={styles.rowLabel}>Order number</Text>
+              <View style={styles.orderPill}>
+                <Text style={styles.orderPillText}>{orderRef}</Text>
+              </View>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryRow}>
+              <Text style={styles.rowLabel}>
+                {paymentPending ? 'Amount due' : 'Total paid'}
               </Text>
+              <Text style={styles.totalAmount}>${total.toFixed(2)}</Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryRow}>
+              <Text style={styles.rowLabel}>Status</Text>
+              <View
+                style={[
+                  styles.statusPill,
+                  paymentPending ? styles.statusPending : styles.statusPaid,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.statusDot,
+                    paymentPending ? styles.dotPending : styles.dotPaid,
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.statusText,
+                    paymentPending ? styles.statusTextPending : styles.statusTextPaid,
+                  ]}
+                >
+                  {paymentPending ? 'Payment pending' : 'Paid'}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
 
+          <View style={styles.infoStack}>
+            <View style={styles.infoRow}>
+              <View style={[styles.infoIconBox, styles.infoIconEmail]}>
+                <Ionicons name="mail-outline" size={20} color={Colors.primary} />
+              </View>
+              <View style={styles.infoTextBlock}>
+                <Text style={styles.infoTitle}>Confirmation email</Text>
+                <Text style={styles.infoDesc}>
+                  Order details and tracking updates will be sent to your inbox.
+                </Text>
+              </View>
+            </View>
+            <View style={styles.infoRowDivider} />
+            <View style={styles.infoRow}>
+              <View style={[styles.infoIconBox, styles.infoIconDelivery]}>
+                <Ionicons name="cube-outline" size={20} color={Colors.primary} />
+              </View>
+              <View style={styles.infoTextBlock}>
+                <Text style={styles.infoTitle}>Estimated delivery</Text>
+                <Text style={styles.infoDesc}>5–7 business days</Text>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+      </ScrollView>
+
+      <Animated.View
+        style={[
+          styles.footer,
+          { paddingBottom: Math.max(insets.bottom, 16), opacity: fadeAnim },
+        ]}
+      >
         {paymentPending ? (
           <TouchableOpacity
-            style={styles.payNowButton}
-            onPress={() =>
-              navigation.navigate('Payment', {
-                orderId,
-                amount: paymentAmount,
-                paymentMethod,
-                onSuccess: () => {
-                  navigation.reset({
-                    index: 0,
-                    routes: [
-                      {
-                        name: 'OrderConfirmation',
-                        params: { orderId, total, paymentPending: false },
-                      },
-                    ],
-                  });
-                },
-              })
-            }
+            style={styles.ctaPay}
+            onPress={handlePayNow}
+            activeOpacity={0.88}
           >
-            <Ionicons name="card-outline" size={20} color={Colors.white} />
-            <Text style={styles.payNowButtonText}>Complete payment with Stripe</Text>
+            <Ionicons name="card-outline" size={22} color={Colors.white} />
+            <Text style={styles.ctaPayText}>Complete payment</Text>
           </TouchableOpacity>
         ) : null}
 
-        {/* Info Message */}
-        <View style={styles.infoCard}>
-          <Ionicons name="mail-outline" size={24} color={Colors.secondary} />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>Confirmation Email Sent</Text>
-            <Text style={styles.infoText}>
-              We've sent you an email with your order details and tracking information.
-            </Text>
-          </View>
-        </View>
-
-        {/* Estimated Delivery */}
-        <View style={styles.deliveryCard}>
-          <Ionicons name="car-outline" size={24} color={Colors.secondary} />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>Estimated Delivery</Text>
-            <Text style={styles.infoText}>5-7 business days</Text>
-          </View>
-        </View>
-      </Animated.View>
-
-      {/* Actions */}
-      <Animated.View style={[styles.actions, { opacity: fadeAnim }]}>
-        <TouchableOpacity style={styles.primaryButton} onPress={handleContinueShopping}>
-          <Ionicons name="home" size={20} color={Colors.white} />
-          <Text style={styles.primaryButtonText}>Continue Shopping</Text>
+        <TouchableOpacity
+          style={paymentPending ? styles.ctaSecondary : styles.ctaPrimary}
+          onPress={handleContinueShopping}
+          activeOpacity={0.88}
+        >
+          <Ionicons
+            name="bag-handle-outline"
+            size={20}
+            color={paymentPending ? Colors.primary : Colors.white}
+          />
+          <Text
+            style={
+              paymentPending ? styles.ctaSecondaryText : styles.ctaPrimaryText
+            }
+          >
+            Continue shopping
+          </Text>
         </TouchableOpacity>
 
-        <View style={styles.secondaryActions}>
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleViewOrder}>
+        <View style={styles.footerLinks}>
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={handleViewOrder}
+            activeOpacity={0.7}
+          >
             <Ionicons name="receipt-outline" size={18} color={Colors.primary} />
-            <Text style={styles.secondaryButtonText}>View Order</Text>
+            <Text style={styles.linkButtonText}>View order</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleShareOrder}>
-            <Ionicons name="share-outline" size={18} color={Colors.primary} />
-            <Text style={styles.secondaryButtonText}>Share</Text>
+          <View style={styles.linkDivider} />
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={handleShareOrder}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="share-social-outline" size={18} color={Colors.primary} />
+            <Text style={styles.linkButtonText}>Share</Text>
           </TouchableOpacity>
         </View>
       </Animated.View>
@@ -223,177 +283,271 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    paddingTop: Platform.OS === 'ios' ? 80 : 60,
-    paddingHorizontal: 20,
   },
-  iconContainer: {
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  hero: {
     alignItems: 'center',
-    marginBottom: 24,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  iconWrap: {
+    marginBottom: 20,
+  },
+  iconRing: {
+    padding: 6,
+    borderRadius: 72,
+    backgroundColor: 'rgba(239, 178, 145, 0.25)',
   },
   iconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: Colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: Colors.secondary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  content: {
-    flex: 1,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '800',
     color: Colors.primary,
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: Colors.primary,
-    opacity: 0.7,
+    opacity: 0.65,
     textAlign: 'center',
     marginTop: 8,
-    marginBottom: 32,
+    lineHeight: 22,
+    paddingHorizontal: 8,
+    maxWidth: 320,
   },
-  orderCard: {
+  body: {
+    marginTop: 8,
+  },
+  summaryCard: {
     backgroundColor: Colors.white,
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 14,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  orderRow: {
+  summaryLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: Colors.primary,
+    opacity: 0.45,
+    marginBottom: 14,
+  },
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    minHeight: 36,
   },
-  orderLabel: {
+  rowLabel: {
     fontSize: 14,
     color: Colors.primary,
     opacity: 0.7,
   },
-  orderValue: {
-    fontSize: 14,
-    fontWeight: '600',
+  orderPill: {
+    backgroundColor: Colors.background,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  orderPillText: {
+    fontSize: 13,
+    fontWeight: '700',
     color: Colors.primary,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: '700',
+  totalAmount: {
+    fontSize: 22,
+    fontWeight: '800',
     color: Colors.secondary,
   },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginVertical: 4,
+  summaryDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(11, 39, 53, 0.12)',
+    marginVertical: 2,
   },
-  statusBadge: {
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  statusPending: {
+    backgroundColor: '#FFF4E8',
+  },
+  statusPaid: {
     backgroundColor: '#E8F5E9',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  dotPending: {
+    backgroundColor: '#E65100',
+  },
+  dotPaid: {
+    backgroundColor: '#2E7D32',
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#4CAF50',
-  },
-  statusBadgePending: {
-    backgroundColor: '#FFF3E0',
+    fontWeight: '700',
   },
   statusTextPending: {
-    color: '#E65100',
+    color: '#C45A00',
   },
-  payNowButton: {
+  statusTextPaid: {
+    color: '#2E7D32',
+  },
+  infoStack: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    padding: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  infoRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 16,
+    gap: 14,
+  },
+  infoRowDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(11, 39, 53, 0.08)',
+    marginHorizontal: 16,
+  },
+  infoIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primary,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginBottom: 16,
-    gap: 8,
   },
-  payNowButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.white,
+  infoIconEmail: {
+    backgroundColor: 'rgba(239, 178, 145, 0.35)',
   },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: Colors.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+  infoIconDelivery: {
+    backgroundColor: 'rgba(11, 39, 53, 0.08)',
   },
-  deliveryCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: Colors.white,
-    borderRadius: 16,
-    padding: 16,
-  },
-  infoContent: {
+  infoTextBlock: {
     flex: 1,
-    marginLeft: 12,
+    paddingTop: 2,
   },
   infoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: Colors.primary,
   },
-  infoText: {
+  infoDesc: {
     fontSize: 13,
     color: Colors.primary,
-    opacity: 0.7,
+    opacity: 0.65,
     marginTop: 4,
-    lineHeight: 20,
+    lineHeight: 19,
   },
-  actions: {
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    backgroundColor: Colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(11, 39, 53, 0.1)',
   },
-  primaryButton: {
+  ctaPay: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primary,
     paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 16,
+    borderRadius: 14,
+    gap: 10,
+    marginBottom: 10,
   },
-  primaryButtonText: {
+  ctaPayText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.white,
-    marginLeft: 8,
   },
-  secondaryActions: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  secondaryButton: {
+  ctaPrimary: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: Colors.white,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: 16,
+    borderRadius: 14,
+    gap: 10,
   },
-  secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
+  ctaPrimaryText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.white,
+  },
+  ctaSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.white,
+    paddingVertical: 16,
+    borderRadius: 14,
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(11, 39, 53, 0.15)',
+  },
+  ctaSecondaryText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: Colors.primary,
-    marginLeft: 6,
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  linkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  linkDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(11, 39, 53, 0.15)',
+  },
+  linkButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 });
 

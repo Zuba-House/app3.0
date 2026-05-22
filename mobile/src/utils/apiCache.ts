@@ -25,3 +25,16 @@ export function setCachedGet(url: string, body: unknown): void {
 export function clearApiCache(): void {
   responseCache.clear();
 }
+
+/** Drop cached GET responses (e.g. after cart mutations). */
+export function invalidateApiCache(urlPart?: string): void {
+  if (!urlPart) {
+    responseCache.clear();
+    return;
+  }
+  for (const key of [...responseCache.keys()]) {
+    if (key.includes(urlPart)) {
+      responseCache.delete(key);
+    }
+  }
+}

@@ -147,10 +147,9 @@ export const productService = {
    */
   getFeaturedProducts: async (): Promise<ApiResponse<Product[]>> => {
     const response = await fetchDataFromApi<Product[]>(
-      API_ENDPOINTS.GET_ALL_PRODUCTS,
-      { featured: true, limit: 10 }
+      API_ENDPOINTS.GET_FEATURED_PRODUCTS
     );
-    return response;
+    return filterProductsForMobilePlatform(response);
   },
 
   /**

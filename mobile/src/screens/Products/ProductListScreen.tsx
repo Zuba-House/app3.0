@@ -21,6 +21,7 @@ import type { Product } from '../../types/product.types';
 import ProductCard from '../../components/ProductCard';
 import { FLATLIST_PERF } from '../../utils/flatListPerf';
 import Colors from '../../constants/colors';
+import { PAGINATION } from '../../constants/config';
 import { filterPricedProducts } from '../../utils/productDisplay';
 import { navigateToProductDetail, pressNavigate } from '../../navigation/navigationHelpers';
 
@@ -99,6 +100,11 @@ function applyListFilter(products: Product[], params: ProductListParams): Produc
   return list;
 }
 
+function mergeUniqueProducts(prev: Product[], next: Product[]): Product[] {
+  const seen = new Set(prev.map((p) => p._id));
+  return [...prev, ...next.filter((p) => !seen.has(p._id))];
+}
+
 const ProductListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'ProductList'>>();
@@ -106,6 +112,9 @@ const ProductListScreen: React.FC = () => {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [resolvedCategoryId, setResolvedCategoryId] = useState<string | undefined>(
     params.categoryId
   );
@@ -120,49 +129,71 @@ const ProductListScreen: React.FC = () => {
     });
   }, [navigation, title]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      let categoryId = params.categoryId;
-      if (!categoryId && (params.categoryName || params.categoryFilter)) {
-        const cats = await categoryService.getCategories();
-        const needle = (params.categoryName || params.categoryFilter || '').toLowerCase();
-        const match = (cats.data ?? []).find((c) => c.name.toLowerCase() === needle);
-        if (match) categoryId = match._id;
-        setResolvedCategoryId(categoryId);
+  const load = useCallback(
+    async (page = 1, append = false) => {
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
       }
+      try {
+        let categoryId = params.categoryId;
+        if (!categoryId && (params.categoryName || params.categoryFilter)) {
+          const cats = await categoryService.getCategories();
+          const needle = (params.categoryName || params.categoryFilter || '').toLowerCase();
+          const match = (cats.data ?? []).find((c) => c.name.toLowerCase() === needle);
+          if (match) categoryId = match._id;
+          setResolvedCategoryId(categoryId);
+        }
 
-      const response = await productService.getAllProducts({
-        category: categoryId,
-        sort: params.sortBy === 'newest' ? 'newest' : undefined,
-        limit: 80,
-      });
+        const response = await productService.getAllProducts({
+          category: categoryId,
+          sort: params.sortBy === 'newest' ? 'newest' : undefined,
+          page,
+          limit: PAGINATION.LIST_PAGE_SIZE,
+        });
 
-      const payload = response.data;
-      const raw = Array.isArray(payload)
-        ? payload
-        : payload && typeof payload === 'object' && Array.isArray((payload as { products?: Product[] }).products)
-          ? (payload as { products: Product[] }).products
-          : [];
+        const payload = response.data;
+        const raw = Array.isArray(payload)
+          ? payload
+          : payload && typeof payload === 'object' && Array.isArray((payload as { products?: Product[] }).products)
+            ? (payload as { products: Product[] }).products
+            : [];
 
-      const filtered = applyListFilter(raw, { ...params, categoryId });
-      setProducts(filtered);
-    } catch {
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [params.categoryId, params.categoryName, params.categoryFilter, params.filter, params.sortBy]);
+        const filtered = applyListFilter(raw, { ...params, categoryId });
+        setProducts((prev) => (append ? mergeUniqueProducts(prev, filtered) : filtered));
+
+        const totalPages = response.totalPages;
+        setHasMore(
+          typeof totalPages === 'number' ? page < totalPages : raw.length >= PAGINATION.LIST_PAGE_SIZE
+        );
+        setCurrentPage(page);
+      } catch {
+        if (!append) setProducts([]);
+        setHasMore(false);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [params.categoryId, params.categoryName, params.categoryFilter, params.filter, params.sortBy]
+  );
 
   useEffect(() => {
-    void load();
+    setCurrentPage(1);
+    setHasMore(true);
+    void load(1, false);
   }, [load]);
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore || loading) return;
+    void load(currentPage + 1, true);
+  }, [loadingMore, hasMore, loading, currentPage, load]);
 
   const subtitle = useMemo(() => {
     if (params.subtitle) return params.subtitle;
-    if (resolvedCategoryId) return undefined;
     return `${products.length} items`;
-  }, [params.subtitle, products.length, resolvedCategoryId]);
+  }, [params.subtitle, products.length]);
 
   const renderItem = ({ item }: { item: Product }) => (
     <View style={styles.cardWrap}>
@@ -173,6 +204,16 @@ const ProductListScreen: React.FC = () => {
       />
     </View>
   );
+
+  const listFooter = useMemo(() => {
+    if (!loadingMore) return <View style={styles.listFooter} />;
+    return (
+      <View style={styles.listFooter}>
+        <ActivityIndicator size="small" color={Colors.secondary} />
+        <Text style={styles.loadingMoreText}>Loading more…</Text>
+      </View>
+    );
+  }, [loadingMore]);
 
   return (
     <View style={styles.container}>
@@ -208,6 +249,9 @@ const ProductListScreen: React.FC = () => {
           numColumns={2}
           contentContainerStyle={styles.list}
           columnWrapperStyle={styles.row}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.35}
+          ListFooterComponent={listFooter}
           {...FLATLIST_PERF}
         />
       )}
@@ -231,6 +275,14 @@ const styles = StyleSheet.create({
   list: { padding: 12, paddingBottom: 32 },
   row: { justifyContent: 'space-between' },
   cardWrap: { width: '48%', marginBottom: 12 },
+  listFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  loadingMoreText: { fontSize: 13, color: Colors.primary, opacity: 0.6 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, color: '#6b7280' },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.primary, marginTop: 12 },

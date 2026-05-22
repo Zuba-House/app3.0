@@ -101,8 +101,11 @@ export default function QuickAddModal({ visible, product, onClose, onAdded }: Qu
           showError(response.message || 'Failed to add to cart');
         }
       } else {
+        const vid = selectedVariation?._id ?? 'simple';
         const cartItem = {
-          _id: `guest_${Date.now()}_${Math.random()}`,
+          _id: `guest_${p._id}_${vid}`,
+          productId: p._id,
+          variationId: selectedVariation?._id ?? null,
           product: p,
           variation: selectedVariation,
           quantity: 1,

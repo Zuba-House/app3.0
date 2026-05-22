@@ -41,11 +41,20 @@ function normalizeResponse<T>(raw: any): ApiResponse<T> {
     }
   }
 
+  const page = typeof raw?.page === 'number' ? raw.page : undefined;
+  const total = typeof raw?.total === 'number' ? raw.total : undefined;
+  const totalPages = typeof raw?.totalPages === 'number' ? raw.totalPages : undefined;
+  const limit = typeof raw?.limit === 'number' ? raw.limit : undefined;
+
   return {
     success: raw?.success !== false && raw?.error !== true,
     error: raw?.error === true,
     message: raw?.message,
     data: (data ?? raw) as T,
+    ...(page !== undefined && { page }),
+    ...(total !== undefined && { total }),
+    ...(totalPages !== undefined && { totalPages }),
+    ...(limit !== undefined && { limit }),
   };
 }
 

@@ -87,19 +87,28 @@ const cartSlice = createSlice({
       state.total = totals.total;
     },
     addItem: (state, action: PayloadAction<CartItem>) => {
-      const existingIndex = state.items.findIndex(
-        (item) => {
-          if (item._id === action.payload._id) return true;
-          if (typeof item.product === 'object' &&
-              typeof action.payload.product === 'object' &&
-              item.product._id === action.payload.product._id) {
-            const itemVarId = typeof item.variation === 'object' ? item.variation?._id : null;
-            const payloadVarId = typeof action.payload.variation === 'object' ? action.payload.variation?._id : null;
-            return itemVarId === payloadVarId;
-          }
-          return false;
+      const payloadPid =
+        action.payload.productId ??
+        (typeof action.payload.product === 'object' ? action.payload.product._id : null);
+      const payloadVid =
+        action.payload.variationId ??
+        (typeof action.payload.variation === 'object' ? action.payload.variation?._id : null) ??
+        null;
+
+      const existingIndex = state.items.findIndex((item) => {
+        if (item._id === action.payload._id) return true;
+        const itemPid =
+          item.productId ??
+          (typeof item.product === 'object' ? item.product._id : null);
+        const itemVid =
+          item.variationId ??
+          (typeof item.variation === 'object' ? item.variation?._id : null) ??
+          null;
+        if (payloadPid && itemPid && String(payloadPid) === String(itemPid)) {
+          return String(payloadVid ?? '') === String(itemVid ?? '');
         }
-      );
+        return false;
+      });
 
       if (existingIndex >= 0) {
         const existingItem = state.items[existingIndex];

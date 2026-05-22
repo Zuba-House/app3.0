@@ -15,6 +15,7 @@ import { AuthProvider } from './src/core/auth/authGuards';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { CurrencyProvider } from './src/context/CurrencyContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { CartHydrator } from './src/components/CartHydrator';
 import { toastConfig } from './src/components/toastConfig';
 import { loadSavedLanguage } from './src/i18n';
 
@@ -62,6 +63,7 @@ const App: React.FC = () => {
           <CurrencyProvider>
             <PaperProvider theme={theme}>
               <AuthProvider>
+                <CartHydrator />
                 <RootNavigator />
                 <Toast config={toastConfig} />
               </AuthProvider>

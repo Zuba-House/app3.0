@@ -9,6 +9,7 @@ import {
   editData,
   deleteData,
 } from './api';
+import { invalidateApiCache } from '../utils/apiCache';
 import { API_ENDPOINTS } from '../constants/config';
 import { Cart } from '../types/cart.types';
 import { ApiResponse } from '../types/api.types';
@@ -30,7 +31,12 @@ export const cartService = {
    * Get user's cart
    */
   getCart: async (): Promise<ApiResponse<any[]>> => {
-    const response = await fetchDataFromApi<CartApiPayload>(API_ENDPOINTS.GET_CART);
+    invalidateApiCache('/api/cart');
+    const response = await fetchDataFromApi<CartApiPayload>(
+      API_ENDPOINTS.GET_CART,
+      undefined,
+      { skipCache: true }
+    );
     const items = extractCartItems(response.data);
     return { ...response, data: items };
   },
@@ -123,6 +129,7 @@ export const cartService = {
     }
 
     const response = await postData<Cart>(API_ENDPOINTS.ADD_TO_CART, data);
+    invalidateApiCache('/api/cart');
     return response;
   },
 
@@ -140,6 +147,7 @@ export const cartService = {
       `${API_ENDPOINTS.UPDATE_CART_ITEM}/update-qty`,
       { _id: cartItemId, ...data }
     );
+    invalidateApiCache('/api/cart');
     return response;
   },
 
@@ -152,6 +160,7 @@ export const cartService = {
     const response = await deleteData<Cart>(
       `${API_ENDPOINTS.REMOVE_FROM_CART}/delete-cart-item/${cartItemId}`
     );
+    invalidateApiCache('/api/cart');
     return response;
   },
 

@@ -348,7 +348,9 @@ export default function SearchScreen() {
     const price = product.salePrice ?? product.price ?? 0;
     if (!isAuthenticated) {
       const cartItem = {
-        _id: `guest_${Date.now()}_${Math.random()}`,
+        _id: `guest_${product._id}_simple`,
+        productId: product._id,
+        variationId: null,
         product,
         quantity: 1,
         price,
@@ -392,27 +394,7 @@ export default function SearchScreen() {
     <ProductCard
       product={item}
       onPress={() => navigation.navigate('ProductDetail', { productId: item._id })}
-      onAddToCart={() => {
-        if (item.productType === 'variable' && (item.variations?.length ?? 0) > 0) {
-          setQuickAddProduct(item);
-        } else {
-          if (!isAuthenticated) {
-            showWarning('Please login to add items to cart');
-            return;
-          }
-          cartService.addToCart(item._id, 1, undefined, undefined, item)
-            .then(async (res) => {
-              if (res.success) {
-                const cr = await cartService.getCart();
-                if (cr.success) dispatch(setCart(cr.data));
-                showSuccess('Added to cart');
-              } else {
-                showError(res.message || 'Failed');
-              }
-            })
-            .catch((e) => showError(e.message || 'Failed'));
-        }
-      }}
+      onAddToCart={() => handleQuickAdd(item)}
       style={[styles.productCard, { width: CARD_WIDTH }]}
     />
   );

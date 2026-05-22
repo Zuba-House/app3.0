@@ -47,14 +47,14 @@ import DealOfTheDay from '../../components/DealOfTheDay';
 import CategoryDeals from '../../components/CategoryDeals';
 import ReferralBanner from '../../components/ReferralBanner';
 import TrendingProducts from '../../components/TrendingProducts';
+import MixedProductFeed from '../../components/MixedProductFeed';
 import { FLATLIST_PERF, FLATLIST_PERF_HORIZONTAL } from '../../utils/flatListPerf';
 import { useDeferredReady } from '../../hooks/useDeferredReady';
+import { PAGINATION } from '../../constants/config';
 
 const { width: SCREEN_WIDTH, width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 36) / 2; // 2 columns with tighter spacing (12px padding each side + 12px gap)
 
-
-const HOME_GRID_PREVIEW = 8;
 
 const HomeScreen: React.FC = () => {
   const { t } = useTranslation();
@@ -109,17 +109,19 @@ const HomeScreen: React.FC = () => {
 
   const topRatedProducts = useMemo(() => {
     if (pricedProducts.length === 0) return [];
-    return [...pricedProducts].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 8);
+    return [...pricedProducts].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 12);
   }, [pricedProducts]);
 
   const customerFavoritesProducts = useMemo(() => {
     if (pricedProducts.length === 0) return [];
-    return [...pricedProducts].sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0)).slice(0, 8);
+    return [...pricedProducts].sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0)).slice(0, 12);
   }, [pricedProducts]);
 
   const newArrivalsProducts = useMemo(() => {
     if (pricedProducts.length === 0) return [];
-    return [...pricedProducts].slice(0, 4);
+    return [...pricedProducts]
+      .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())
+      .slice(0, 8);
   }, [pricedProducts]);
 
   // Calculate trending products based on likes (wishlistCount) and purchases (totalSales)
@@ -149,14 +151,14 @@ const HomeScreen: React.FC = () => {
     );
     
     // Return top 8 trending products
-    const trending = sorted.slice(0, 8);
+    const trending = sorted.slice(0, 12);
     
     // If no products have any trending data (all scores are 0), use default (featured or top-rated)
     if (trending.length > 0 && trending[0].trendingScore === 0) {
       // Fallback to featured products or top-rated
       return featuredProducts.length > 0 
-        ? featuredProducts.slice(0, 8)
-        : topRatedProducts.slice(0, 8);
+        ? featuredProducts.slice(0, 12)
+        : topRatedProducts.slice(0, 12);
     }
     
     return filterPricedProducts(trending as Product[]);
@@ -360,7 +362,7 @@ const HomeScreen: React.FC = () => {
       }
       
       let response;
-      const pageSize = 20; // Products per page
+      const pageSize = PAGINATION.HOME_PAGE_SIZE;
       
       if (categoryId) {
         response = await productService.getProductsByCategory(categoryId, page, pageSize);
@@ -397,17 +399,23 @@ const HomeScreen: React.FC = () => {
         });
         
         if (append) {
-          // Append to existing products
-          setProducts(prev => [...prev, ...productsWithReviews]);
-          setFilteredProducts(prev => [...prev, ...productsWithReviews]);
+          const mergeUnique = (prev: Product[], next: Product[]) => {
+            const seen = new Set(prev.map((p) => p._id));
+            return [...prev, ...next.filter((p) => !seen.has(p._id))];
+          };
+          setProducts((prev) => mergeUnique(prev, productsWithReviews));
+          setFilteredProducts((prev) => mergeUnique(prev, productsWithReviews));
         } else {
           // Replace products
           setProducts(productsWithReviews);
           setFilteredProducts(productsWithReviews);
         }
         
-        // Check if there are more products
-        const hasMoreProducts = productsWithReviews.length === pageSize;
+        const totalPages = (response as { totalPages?: number }).totalPages;
+        const hasMoreProducts =
+          typeof totalPages === 'number'
+            ? page < totalPages
+            : productsWithReviews.length >= pageSize;
         setHasMore(hasMoreProducts);
         setCurrentPage(page);
         
@@ -510,7 +518,7 @@ const HomeScreen: React.FC = () => {
             reviewCount: product.reviewCount || 0,
           };
         });
-        const featured = productsWithReviews.slice(0, 6);
+        const featured = productsWithReviews.slice(0, 12);
         setFeaturedProducts(featured);
         // Update cache
         dataCacheRef.current.featuredProducts = featured;
@@ -528,6 +536,22 @@ const HomeScreen: React.FC = () => {
     await loadData(true); // Force refresh
     setRefreshing(false);
   };
+
+  const loadMoreProducts = useCallback(() => {
+    if (loadingMore || !hasMore || selectedCategory || searchQuery) return;
+    void loadProducts(null, undefined, currentPage + 1, true);
+  }, [loadingMore, hasMore, selectedCategory, searchQuery, currentPage]);
+
+  const handleScrollLoadMore = useCallback(
+    (event: { nativeEvent: { layoutMeasurement: { height: number }; contentOffset: { y: number }; contentSize: { height: number } } }) => {
+      const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+      const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+      if (distanceFromBottom < 320) {
+        loadMoreProducts();
+      }
+    },
+    [loadMoreProducts]
+  );
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
@@ -743,7 +767,7 @@ const HomeScreen: React.FC = () => {
     sectionProducts: Product[],
     listParams?: Parameters<typeof navigateToProductList>[1]
   ) => {
-    const displayProducts = filterPricedProducts(sectionProducts).slice(0, 10);
+    const displayProducts = filterPricedProducts(sectionProducts).slice(0, 12);
     if (displayProducts.length === 0) return null;
 
     return (
@@ -934,6 +958,8 @@ const HomeScreen: React.FC = () => {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled={true}
+        onScroll={handleScrollLoadMore}
+        scrollEventThrottle={200}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -1065,29 +1091,15 @@ const HomeScreen: React.FC = () => {
           </View>
         )}
 
-        {!selectedCategory && !searchQuery && products.length > 0 && (
+        {!selectedCategory && !searchQuery && pricedProducts.length > 0 && (
           <View style={styles.section}>
             {renderSectionHeader(
-              'Shop All Products',
-              'Discover amazing deals',
+              'Explore the catalog',
+              'Mixed deals · scroll for more',
               true,
               () => navigateToProductList(navigation, { title: 'Shop All Products' })
             )}
-            <FlatList
-              {...FLATLIST_PERF}
-              data={products.slice(0, HOME_GRID_PREVIEW)}
-              renderItem={renderProductItem}
-              keyExtractor={(item) => item._id}
-              numColumns={2}
-              scrollEnabled={false}
-              contentContainerStyle={styles.productsList}
-              onEndReachedThreshold={0.1}
-              getItemLayout={(data, index) => ({
-                length: CARD_WIDTH + 12,
-                offset: (CARD_WIDTH + 12) * Math.floor(index / 2),
-                index,
-              })}
-            />
+            <MixedProductFeed products={pricedProducts} loadingMore={loadingMore} />
           </View>
         )}
 

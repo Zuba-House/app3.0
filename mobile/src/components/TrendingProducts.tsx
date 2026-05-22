@@ -141,7 +141,7 @@ const TrendingProducts: React.FC<TrendingProductsProps> = ({
       {/* Products Grid */}
       <FlatList
         {...FLATLIST_PERF}
-        data={visible.slice(0, 6)}
+        data={visible.slice(0, 10)}
         renderItem={renderProduct}
         keyExtractor={(item) => `trending-${item._id}`}
         numColumns={2}

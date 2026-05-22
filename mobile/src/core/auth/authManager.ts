@@ -58,6 +58,20 @@ function extractSession(data: any): RefreshResponse['session'] {
   };
 }
 
+async function syncServerCartToRedux(): Promise<void> {
+  try {
+    const { cartService } = await import('../../services/cart.service');
+    const { store } = await import('../../store/store');
+    const { setCart } = await import('../../store/slices/cartSlice');
+    const response = await cartService.getCart();
+    if (response.success && Array.isArray(response.data)) {
+      store.dispatch(setCart(response.data));
+    }
+  } catch {
+    // Best-effort — cart screen will refetch on focus
+  }
+}
+
 async function applyAuthenticatedSession(session: ExternalAuthInput): Promise<void> {
   authSession.setRefreshToken(session.refreshToken || null);
   if (session.refreshToken) {
@@ -67,6 +81,7 @@ async function applyAuthenticatedSession(session: ExternalAuthInput): Promise<vo
   authSession.setAuthenticated(user, session.accessToken);
   await authStorage.setUserCache(user);
   await mergeGuestCart(session.accessToken);
+  await syncServerCartToRedux();
   const { wishlistService } = await import('../../services/wishlist.service');
   await wishlistService.mergeLocalWishlistToCloud();
 }

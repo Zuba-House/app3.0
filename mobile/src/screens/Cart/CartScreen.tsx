@@ -21,7 +21,6 @@ import { ActivityIndicator } from 'react-native-paper';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cartService } from '../../services/cart.service';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectCartItems, selectCartTotal, setCart, updateQuantity, removeItem } from '../../store/slices/cartSlice';
@@ -30,10 +29,10 @@ import Colors from '../../constants/colors';
 import { FLATLIST_PERF } from '../../utils/flatListPerf';
 import { FREE_SHIPPING_THRESHOLD, API_URL } from '../../constants/config';
 import { showError, showWarning } from '../../utils/toast';
-import { STORAGE_KEYS } from '../../constants/config';
-import { store } from '../../store/store';
 import { useAuthState } from '../../core/auth/authGuards';
 import { useAuthGate } from '../../core/auth/authGate';
+import { loadGuestCartFromStorage } from '../../utils/guestCart';
+import { store } from '../../store/store';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -64,19 +63,14 @@ const CartScreen: React.FC = () => {
   const loadGuestCart = async () => {
     try {
       setLoading(true);
-      const guestCart = await AsyncStorage.getItem(STORAGE_KEYS.CART);
+      const stored = await loadGuestCartFromStorage();
       const reduxCount = store.getState().cart.items.length;
-      if (guestCart) {
-        const items = JSON.parse(guestCart);
-        if (Array.isArray(items)) {
-          if (items.length > 0) {
-            dispatch(setCart({ items }));
-          } else if (reduxCount === 0) {
-            dispatch(setCart({ items: [] }));
-          }
-          // Persisted [] while Redux still has lines — don't overwrite (race before AppNavigator persist runs).
-        }
+      if (stored.length > 0) {
+        dispatch(setCart({ items: stored }));
+      } else if (reduxCount === 0) {
+        dispatch(setCart({ items: [] }));
       }
+      // If storage is empty but Redux has items (just added), keep Redux — listener persists async.
     } catch {
       showError('Failed to load guest cart');
     } finally {
@@ -84,20 +78,15 @@ const CartScreen: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      AsyncStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(cartItems)).catch(() => {
-        // Non-blocking persistence
-      });
-    }
-  }, [isAuthenticated, cartItems]);
-
   const loadCart = async () => {
     try {
       setLoading(true);
       const response = await cartService.getCart();
       if (response.success && Array.isArray(response.data)) {
-        dispatch(setCart(response.data));
+        const priorCount = store.getState().cart.items.length;
+        if (response.data.length > 0 || priorCount === 0) {
+          dispatch(setCart(response.data));
+        }
       }
     } catch (error) {
       console.error('Error loading cart:', error);
@@ -109,7 +98,11 @@ const CartScreen: React.FC = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    if (isAuthenticated) await loadCart();
+    if (isAuthenticated) {
+      await loadCart();
+    } else {
+      await loadGuestCart();
+    }
     setRefreshing(false);
   };
 
@@ -303,7 +296,9 @@ const CartScreen: React.FC = () => {
         {...FLATLIST_PERF}
         data={cartItems}
         renderItem={renderCartItem}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item, index) =>
+          item._id || `${item.productId ?? 'item'}_${item.variationId ?? 'v'}_${index}`
+        }
         contentContainerStyle={styles.listContent}
         onEndReachedThreshold={0.1}
         refreshControl={
