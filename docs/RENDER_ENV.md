@@ -17,12 +17,42 @@ Set these in **Render Dashboard → zubahouse-api → Environment** (copy values
 | `cloudinary_Config_api_key` | Cloudinary API key |
 | `cloudinary_Config_api_secret` | Cloudinary API secret |
 
+## Email sign-in / sign-up (required for OTP)
+
+| Key | Where to copy from |
+|-----|-------------------|
+| `SENDGRID_API_KEY` | SendGrid → API Keys (starts with `SG.`) |
+| `EMAIL_FROM` | e.g. `orders@zubahouse.com` (must be verified in SendGrid) |
+| `EMAIL_SENDER_NAME` | `Zuba House` |
+
+Without `SENDGRID_API_KEY`, register will fail when sending the verification OTP.
+
+## Google sign-in (mobile app)
+
+The mobile app uses **`POST /api/user/authWithGoogle`** (profile from Google → your API).  
+You do **not** need `GOOGLE_CLIENT_SECRET` on Render for this flow.
+
+Google OAuth client IDs go in **`mobile/.env`** only (rebuild app after changing):
+
+| Mobile variable | Your value (from `mobile/.env`) |
+|-----------------|----------------------------------|
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | `473177050132-1qblfnv4gap1gkpfq6mg4iu11lucp48u.apps.googleusercontent.com` |
+| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | `473177050132-9rdnpnh57lnd3oi29tgujdnihgqfajo7.apps.googleusercontent.com` |
+| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | `473177050132-2s3gl7imtijd3h36bj9tjtjqktc25eja.apps.googleusercontent.com` |
+
+Optional on Render (only if you add server-side Google code exchange later):
+
+| Key | Value |
+|-----|--------|
+| `GOOGLE_CLIENT_ID` | Same as **Web** client ID above |
+| `GOOGLE_CLIENT_SECRET` | Google Cloud → Credentials → Web client → secret |
+| `GOOGLE_OAUTH_REDIRECT_URI` | `zuba://redirect` |
+
 ## Recommended
 
 | Key | Value |
 |-----|--------|
 | `NODE_VERSION` | `20.18.0` or `22` (18.x is EOL) |
-| `GOOGLE_CLIENT_SECRET` | From Google Cloud Console |
 | `API_URL` | `https://zuba-api.onrender.com` |
 | `ADMIN_EMAIL` | `sales@zubahouse.com` |
 

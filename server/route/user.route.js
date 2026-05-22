@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import {addReview, approveReview, changePasswordController, deleteMultiple, deleteOwnAccount, deleteUser, forgotPasswordController, getAllReviews, getAllUsers, getGeoBreakdown, getProductReviewsAdmin, getReviews, loginUserController, logoutController, markReviewAsSpam, refreshToken, registerUserController, rejectReview, removeImageFromCloudinary, resetpassword, updateUserDetails, userAvatarController, userDetails, verifyEmailController, verifyForgotPasswordOtp} from '../controllers/user.controller.js';
+import {addReview, approveReview, authWithGoogle, changePasswordController, deleteMultiple, deleteOwnAccount, deleteUser, forgotPasswordController, getAllReviews, getAllUsers, getGeoBreakdown, getProductReviewsAdmin, getReviews, loginUserController, logoutController, markReviewAsSpam, refreshToken, registerUserController, rejectReview, removeImageFromCloudinary, resetpassword, updateUserDetails, userAvatarController, userDetails, verifyEmailController, verifyForgotPasswordOtp} from '../controllers/user.controller.js';
 import auth, { optionalAuth } from '../middlewares/auth.js';
 import upload from '../middlewares/multer.js';
 import { basicRateLimit } from '../middlewares/basicRateLimit.js';
@@ -12,6 +12,7 @@ const otpLimiter = basicRateLimit({ windowMs: 60 * 1000, max: 8, keyPrefix: 'otp
 userRouter.post('/register', authLimiter, registerUserController)
 userRouter.post('/verifyEmail', otpLimiter, verifyEmailController)
 userRouter.post('/login', authLimiter, loginUserController)
+userRouter.post('/authWithGoogle', authLimiter, authWithGoogle)
 userRouter.post('/logout', auth, logoutController);
 userRouter.put('/user-avatar',auth,upload.array('avatar'),userAvatarController);
 userRouter.delete('/deteleImage',auth,removeImageFromCloudinary);

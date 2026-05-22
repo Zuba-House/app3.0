@@ -251,6 +251,53 @@ export async function verifyEmailController(request, response) {
 }
 
 
+export async function authWithGoogle(request, response) {
+    try {
+        const { name, email, avatar, mobile, role } = request.body;
+        const normalizedEmail = normalizeEmail(email);
+
+        if (!normalizedEmail) {
+            return sendError(response, 400, 'Email is required for Google sign-in');
+        }
+
+        let user = await UserModel.findOne({ email: normalizedEmail });
+
+        if (!user) {
+            const salt = await bcryptjs.genSalt(10);
+            const hashPassword = await bcryptjs.hash(crypto.randomBytes(32).toString('hex'), salt);
+            user = await UserModel.create({
+                name: name || normalizedEmail.split('@')[0] || 'User',
+                mobile: mobile || null,
+                email: normalizedEmail,
+                password: hashPassword,
+                avatar: avatar || '',
+                role: role || 'USER',
+                verify_email: true,
+                signUpWithGoogle: true,
+                status: 'Active',
+            });
+        } else {
+            const status = String(user.status || 'Active').trim().toLowerCase();
+            if (status !== 'active') {
+                return sendError(response, 403, 'Contact to admin');
+            }
+            user.verify_email = true;
+            user.signUpWithGoogle = true;
+            if (avatar && !user.avatar) user.avatar = avatar;
+            await user.save();
+        }
+
+        const { accessToken, refreshToken } = await issueAuthTokens(response, user._id);
+        await UserModel.findByIdAndUpdate(user._id, { last_login_date: new Date() });
+
+        const tokenData = buildTokenData(accessToken, refreshToken);
+        tokenData.accesstoken = accessToken;
+        return sendSuccess(response, 200, 'Login successfully', tokenData);
+    } catch (error) {
+        return sendError(response, 500, error.message || 'Google sign-in failed');
+    }
+}
+
 export async function loginUserController(request, response) {
     try {
         const { email, password, guestCart } = request.body;
@@ -262,12 +309,17 @@ export async function loginUserController(request, response) {
             return sendError(response, 401, "Invalid email or password");
         }
 
-        if (user.status !== "Active") {
+        const status = String(user.status || 'Active').trim().toLowerCase();
+        if (status !== 'active') {
             return sendError(response, 403, "Contact to admin");
         }
 
         if (user.verify_email !== true) {
             return sendError(response, 403, "Your Email is not verify yet please verify your email first");
+        }
+
+        if (user.signUpWithGoogle) {
+            return sendError(response, 400, "This account uses Google sign-in. Please continue with Google.");
         }
 
         const checkPassword = await bcryptjs.compare(password, user.password);
