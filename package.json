@@ -3,7 +3,8 @@
   "private": true,
   "description": "Monorepo root. Expo app and app.json live in mobile/",
   "scripts": {
-    "start": "npm --prefix mobile run start",
+    "start": "npm --prefix server run start",
+    "build": "npm --prefix server install",
     "mobile": "npm --prefix mobile run start",
     "expo:start": "npm --prefix mobile run start",
     "expo:clear": "npm --prefix mobile run start -- --clear",
