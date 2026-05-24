@@ -7,6 +7,7 @@
     "scheme": "zuba",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -31,7 +32,6 @@
       "supportsTablet": true,
       "useFrameworks": "static",
       "bundleIdentifier": "ninja.wpapp.appzubahousecom",
-      "buildNumber": "2",
       "googleServicesFile": "./GoogleService-Info.plist",
       "splash": {
         "image": "./assets/splash.png",
@@ -51,7 +51,7 @@
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0b2735"
+        "backgroundColor": "#000000"
       },
       "splash": {
         "image": "./assets/splash.png",
