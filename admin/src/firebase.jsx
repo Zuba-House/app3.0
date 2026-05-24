@@ -11,6 +11,8 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
+const appIdProjectNumber = firebaseConfig.appId?.split(':')[1];
+
 export const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey &&
     firebaseConfig.authDomain &&
@@ -18,9 +20,24 @@ export const isFirebaseConfigured = Boolean(
     firebaseConfig.appId
 );
 
+/** Mismatched Vercel env (apiKey from one web app, appId from another) breaks Google sign-in. */
+export const isFirebaseConfigConsistent = Boolean(
+  isFirebaseConfigured &&
+    appIdProjectNumber &&
+    firebaseConfig.messagingSenderId &&
+    appIdProjectNumber === firebaseConfig.messagingSenderId
+);
+
 let firebaseApp = null;
 
-if (isFirebaseConfigured) {
+if (isFirebaseConfigured && !isFirebaseConfigConsistent) {
+  console.error(
+    'Firebase env mismatch: VITE_FIREBASE_APP_ID and VITE_FIREBASE_MESSAGING_SENDER_ID must be from the same web app. ' +
+      'Update Vercel env vars from admin/.env.example and redeploy.'
+  );
+}
+
+if (isFirebaseConfigured && isFirebaseConfigConsistent) {
   try {
     firebaseApp = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
   } catch (err) {

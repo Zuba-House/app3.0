@@ -17,7 +17,7 @@ import { useContext } from "react";
 import { MyContext } from "../../App.jsx";
 
 import { signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
-import { getFirebaseAuth, isFirebaseConfigured } from "../../firebase";
+import { getFirebaseAuth, isFirebaseConfigured, isFirebaseConfigConsistent } from "../../firebase";
 import { useEffect } from "react";
 
 const Login = () => {
@@ -153,6 +153,14 @@ const Login = () => {
   const authWithGoogle = async () => {
     if (!isFirebaseConfigured) {
       context.alertBox("error", "Google sign-in is not configured. Use email and password, or add Firebase keys to admin/.env");
+      return;
+    }
+
+    if (!isFirebaseConfigConsistent) {
+      context.alertBox(
+        "error",
+        "Firebase keys on the server are mismatched. In Vercel, set all VITE_FIREBASE_* from admin/.env.example, then redeploy."
+      );
       return;
     }
 
