@@ -76,53 +76,80 @@ export interface GiftCardValidation {
   error?: string;
 }
 
-const MOCK_SHIPPING_METHODS: ShippingMethod[] = [
-  {
-    _id: 'standard',
-    name: 'Zuba House Regular',
-    description: 'Regular delivery',
-    price: 4.99,
-    estimatedDays: '1-5 business days',
-    carrier: 'Zuba House',
-  },
-  {
-    _id: 'express',
-    name: 'Zuba House Express',
-    description: 'Faster delivery',
-    price: 9.99,
-    estimatedDays: '1-3 business days',
-    carrier: 'Zuba House',
-  },
-  {
-    _id: 'overnight',
-    name: 'Zuba House Express (Overnight)',
-    description: 'Next business day',
-    price: 19.99,
-    estimatedDays: '1 business day',
-    carrier: 'Zuba House',
-  },
-];
+/** True when address has enough fields for /api/shipping/rates (matches web cart). */
+export function isValidShippingAddress(shippingAddress?: Record<string, any> | null): boolean {
+  if (!shippingAddress || typeof shippingAddress !== 'object') return false;
+  const city = String(shippingAddress.city || shippingAddress.address?.city || '').trim();
+  const countryCode = String(
+    shippingAddress.countryCode || shippingAddress.address?.countryCode || ''
+  ).trim();
+  const postal = String(
+    shippingAddress.postalCode ||
+      shippingAddress.postal_code ||
+      shippingAddress.address?.postalCode ||
+      ''
+  ).trim();
+  const addressLine1 = String(
+    shippingAddress.addressLine1 || shippingAddress.address?.addressLine1 || ''
+  ).trim();
+  return Boolean(city && addressLine1 && (postal || countryCode));
+}
+
+/** Normalize address for shipping rate API. */
+export function addressToShippingPayload(address: Record<string, any>): Record<string, any> {
+  const addr: any = address;
+  return {
+    firstName: addr.contactInfo?.firstName || addr.name?.split(' ')[0] || '',
+    lastName: addr.contactInfo?.lastName || addr.name?.split(' ').slice(1).join(' ') || '',
+    addressLine1: addr.addressLine1 || addr.address?.addressLine1 || '',
+    addressLine2: addr.addressLine2 || addr.address?.addressLine2 || '',
+    city: addr.city || addr.address?.city || '',
+    province: addr.state || addr.province || addr.provinceCode || addr.address?.province || '',
+    provinceCode: addr.provinceCode || addr.state?.slice(0, 2)?.toUpperCase() || '',
+    postalCode: addr.postalCode || addr.postal_code || addr.address?.postalCode || '',
+    postal_code: addr.postalCode || addr.postal_code || addr.address?.postalCode || '',
+    country: addr.country || addr.address?.country || '',
+    countryCode: addr.countryCode || addr.address?.countryCode || 'CA',
+    phone: addr.phone || addr.mobile || addr.contactInfo?.phone || '',
+  };
+}
+
+/** Build cart lines with product weights for accurate API calculation. */
+export function buildCartItemsForShipping(cartItems: any[] = []) {
+  return cartItems.map((item) => ({
+    productId: item.productId || item.product?._id || item._id,
+    quantity: item.quantity || 1,
+    product: {
+      name: item.product?.name || item.productTitle || 'Product',
+      shipping: {
+        weight: item.product?.shipping?.weight ?? item.product?.inventory?.weight ?? 0.5,
+        weightUnit: item.product?.shipping?.weightUnit || 'kg',
+        dimensions: item.product?.shipping?.dimensions,
+      },
+    },
+  }));
+}
 
 function mapRatesPayload(raw: { standard?: any; express?: any }): ShippingMethod[] {
   const methods: ShippingMethod[] = [];
   if (raw?.standard) {
     methods.push({
       _id: 'standard',
-      name: 'Zuba House Regular',
+      name: raw.standard.name || 'Zuba House Regular',
       description: raw.standard.delivery || raw.standard.estimatedDelivery || 'Regular delivery',
-      price: Number(raw.standard.cost) || 4.99,
-      estimatedDays: raw.standard.delivery || raw.standard.estimatedDelivery || '1-5 business days',
-      carrier: 'Zuba House',
+      price: Number(raw.standard.cost) || 0,
+      estimatedDays: raw.standard.delivery || raw.standard.estimatedDelivery || '5-10 business days',
+      carrier: raw.standard.carrier || 'Zuba House',
     });
   }
   if (raw?.express) {
     methods.push({
       _id: 'express',
-      name: 'Zuba House Express',
+      name: raw.express.name || 'Zuba House Express',
       description: raw.express.delivery || raw.express.estimatedDelivery || 'Faster delivery',
-      price: Number(raw.express.cost) || 9.99,
-      estimatedDays: raw.express.delivery || raw.express.estimatedDelivery || '1-3 business days',
-      carrier: 'Zuba House',
+      price: Number(raw.express.cost) || 0,
+      estimatedDays: raw.express.delivery || raw.express.estimatedDelivery || '2-5 business days',
+      carrier: raw.express.carrier || 'Zuba House',
     });
   }
   return methods;
@@ -136,32 +163,37 @@ export const checkoutService = {
     cartItems: any[] = [],
     shippingAddress?: Record<string, any> | null
   ): Promise<ApiResponse<ShippingMethod[]>> => {
-    const fallback = (): ApiResponse<ShippingMethod[]> => ({
-      success: true,
-      error: false,
-      data: MOCK_SHIPPING_METHODS,
-    });
-
-    if (!cartItems?.length || !shippingAddress || typeof shippingAddress !== 'object') {
-      return fallback();
+    if (!cartItems?.length) {
+      throw new Error('Your cart is empty.');
     }
 
-    try {
-      const response = await postData<{ standard?: any; express?: any }>(API_ENDPOINTS.GET_SHIPPING_RATES, {
-        cartItems,
-        shippingAddress,
-      });
-      const raw = response.data as { standard?: any; express?: any } | undefined;
-      if (response.success && raw?.standard && raw?.express) {
-        const methods = mapRatesPayload(raw);
-        if (methods.length > 0) {
-          return { ...response, data: methods };
-        }
-      }
-      return fallback();
-    } catch {
-      return fallback();
+    if (!isValidShippingAddress(shippingAddress)) {
+      throw new Error('Please enter a complete shipping address to see shipping options.');
     }
+
+    const payload = {
+      cartItems: buildCartItemsForShipping(cartItems),
+      shippingAddress: addressToShippingPayload(shippingAddress!),
+    };
+
+    const response = await postData<{ standard?: any; express?: any }>(
+      API_ENDPOINTS.GET_SHIPPING_RATES,
+      payload
+    );
+
+    const raw = response.data as { standard?: any; express?: any } | undefined;
+    if (!response.success || !raw?.standard || !raw?.express) {
+      throw new Error(
+        response.message || 'No shipping options available for this address.'
+      );
+    }
+
+    const methods = mapRatesPayload(raw);
+    if (methods.length === 0) {
+      throw new Error('No shipping options available for this address.');
+    }
+
+    return { ...response, data: methods };
   },
 
   /**
@@ -178,13 +210,20 @@ export const checkoutService = {
   /**
    * Apply coupon to cart
    */
-  applyCoupon: async (couponCode: string, cartItems: any[], cartTotal: number): Promise<ApiResponse<{ discount: number; type: string; freeShipping?: boolean }>> => {
-    const response = await postData<{ discount: number; type: string; freeShipping?: boolean }>(API_ENDPOINTS.APPLY_COUPON, { 
-      code: couponCode,
-      cartItems,
-      cartTotal,
-      platform: 'mobile',
-    });
+  applyCoupon: async (
+    couponCode: string,
+    cartItems: any[],
+    cartTotal: number
+  ): Promise<ApiResponse<{ discount: number; type: string; freeShipping?: boolean }>> => {
+    const response = await postData<{ discount: number; type: string; freeShipping?: boolean }>(
+      API_ENDPOINTS.APPLY_COUPON,
+      {
+        code: couponCode,
+        cartItems,
+        cartTotal,
+        platform: 'mobile',
+      }
+    );
     return response;
   },
 
@@ -199,11 +238,17 @@ export const checkoutService = {
   /**
    * Apply gift card to cart
    */
-  applyGiftCard: async (code: string, cartTotal: number): Promise<ApiResponse<{ discount: number; giftCard: GiftCardValidation['giftCard'] }>> => {
-    const response = await postData<{ discount: number; giftCard: GiftCardValidation['giftCard'] }>(API_ENDPOINTS.APPLY_GIFT_CARD, { 
-      code,
-      cartTotal
-    });
+  applyGiftCard: async (
+    code: string,
+    cartTotal: number
+  ): Promise<ApiResponse<{ discount: number; giftCard: GiftCardValidation['giftCard'] }>> => {
+    const response = await postData<{ discount: number; giftCard: GiftCardValidation['giftCard'] }>(
+      API_ENDPOINTS.APPLY_GIFT_CARD,
+      {
+        code,
+        cartTotal,
+      }
+    );
     return response;
   },
 
@@ -220,7 +265,6 @@ export const checkoutService = {
 
   /**
    * Create Stripe checkout session (redirects to Stripe hosted checkout)
-   * Supports: Credit/Debit cards, Apple Pay, Google Pay
    */
   createCheckoutSession: async (
     amount: number,
@@ -244,12 +288,16 @@ export const checkoutService = {
   /**
    * Get checkout session status
    */
-  getCheckoutStatus: async (sessionId: string): Promise<ApiResponse<{
-    status: string;
-    paymentStatus: string;
-    amountTotal: number;
-    currency: string;
-  }>> => {
+  getCheckoutStatus: async (
+    sessionId: string
+  ): Promise<
+    ApiResponse<{
+      status: string;
+      paymentStatus: string;
+      amountTotal: number;
+      currency: string;
+    }>
+  > => {
     const response = await fetchDataFromApi<{
       status: string;
       paymentStatus: string;
@@ -262,7 +310,10 @@ export const checkoutService = {
   /**
    * Confirm order payment after Stripe reports paid
    */
-  confirmOrderPayment: async (orderId: string, payload: ConfirmOrderPaymentPayload): Promise<ApiResponse<any>> => {
+  confirmOrderPayment: async (
+    orderId: string,
+    payload: ConfirmOrderPaymentPayload
+  ): Promise<ApiResponse<any>> => {
     return postData(`${API_ENDPOINTS.CONFIRM_ORDER_PAYMENT}/${orderId}`, payload);
   },
 
@@ -275,7 +326,7 @@ export const checkoutService = {
   },
 
   /**
-   * Create order as guest (no auth, inline address and guest customer)
+   * Create order as guest
    */
   createGuestOrder: async (payload: {
     products: Array<{ productId?: string; _id?: string; price: number; quantity: number; subTotal?: number }>;
@@ -303,21 +354,23 @@ export const checkoutService = {
   },
 
   /**
-   * Calculate order totals
+   * Calculate order totals (honors freeShipping on coupon)
    */
   calculateTotals: (
-    subtotal: number, 
-    shippingCost: number, 
+    subtotal: number,
+    shippingCost: number,
     couponDiscount: number = 0,
-    giftCardDiscount: number = 0
+    giftCardDiscount: number = 0,
+    freeShipping: boolean = false
   ) => {
+    const finalShippingCost = freeShipping ? 0 : shippingCost;
     const totalDiscount = couponDiscount + giftCardDiscount;
     const payableAmount = Math.max(0, subtotal - totalDiscount);
-    const total = Math.max(0, payableAmount + shippingCost);
+    const total = Math.max(0, payableAmount + finalShippingCost);
 
     return {
       subtotal,
-      shippingCost,
+      shippingCost: finalShippingCost,
       couponDiscount,
       giftCardDiscount,
       discount: totalDiscount,

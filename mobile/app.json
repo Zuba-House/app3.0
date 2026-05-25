@@ -12,13 +12,7 @@
       "**/*"
     ],
     "plugins": [
-      [
-        "@stripe/stripe-react-native",
-        {
-          "merchantIdentifier": "merchant.ninja.wpapp.appzubahousecom",
-          "enableGooglePay": false
-        }
-      ],
+      "./plugins/withStripeCardOnly.js",
       "expo-secure-store",
       "expo-dev-client",
       [

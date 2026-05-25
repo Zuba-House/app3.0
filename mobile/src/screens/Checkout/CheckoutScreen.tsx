@@ -19,7 +19,10 @@ import { ActivityIndicator } from 'react-native-paper';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { addressService } from '../../services/address.service';
-import { checkoutService } from '../../services/checkout.service';
+import {
+  checkoutService,
+  isValidShippingAddress,
+} from '../../services/checkout.service';
 import { cartService } from '../../services/cart.service';
 import { productService } from '../../services/product.service';
 import { Address, ShippingMethod } from '../../types/address.types';
@@ -27,7 +30,6 @@ import { ApiResponse } from '../../types/api.types';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectCartItems, selectCartTotal, clearCart, setCart } from '../../store/slices/cartSlice';
 import Colors from '../../constants/colors';
-import { getDeliveryEstimateForMethod } from '../../constants/shipping';
 import { analyticsService } from '../../services/analytics.service';
 import { showError, showSuccess, showWarning } from '../../utils/toast';
 import { useAuthState } from '../../core/auth/authGuards';
@@ -58,6 +60,7 @@ const CheckoutScreen: React.FC = () => {
   // Checkout state
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('address');
   const [loading, setLoading] = useState(true);
+  const [shippingRatesLoading, setShippingRatesLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
 
   // Data state
@@ -94,7 +97,12 @@ const CheckoutScreen: React.FC = () => {
 
   // Coupon & Gift Card state
   const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; type: string } | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discount: number;
+    type: string;
+    freeShipping?: boolean;
+  } | null>(null);
   const [giftCardCode, setGiftCardCode] = useState('');
   const [appliedGiftCard, setAppliedGiftCard] = useState<{ code: string; discount: number; balance: number } | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
@@ -208,16 +216,82 @@ const CheckoutScreen: React.FC = () => {
     }, [isAuthenticated, dispatch])
   );
 
+  const cartQuantitySignature = cartItems
+    .map((item: any) => `${item.productId || item.product?._id}:${item.quantity || 1}`)
+    .join('|');
+
+  const loadShippingRates = useCallback(
+    async (address: Address | Record<string, any> | null) => {
+      if (!cartItems.length) {
+        setShippingMethods([]);
+        setSelectedShipping(null);
+        return;
+      }
+
+      if (!isValidShippingAddress(address)) {
+        setShippingMethods([]);
+        setSelectedShipping(null);
+        return;
+      }
+
+      setShippingRatesLoading(true);
+      try {
+        const shippingRes = await checkoutService.getShippingRates(cartItems, address);
+        if (shippingRes.success && shippingRes.data) {
+          const methods = Array.isArray(shippingRes.data) ? shippingRes.data : [];
+          setShippingMethods(methods);
+          setSelectedShipping((prev) => {
+            if (prev && methods.some((m) => m._id === prev._id)) {
+              return methods.find((m) => m._id === prev._id) || methods[0] || null;
+            }
+            return methods[0] || null;
+          });
+        }
+      } catch (err) {
+        console.error('[Checkout] Shipping rate fetch failed:', err);
+        setShippingMethods([]);
+        setSelectedShipping(null);
+        showError(
+          err instanceof Error
+            ? err.message
+            : 'Could not calculate shipping for this address. Please check your address and try again.'
+        );
+      } finally {
+        setShippingRatesLoading(false);
+      }
+    },
+    [cartItems]
+  );
+
+  const handleAddressChange = useCallback(
+    async (newAddress: Address | null) => {
+      setSelectedAddress(newAddress);
+      await loadShippingRates(newAddress);
+    },
+    [loadShippingRates]
+  );
+
   useEffect(() => {
-    // Recalculate totals when shipping or discount changes
     const shippingCost = selectedShipping?.price || 0;
-    const newTotals = checkoutService.calculateTotals(cartTotal, shippingCost, couponDiscount, giftCardDiscount);
+    const newTotals = checkoutService.calculateTotals(
+      cartTotal,
+      shippingCost,
+      couponDiscount,
+      giftCardDiscount,
+      Boolean(appliedCoupon?.freeShipping)
+    );
     setTotals(newTotals);
-  }, [cartTotal, selectedShipping, couponDiscount, giftCardDiscount]);
+  }, [cartTotal, selectedShipping, couponDiscount, giftCardDiscount, appliedCoupon?.freeShipping]);
+
+  useEffect(() => {
+    if (!cartItems.length || !selectedAddress) return;
+    if (!isValidShippingAddress(selectedAddress)) return;
+    void loadShippingRates(selectedAddress);
+  }, [cartQuantitySignature, selectedAddress?._id, selectedAddress?.postalCode, selectedAddress?.city, selectedAddress?.countryCode, loadShippingRates, cartItems.length]);
 
   useEffect(() => {
     if (!appliedGiftCard?.code) return;
-    const shippingCost = selectedShipping?.price || 0;
+    const shippingCost = appliedCoupon?.freeShipping ? 0 : selectedShipping?.price || 0;
     const payableBeforeGift = Math.max(0, cartTotal + shippingCost - couponDiscount);
     let cancelled = false;
     (async () => {
@@ -248,7 +322,7 @@ const CheckoutScreen: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [couponDiscount, cartTotal, selectedShipping?.price, appliedGiftCard?.code]);
+  }, [couponDiscount, cartTotal, selectedShipping?.price, appliedCoupon?.freeShipping, appliedGiftCard?.code]);
 
   const hasNavigatedToAddAddressRef = useRef(false);
   useEffect(() => {
@@ -258,13 +332,13 @@ const CheckoutScreen: React.FC = () => {
     hasNavigatedToAddAddressRef.current = true;
     navigation.navigate('AddAddress', {
       isGuestCheckout: !isAuthenticated,
-      onSave: (newAddress: Address) => {
+      onSave: async (newAddress: Address) => {
         setAddresses([newAddress]);
-        setSelectedAddress(newAddress);
+        await handleAddressChange(newAddress);
         setCurrentStep('shipping');
       },
     });
-  }, [loading, currentStep, addresses.length, isAuthenticated, navigation]);
+  }, [loading, currentStep, addresses.length, isAuthenticated, navigation, handleAddressChange]);
 
   const loadInitialData = async () => {
     try {
@@ -279,37 +353,24 @@ const CheckoutScreen: React.FC = () => {
       if (addressRes.success && addressRes.data) {
         addressList = Array.isArray(addressRes.data) ? addressRes.data : [];
         setAddresses(addressList);
-        // Auto-select default address
-        const defaultAddr = addressList.find((a) => a.isDefault) || addressList[0];
-        if (defaultAddr) {
-          setSelectedAddress(defaultAddr);
-        }
       }
 
-      const cartPayload = cartItems.map((item: any) => ({
-        productId: item.productId || item.product?._id || item._id,
-        quantity: item.quantity || 1,
-        product: item.product,
-      }));
-      const addrForRates =
-        addressList.find((a) => a.isDefault) ||
-        addressList[0] ||
-        (shippingLocation.countryCode
-          ? {
-              addressLine1: '—',
-              city: shippingLocation.city || '—',
-              postalCode: '00000',
-              country: shippingLocation.countryName || shippingLocation.countryCode,
-              countryCode: shippingLocation.countryCode,
-            }
-          : null);
-
-      const shippingRes = await checkoutService.getShippingRates(cartPayload, addrForRates);
-
-      if (shippingRes.success && shippingRes.data) {
-        const methods = Array.isArray(shippingRes.data) ? shippingRes.data : [];
-        setShippingMethods(methods);
-        if (methods.length > 0) setSelectedShipping(methods[0]);
+      const defaultAddr = addressList.find((a) => a.isDefault) || addressList[0];
+      if (defaultAddr) {
+        setSelectedAddress(defaultAddr);
+      } else if (shippingLocation.countryCode) {
+        const stubAddress = {
+          _id: 'guest-stub',
+          name: 'Customer',
+          phone: '',
+          addressLine1: 'Address pending',
+          city: shippingLocation.city || '—',
+          state: '',
+          postalCode: '00000',
+          country: shippingLocation.countryName || shippingLocation.countryCode,
+          countryCode: shippingLocation.countryCode,
+        } as Address;
+        setSelectedAddress(stubAddress);
       }
     } catch (error) {
       console.error('Error loading checkout data:', error);
@@ -332,12 +393,18 @@ const CheckoutScreen: React.FC = () => {
       if (response.success && response.data) {
         const discount = response.data.discount || 0;
         setCouponDiscount(discount);
+        const freeShipping = Boolean(response.data.freeShipping);
         setAppliedCoupon({
           code: couponCode.trim().toUpperCase(),
           discount,
-          type: response.data.type || 'fixed'
+          type: response.data.type || 'fixed',
+          freeShipping,
         });
-        showSuccess(`Coupon applied! You saved $${discount.toFixed(2)}`);
+        if (freeShipping) {
+          showSuccess('Coupon applied! Free shipping unlocked.');
+        } else {
+          showSuccess(`Coupon applied! You saved $${discount.toFixed(2)}`);
+        }
       } else {
         const errMsg = (response as any).error || (response as any).message;
         const code = (response as any).code;
@@ -373,7 +440,7 @@ const CheckoutScreen: React.FC = () => {
     
     try {
       setGiftCardLoading(true);
-      const shippingCost = selectedShipping?.price || 0;
+      const shippingCost = appliedCoupon?.freeShipping ? 0 : selectedShipping?.price || 0;
       const payableBeforeGift = Math.max(0, cartTotal + shippingCost - couponDiscount);
       const response = await checkoutService.applyGiftCard(giftCardCode.trim(), payableBeforeGift);
       
@@ -405,9 +472,9 @@ const CheckoutScreen: React.FC = () => {
 
   const handleAddAddress = () => {
     navigation.navigate('AddAddress', {
-      onSave: (newAddress: Address) => {
+      onSave: async (newAddress: Address) => {
         setAddresses([...addresses, newAddress]);
-        setSelectedAddress(newAddress);
+        await handleAddressChange(newAddress);
       },
     });
   };
@@ -418,9 +485,9 @@ const CheckoutScreen: React.FC = () => {
         if (!isAuthenticated) {
           navigation.navigate('AddAddress', {
             isGuestCheckout: true,
-            onSave: (newAddress: Address) => {
+            onSave: async (newAddress: Address) => {
               setAddresses([newAddress]);
-              setSelectedAddress(newAddress);
+              await handleAddressChange(newAddress);
               setCurrentStep('shipping');
             },
           });
@@ -584,7 +651,7 @@ const CheckoutScreen: React.FC = () => {
         selectedShipping: checkoutSnapshot.shippingMethod || selectedShipping,
         cartItems,
         totalAmt: totals.total,
-        shippingCost: (checkoutSnapshot.shippingMethod || selectedShipping)?.price || 0,
+        shippingCost: totals.shippingCost,
         idempotencyKey,
         paymentMethod: checkoutSnapshot.paymentMethod || paymentMethod,
         couponCode: appliedCoupon?.code,
@@ -742,9 +809,9 @@ const CheckoutScreen: React.FC = () => {
             onPress={isAuthenticated ? handleAddAddress : () => {
               navigation.navigate('AddAddress', {
                 isGuestCheckout: true,
-                onSave: (newAddress: Address) => {
+                onSave: async (newAddress: Address) => {
                   setAddresses([newAddress]);
-                  setSelectedAddress(newAddress);
+                  await handleAddressChange(newAddress);
                   setCurrentStep('shipping');
                 },
               });
@@ -765,7 +832,7 @@ const CheckoutScreen: React.FC = () => {
                 styles.addressCard,
                 selectedAddress?._id === address._id && styles.addressCardSelected,
               ]}
-              onPress={() => setSelectedAddress(address)}
+              onPress={() => void handleAddressChange(address)}
             >
               <View style={styles.addressRadio}>
                 <View
@@ -802,9 +869,9 @@ const CheckoutScreen: React.FC = () => {
             style={styles.addAddressLink}
             onPress={isAuthenticated ? handleAddAddress : () => navigation.navigate('AddAddress', {
               isGuestCheckout: true,
-              onSave: (newAddress: Address) => {
+              onSave: async (newAddress: Address) => {
                 setAddresses([...addresses, newAddress]);
-                setSelectedAddress(newAddress);
+                await handleAddressChange(newAddress);
               },
             })}
           >
@@ -822,6 +889,19 @@ const CheckoutScreen: React.FC = () => {
       <Text style={styles.stepSubtitle}>
         Zuba House Regular & Express
       </Text>
+
+      {shippingRatesLoading ? (
+        <View style={styles.shippingLoadingRow}>
+          <ActivityIndicator size="small" color={Colors.secondary} />
+          <Text style={styles.shippingLoadingText}>Calculating shipping rates…</Text>
+        </View>
+      ) : null}
+
+      {!shippingRatesLoading && shippingMethods.length === 0 ? (
+        <Text style={styles.shippingEmptyText}>
+          Enter a complete shipping address to see delivery options.
+        </Text>
+      ) : null}
 
       {shippingMethods.map((method) => (
         <TouchableOpacity
@@ -853,7 +933,7 @@ const CheckoutScreen: React.FC = () => {
             <View style={styles.shippingMeta}>
               <Ionicons name="time-outline" size={14} color={Colors.primary} />
               <Text style={styles.shippingEta}>
-                {getDeliveryEstimateForMethod(method._id, shippingLocation.countryCode)}
+                {method.estimatedDays}
               </Text>
               {method.carrier && (
                 <>
@@ -899,7 +979,9 @@ const CheckoutScreen: React.FC = () => {
               <View style={styles.appliedDiscountText}>
                 <Text style={styles.appliedCode}>{appliedCoupon.code}</Text>
                 <Text style={styles.appliedSavings}>
-                  You save ${appliedCoupon.discount.toFixed(2)}
+                  {appliedCoupon.freeShipping
+                    ? 'Free shipping applied'
+                    : `You save $${appliedCoupon.discount.toFixed(2)}`}
                 </Text>
               </View>
             </View>
@@ -1048,7 +1130,8 @@ const CheckoutScreen: React.FC = () => {
           <View style={styles.reviewContent}>
             <Text style={styles.reviewText}>{selectedShipping.name}</Text>
             <Text style={styles.reviewSubtext}>
-              {selectedShipping.estimatedDays} - ${selectedShipping.price.toFixed(2)}
+              {selectedShipping.estimatedDays}
+              {appliedCoupon?.freeShipping ? ' — FREE' : ` — $${totals.shippingCost.toFixed(2)}`}
             </Text>
           </View>
         )}
@@ -1085,7 +1168,11 @@ const CheckoutScreen: React.FC = () => {
         </View>
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Shipping</Text>
-          <Text style={styles.totalValue}>${totals.shippingCost.toFixed(2)}</Text>
+          <Text style={styles.totalValue}>
+            {totals.shippingCost <= 0 && appliedCoupon?.freeShipping
+              ? 'FREE'
+              : `$${totals.shippingCost.toFixed(2)}`}
+          </Text>
         </View>
         {totals.couponDiscount > 0 && (
           <View style={styles.totalRow}>
@@ -1467,6 +1554,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.secondary,
     marginLeft: 8,
+  },
+  shippingLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+  },
+  shippingLoadingText: {
+    fontSize: 14,
+    color: Colors.primary,
+  },
+  shippingEmptyText: {
+    fontSize: 14,
+    color: '#6B7C89',
+    marginBottom: 12,
   },
   shippingCard: {
     flexDirection: 'row',
