@@ -202,10 +202,6 @@ const Login = () => {
           const ok = await completeAdminLogin(res, false);
           if (!ok) {
             await signOut(auth);
-            context.alertBox(
-              "error",
-              "This Google account is not an admin account."
-            );
           } else {
             localStorage.setItem("userEmail", fields.email);
           }
@@ -213,6 +209,10 @@ const Login = () => {
           setIsLoading(false);
         }).catch(async () => {
           await signOut(auth).catch(() => {});
+          context.alertBox(
+            "error",
+            "Google sign-in could not reach the server. If this persists after the API redeploys, check CORS and try again."
+          );
           setLoadingGoogle(false);
           setIsLoading(false);
         });

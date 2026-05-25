@@ -59,6 +59,7 @@ const allowedOrigins = [
   'https://admin.zubahouse.com',
   'https://vendor.zubahouse.com',
   'https://api.zubahouse.com',
+  'https://mobileapp.zubahouse.com',
   env.frontendUrl,
   env.adminUrl,
   env.vendorUrl,
@@ -70,6 +71,15 @@ app.use(cors({
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
+    }
+    // Allow any zubahouse.com subdomain (custom Vercel domains, etc.)
+    try {
+      const { hostname, protocol } = new URL(origin);
+      if (protocol === 'https:' && (hostname === 'zubahouse.com' || hostname.endsWith('.zubahouse.com'))) {
+        return callback(null, true);
+      }
+    } catch {
+      // ignore malformed origin
     }
     // Allow any Vercel deployment
     if (origin.includes('.vercel.app')) {

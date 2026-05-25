@@ -1,9 +1,14 @@
 import axios from "axios";
 import { toLegacyApiResponse } from "./apiResponse.js";
 
-const rawBase =
-    import.meta.env.VITE_API_URL || "https://zuba-api.onrender.com";
-const apiUrl = String(rawBase).replace(/\/+$/, "");
+function resolveApiBase() {
+    const envUrl = import.meta.env.VITE_API_URL;
+    if (envUrl) return String(envUrl).replace(/\/+$/, "");
+    // Production: same-origin /api is proxied to Render via vercel.json (no CORS)
+    if (import.meta.env.PROD && typeof window !== "undefined") return "";
+    return "https://zuba-api.onrender.com";
+}
+const apiUrl = resolveApiBase();
 axios.defaults.withCredentials = true;
 
 // Helper function to check if token error and clear session

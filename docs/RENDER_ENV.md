@@ -61,6 +61,14 @@ Optional on Render (only if you add server-side Google code exchange later):
 
 In Atlas → **Network Access**, allow **0.0.0.0/0** (or Render outbound IPs) so the web service can connect.
 
+## Custom domains (CORS)
+
+If the web app uses a Vercel custom domain (e.g. `https://mobileapp.zubahouse.com`) and calls the API directly (`VITE_API_URL=https://zuba-api.onrender.com`), redeploy **zubahouse-api** after updating `server/index.js` so CORS allows that origin.
+
+Alternatively, leave `VITE_API_URL` unset on Vercel so the app uses same-origin `/api` (proxied by `vercel.json`).
+
+In **Firebase Console → Authentication → Settings → Authorized domains**, add `mobileapp.zubahouse.com` for Google sign-in on that domain.
+
 ## Verify after deploy
 
 ```bash
