@@ -187,6 +187,7 @@ export const authManager = {
       authMonitor.emit('login_success');
       authMonitor.emit('session_restored', { source: 'login' });
     } catch (error) {
+      authSession.setGuest(true);
       authMonitor.emit('login_failure', { reason: error instanceof Error ? error.message : 'unknown' });
       throw error;
     }
@@ -208,6 +209,7 @@ export const authManager = {
       authEvents.emit(AUTH_EVENTS.SESSION_RESTORED, { source: 'register' });
       authMonitor.emit('session_restored', { source: 'register' });
     } catch (error) {
+      authSession.setGuest(true);
       authMonitor.emit('login_failure', { reason: error instanceof Error ? error.message : 'unknown', from: 'register' });
       throw error;
     }
@@ -362,6 +364,7 @@ export const authManager = {
       authMonitor.emit('session_restored', { source: 'social' });
       authMonitor.emit('login_success', { method: 'social' });
     } catch (error) {
+      authSession.setGuest(true);
       authMonitor.emit('login_failure', { reason: error instanceof Error ? error.message : 'unknown', from: 'social' });
       throw error;
     }

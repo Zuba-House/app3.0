@@ -57,9 +57,11 @@ const allowedOrigins = [
   'https://zubahouse.com',
   'https://www.zubahouse.com',
   'https://admin.zubahouse.com',
+  'https://www.admin.zubahouse.com',
   'https://vendor.zubahouse.com',
   'https://api.zubahouse.com',
   'https://mobileapp.zubahouse.com',
+  'https://appadmin-rho.vercel.app',
   env.frontendUrl,
   env.adminUrl,
   env.vendorUrl,
@@ -95,7 +97,14 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'X-Device-Session-Id',
+  ],
+  optionsSuccessStatus: 204,
 }));
 
 // Security & Middleware

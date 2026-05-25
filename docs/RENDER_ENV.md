@@ -63,7 +63,9 @@ In Atlas → **Network Access**, allow **0.0.0.0/0** (or Render outbound IPs) so
 
 ## Custom domains (CORS)
 
-If the web app uses a Vercel custom domain (e.g. `https://mobileapp.zubahouse.com`) and calls the API directly (`VITE_API_URL=https://zuba-api.onrender.com`), redeploy **zubahouse-api** after updating `server/index.js` so CORS allows that origin.
+Allowed web origins include `https://mobileapp.zubahouse.com`, `https://admin.zubahouse.com`, `https://www.admin.zubahouse.com`, and `https://appadmin-rho.vercel.app`, plus any `*.zubahouse.com` or `*.vercel.app` host. Native iOS/Android apps send no `Origin` header and are not blocked by CORS.
+
+If the web app calls the API directly (`VITE_API_URL=https://zuba-api.onrender.com`), redeploy **zubahouse-api** after updating `server/index.js` so CORS changes take effect on the live API.
 
 Alternatively, leave `VITE_API_URL` unset on Vercel so the app uses same-origin `/api` (proxied by `vercel.json`).
 
