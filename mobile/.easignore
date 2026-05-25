@@ -1,0 +1,8 @@
+# Shrink EAS upload archive
+node_modules/.cache/
+.expo/
+dist/
+*.md
+!README.md
+INSTALL_DEV_BUILD.md
+build-ios-dev.ps1

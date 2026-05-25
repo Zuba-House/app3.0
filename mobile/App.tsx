@@ -18,8 +18,9 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { CartHydrator } from './src/components/CartHydrator';
 import { toastConfig } from './src/components/toastConfig';
 import { loadSavedLanguage } from './src/i18n';
-import { StripeProvider } from '@stripe/stripe-react-native';
 import { STRIPE_PUBLISHABLE_KEY } from './src/constants/config';
+import { StripeAppProvider } from './src/providers/StripeAppProvider';
+import { StripePaymentProvider } from './src/providers/StripePaymentProvider';
 
 const theme = {
   colors: {
@@ -76,11 +77,9 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      {STRIPE_PUBLISHABLE_KEY.startsWith('pk_') ? (
-        <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>{appTree}</StripeProvider>
-      ) : (
-        appTree
-      )}
+      <StripeAppProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+        <StripePaymentProvider>{appTree}</StripePaymentProvider>
+      </StripeAppProvider>
     </ErrorBoundary>
   );
 };

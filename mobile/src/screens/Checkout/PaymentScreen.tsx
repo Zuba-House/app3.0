@@ -43,7 +43,7 @@ const PaymentScreen: React.FC = () => {
     onSuccess,
   } = route.params as PaymentScreenParams;
 
-  const { payForOrder, isStripeConfigured } = useInAppStripePayment();
+  const { payForOrder, isStripeConfigured, isStripeNativeAvailable } = useInAppStripePayment();
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [orderAlreadyComplete, setOrderAlreadyComplete] = useState(false);
@@ -64,8 +64,16 @@ const PaymentScreen: React.FC = () => {
   }, [amount, dispatch, navigation, onSuccess, orderId]);
 
   const runPayment = useCallback(async () => {
+    if (!isStripeNativeAvailable) {
+      showError(
+        'Install the latest Zuba House dev build (with Stripe). From mobile/: eas build --profile development-store --platform ios'
+      );
+      return;
+    }
     if (!isStripeConfigured) {
-      showError('Card payments are not configured for this build.');
+      showError(
+        'Card payments are not configured in this build. Set EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY in mobile/eas.json (production), rebuild, and reinstall from TestFlight.'
+      );
       return;
     }
     setPaying(true);
@@ -75,6 +83,7 @@ const PaymentScreen: React.FC = () => {
         amount,
         customerEmail,
         customerName,
+        useCardForm: false,
       });
       if (result.status === 'paid') {
         finishPaymentSuccess();
@@ -90,6 +99,7 @@ const PaymentScreen: React.FC = () => {
     customerName,
     finishPaymentSuccess,
     isStripeConfigured,
+    isStripeNativeAvailable,
     orderId,
     payForOrder,
   ]);
@@ -119,10 +129,10 @@ const PaymentScreen: React.FC = () => {
 
   useEffect(() => {
     if (loading || orderAlreadyComplete || paying || hasAutoPresented.current) return;
-    if (!isStripeConfigured) return;
+    if (!isStripeConfigured || !isStripeNativeAvailable) return;
     hasAutoPresented.current = true;
     runPayment();
-  }, [loading, orderAlreadyComplete, paying, isStripeConfigured, runPayment]);
+  }, [loading, orderAlreadyComplete, paying, isStripeConfigured, isStripeNativeAvailable, runPayment]);
 
   const handleCancel = () => {
     Alert.alert(

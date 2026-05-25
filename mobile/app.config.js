@@ -27,10 +27,18 @@ function getIosGoogleUrlScheme() {
 
 
 module.exports = () => {
+  const buildProfile = process.env.EAS_BUILD_PROFILE || '';
+  const isStoreRelease = buildProfile === 'production' || buildProfile === 'preview';
 
   const appScheme = appJson.expo.scheme || 'zuba';
 
   const googleScheme = getIosGoogleUrlScheme();
+
+  const plugins = (appJson.expo.plugins || []).filter((plugin) => {
+    if (!isStoreRelease) return true;
+    const name = Array.isArray(plugin) ? plugin[0] : plugin;
+    return name !== 'expo-dev-client';
+  });
 
 
 
@@ -106,7 +114,7 @@ module.exports = () => {
 
       },
 
-      plugins: appJson.expo.plugins || [],
+      plugins,
 
       extra: {
 
@@ -121,6 +129,13 @@ module.exports = () => {
         },
 
         googleIosUrlScheme: googleScheme || undefined,
+        googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() || undefined,
+        googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() || undefined,
+        googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim() || undefined,
+
+        stripePublishableKey: process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() || undefined,
+
+        apiUrl: process.env.EXPO_PUBLIC_API_URL?.trim() || appJson.expo.extra?.apiUrl,
 
       },
 

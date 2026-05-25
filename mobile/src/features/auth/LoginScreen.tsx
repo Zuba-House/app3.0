@@ -62,12 +62,14 @@ const LoginScreen: React.FC = () => {
             >
               {t('common.continue')}
             </Button>
+            <Text style={styles.orDivider}>{t('auth.orContinueWith')}</Text>
             {googleConfigured ? (
-              <>
-                <Text style={styles.orDivider}>{t('auth.orContinueWith')}</Text>
-                <GoogleSignInSection onSuccess={onAuthSuccess} disabled={isBusy} />
-              </>
-            ) : null}
+              <GoogleSignInSection onSuccess={onAuthSuccess} disabled={isBusy} />
+            ) : (
+              <Text style={styles.googleHint}>
+                Google sign-in will appear after you install the latest app update from TestFlight.
+              </Text>
+            )}
             <Button mode="text" onPress={() => navigation.navigate('Register')} style={styles.link} labelStyle={styles.linkLabel}>
               {t('auth.createAccount')}
             </Button>
@@ -102,6 +104,7 @@ const styles = StyleSheet.create({
   orDivider: { textAlign: 'center', color: '#6B7C89', fontSize: 13, marginVertical: 4 },
   link: { marginTop: 8, alignSelf: 'center' },
   linkLabel: { color: Colors.primary, fontWeight: '600' },
+  googleHint: { textAlign: 'center', color: '#6B7C89', fontSize: 13, lineHeight: 18 },
 });
 
 export default LoginScreen;

@@ -36,10 +36,26 @@ export const API_URL = resolveApiBaseUrl();
 
 
 
-export const STRIPE_PUBLISHABLE_KEY =
-  process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() ||
-  process.env.STRIPE_PUBLISHABLE_KEY?.trim() ||
-  '';
+function resolveStripePublishableKey(): string {
+  const fromEnv =
+    process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() ||
+    process.env.STRIPE_PUBLISHABLE_KEY?.trim() ||
+    '';
+  if (fromEnv) return fromEnv;
+  const fromExtra = (Constants.expoConfig?.extra as { stripePublishableKey?: string } | undefined)
+    ?.stripePublishableKey?.trim();
+  return fromExtra || '';
+}
+
+export const STRIPE_PUBLISHABLE_KEY = resolveStripePublishableKey();
+
+/** True when a real Stripe publishable key is baked into the build (not a placeholder). */
+export function isStripePublishableKeyConfigured(key: string = STRIPE_PUBLISHABLE_KEY): boolean {
+  const value = key?.trim() || '';
+  if (!value.startsWith('pk_')) return false;
+  if (value.includes('REPLACE_ME')) return false;
+  return value.length >= 20;
+}
 
 
 

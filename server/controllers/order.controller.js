@@ -55,6 +55,8 @@ import AdminOrderNotificationEmail from "../utils/adminOrderNotificationEmailTem
 import sendEmailFun from "../config/sendEmail.js";
 import { calculateOrderCommissions, creditVendorBalance } from "../utils/commissionCalculator.js";
 import { sendVendorNewOrder } from "../utils/vendorEmails.js";
+import { markOrderPaid } from "../services/orderPayment.service.js";
+import { isStripeConfigured, stripeCall } from "../services/stripeClient.js";
 
 export const createOrderController = async (request, response) => {
     try {
@@ -1304,3 +1306,98 @@ export async function deleteOrder(request, response) {
         });
     }
 }
+
+/**
+ * POST /api/order/confirm-payment/:orderId
+ * Called by mobile after Stripe Checkout returns paid.
+ */
+export const confirmOrderPaymentController = async (request, response) => {
+    try {
+        const { orderId } = request.params;
+        const { sessionId, paymentIntentId, paymentMethod = 'stripe', source } = request.body || {};
+
+        if (!orderId) {
+            return response.status(400).json({
+                success: false,
+                error: true,
+                message: 'orderId is required',
+            });
+        }
+
+        const order = await OrderModel.findById(orderId);
+        if (!order) {
+            return response.status(404).json({
+                success: false,
+                error: true,
+                message: 'Order not found',
+            });
+        }
+
+        let verified = false;
+
+        if (isStripeConfigured()) {
+            try {
+                if (sessionId) {
+                    const session = await stripeCall((s, opts) =>
+                        opts.stripeAccount
+                            ? s.checkout.sessions.retrieve(sessionId, opts)
+                            : s.checkout.sessions.retrieve(sessionId)
+                    );
+                    if (session.payment_status === 'paid') {
+                        verified = true;
+                    }
+                } else if (paymentIntentId) {
+                    const pi = await stripeCall((s, opts) =>
+                        opts.stripeAccount
+                            ? s.paymentIntents.retrieve(paymentIntentId, opts)
+                            : s.paymentIntents.retrieve(paymentIntentId)
+                    );
+                    if (pi.status === 'succeeded') {
+                        verified = true;
+                    }
+                }
+            } catch (stripeErr) {
+                console.warn('[confirm-payment] Stripe verify failed:', stripeErr?.message || stripeErr);
+            }
+        }
+
+        if (!verified) {
+            const status = String(order.payment_status || '').toLowerCase();
+            if (['paid', 'completed', 'success', 'succeeded'].includes(status)) {
+                verified = true;
+            }
+        }
+
+        if (!verified) {
+            return response.status(402).json({
+                success: false,
+                error: true,
+                message: 'Payment not completed yet. Finish checkout on Stripe, then try again.',
+                payment_status: order.payment_status,
+            });
+        }
+
+        const updated = await markOrderPaid(
+            orderId,
+            sessionId || paymentIntentId || order.paymentId,
+            paymentMethod
+        );
+
+        console.log('[confirm-payment] Order marked paid:', orderId, source || 'mobile');
+
+        return response.status(200).json({
+            success: true,
+            error: false,
+            message: 'Payment confirmed',
+            order: updated,
+            payment_status: updated?.payment_status || 'paid',
+        });
+    } catch (error) {
+        console.error('[confirm-payment] Error:', error);
+        return response.status(500).json({
+            success: false,
+            error: true,
+            message: error.message || 'Failed to confirm payment',
+        });
+    }
+};

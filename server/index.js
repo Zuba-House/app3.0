@@ -26,6 +26,7 @@ import discountRoutes from './route/discount.route.js';
 import analyticsRoutes from './route/analytics.route.js';
 import seoRoutes from './route/seo.route.js';
 import stripeRoutes from './route/stripe.route.js';
+import { handleStripeWebhook } from './controllers/payment.controller.js';
 import bannerRoutes from './route/banner.route.js';
 import bannerV1Routes from './route/bannerV1.route.js';
 import bannerList2Routes from './route/bannerList2.route.js';
@@ -114,6 +115,14 @@ app.use(helmet({
 }));
 app.use(cookieParser());
 app.use(morgan('dev'));
+
+// Stripe webhooks need the raw body (must be before express.json)
+app.post(
+  '/api/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  handleStripeWebhook
+);
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(responseNormalizer);
@@ -137,6 +146,8 @@ app.get('/api/health', (req, res) => {
     database: 'connected',
     routes: {
       deleteAccount: 'DELETE /api/user/delete-account',
+      stripeCheckout: 'POST /api/stripe/create-checkout-session',
+      stripeHealth: 'GET /api/stripe/health',
     },
   });
 });

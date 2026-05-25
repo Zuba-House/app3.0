@@ -3,7 +3,7 @@
     "name": "Zuba House",
     "owner": "olivierndev",
     "slug": "zuba-mobile",
-    "version": "11.0.0",
+    "version": "11.0.3",
     "scheme": "zuba",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -47,7 +47,7 @@
     },
     "android": {
       "package": "appzubahousecom.wpapp",
-      "versionCode": 2,
+      "versionCode": 3,
       "enableProguardInReleaseBuilds": true,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {

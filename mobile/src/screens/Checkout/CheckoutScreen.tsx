@@ -40,6 +40,7 @@ import { createCheckoutOrder } from '../../features/checkout/api/createOrder';
 import { checkoutStore } from '../../features/checkout/store/checkoutStore';
 import { getOrderId, needsOnlineStripePayment, type RawOrder } from '../../utils/order.mappers';
 import { useInAppStripePayment } from '../../hooks/useInAppStripePayment';
+import { CheckoutStripeCardField } from '../../components/checkout/CheckoutStripeCardField';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DELIVERY_NOTE_STORAGE_KEY = 'checkout_delivery_note_v1';
@@ -69,7 +70,8 @@ const CheckoutScreen: React.FC = () => {
   const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<ShippingMethod | null>(null);
   const paymentMethod = 'stripe' as const;
-  const { payForOrder } = useInAppStripePayment();
+  const { payForOrder, isStripeConfigured } = useInAppStripePayment();
+  const [cardDetailsComplete, setCardDetailsComplete] = useState(false);
   const [deliveryNote, setDeliveryNote] = useState('');
   const [savedDeliveryNote, setSavedDeliveryNote] = useState('');
 
@@ -504,6 +506,10 @@ const CheckoutScreen: React.FC = () => {
       }
       setCurrentStep('payment');
     } else if (currentStep === 'payment') {
+      if (isAuthenticated && totals.total > 0 && isStripeConfigured && !cardDetailsComplete) {
+        showWarning('Please enter your full card details before continuing.');
+        return;
+      }
       setCurrentStep('review');
     }
   };
@@ -642,6 +648,21 @@ const CheckoutScreen: React.FC = () => {
         }
       }
 
+      if (isAuthenticated && totals.total > 0 && !isStripeConfigured) {
+        showError(
+          'Card payments are not configured in this build. Reinstall the latest TestFlight update from Zuba House.'
+        );
+        setProcessing(false);
+        return;
+      }
+
+      if (isAuthenticated && totals.total > 0 && isStripeConfigured && !cardDetailsComplete) {
+        showWarning('Please enter your card details on the Payment step before paying.');
+        setCurrentStep('payment');
+        setProcessing(false);
+        return;
+      }
+
       const idempotencyKey = `checkout_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
       const checkoutSnapshot = checkoutStore.getState();
       const payloadResult = buildCheckoutPayload({
@@ -685,7 +706,12 @@ const CheckoutScreen: React.FC = () => {
 
         const { effectiveName, effectiveEmail } = getEffectiveContact();
 
-        const completeCheckoutSuccess = (paymentPending = false) => {
+        const clearCartAfterOrder = () => {
+          cartService.clearCart().catch(() => undefined);
+          dispatch(clearCart());
+        };
+
+        const navigateToPaidConfirmation = () => {
           analyticsService.purchase(
             orderId,
             totals.total,
@@ -696,8 +722,7 @@ const CheckoutScreen: React.FC = () => {
               quantity: item.quantity,
             }))
           );
-          cartService.clearCart().catch(() => undefined);
-          dispatch(clearCart());
+          clearCartAfterOrder();
           navigation.reset({
             index: 0,
             routes: [
@@ -706,11 +731,48 @@ const CheckoutScreen: React.FC = () => {
                 params: {
                   orderId,
                   total: totals.total,
-                  paymentPending,
+                  paymentPending: false,
                   paymentAmount: totals.total,
                   paymentMethod,
                   customerEmail: effectiveEmail,
                   customerName: effectiveName,
+                },
+              },
+            ],
+          });
+        };
+
+        const navigateToPaymentScreen = (message?: string) => {
+          if (message) showWarning(message);
+          clearCartAfterOrder();
+          navigation.reset({
+            index: 0,
+            routes: [
+              {
+                name: 'Payment',
+                params: {
+                  orderId,
+                  amount: totals.total,
+                  customerEmail: effectiveEmail,
+                  customerName: effectiveName,
+                  onSuccess: () => {
+                    navigation.reset({
+                      index: 0,
+                      routes: [
+                        {
+                          name: 'OrderConfirmation',
+                          params: {
+                            orderId,
+                            total: totals.total,
+                            paymentPending: false,
+                            paymentAmount: totals.total,
+                            customerEmail: effectiveEmail,
+                            customerName: effectiveName,
+                          },
+                        },
+                      ],
+                    });
+                  },
                 },
               },
             ],
@@ -726,10 +788,18 @@ const CheckoutScreen: React.FC = () => {
             amount: totals.total,
             customerEmail: effectiveEmail,
             customerName: effectiveName,
+            useCardForm: true,
           });
-          completeCheckoutSuccess(payResult.status !== 'paid');
+
+          if (payResult.status === 'paid') {
+            navigateToPaidConfirmation();
+          } else if (payResult.status === 'cancelled') {
+            navigateToPaymentScreen('Payment cancelled. Add your card to confirm your order.');
+          } else {
+            navigateToPaymentScreen('Payment was not completed. Add your card to finish checkout.');
+          }
         } else {
-          completeCheckoutSuccess(false);
+          navigateToPaidConfirmation();
         }
       } else {
         showError(toUserFriendlyOrderError((orderResponse as any).message || ''));
@@ -959,7 +1029,7 @@ const CheckoutScreen: React.FC = () => {
           <View style={styles.paymentInfo}>
             <Text style={styles.paymentName}>Credit / Debit Card</Text>
             <Text style={styles.paymentDescription}>
-              You will enter your card on the next step — payment stays inside the app.
+              Enter your card below. Payment is processed securely inside the app.
             </Text>
           </View>
           <View style={styles.paymentLogos}>
@@ -968,6 +1038,12 @@ const CheckoutScreen: React.FC = () => {
           </View>
         </View>
       </View>
+
+      {isStripeConfigured ? (
+        <View style={styles.reviewSection}>
+          <CheckoutStripeCardField onCardChange={setCardDetailsComplete} />
+        </View>
+      ) : null}
 
       {/* Coupon Code Section */}
       <View style={styles.discountSection}>
