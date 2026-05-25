@@ -19,6 +19,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "credentialsSource": "local",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://zuba-api.onrender.com"
       }
