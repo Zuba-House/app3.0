@@ -210,10 +210,10 @@ export const checkoutService = {
   /**
    * Create Stripe payment intent
    */
-  createPaymentIntent: async (amount: number, currency: string = 'usd'): Promise<ApiResponse<PaymentIntent>> => {
+  createPaymentIntent: async (amount: number, orderId?: string): Promise<ApiResponse<PaymentIntent>> => {
     const response = await postData<PaymentIntent>(API_ENDPOINTS.CREATE_PAYMENT_INTENT, {
       amount,
-      currency,
+      orderId,
     });
     return response;
   },

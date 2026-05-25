@@ -14,7 +14,7 @@ export interface CheckoutSnapshot {
   shippingMethod: ShippingMethod | null;
   customer: CheckoutCustomerInfo | null;
   deliveryNote: string;
-  paymentMethod: 'stripe' | 'apple_pay' | 'google_pay';
+  paymentMethod: 'stripe';
 }
 
 export interface CheckoutValidationIssue {

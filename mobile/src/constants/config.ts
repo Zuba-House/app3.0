@@ -36,11 +36,14 @@ export const API_URL = resolveApiBaseUrl();
 
 
 
-export const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY || '';
+export const STRIPE_PUBLISHABLE_KEY =
+  process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() ||
+  process.env.STRIPE_PUBLISHABLE_KEY?.trim() ||
+  '';
 
 
 
-export const APP_NAME = process.env.APP_NAME || 'Zuba';
+export const APP_NAME = process.env.APP_NAME || 'Zuba House';
 
 export const APP_VERSION =
 

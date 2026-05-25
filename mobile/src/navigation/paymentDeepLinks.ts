@@ -58,11 +58,14 @@ export async function handlePaymentDeepLink(url: string): Promise<boolean> {
 
   if (link.sessionId) {
     try {
-      await checkoutService.confirmOrderPayment(link.orderId, {
-        sessionId: link.sessionId,
-        paymentMethod: 'stripe',
-        source: 'zuba_mobile_deep_link',
-      });
+      const statusRes = await checkoutService.getCheckoutStatus(link.sessionId);
+      if (statusRes.success && statusRes.data?.paymentStatus === 'paid') {
+        await checkoutService.confirmOrderPayment(link.orderId, {
+          sessionId: link.sessionId,
+          paymentMethod: 'stripe',
+          source: 'zuba_mobile_deep_link',
+        });
+      }
     } catch (error) {
       console.warn('[PaymentDeepLink] confirm payment failed:', error);
     }

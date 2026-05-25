@@ -37,10 +37,9 @@ import { buildCheckoutPayload } from '../../features/checkout/utils/buildCheckou
 import { createCheckoutOrder } from '../../features/checkout/api/createOrder';
 import { checkoutStore } from '../../features/checkout/store/checkoutStore';
 import { getOrderId, needsOnlineStripePayment, type RawOrder } from '../../utils/order.mappers';
+import { useInAppStripePayment } from '../../hooks/useInAppStripePayment';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SAVED_CARDS_STORAGE_KEY = 'checkout_saved_cards_v1';
-const SELECTED_PAYMENT_STORAGE_KEY = 'checkout_selected_payment_v1';
 const DELIVERY_NOTE_STORAGE_KEY = 'checkout_delivery_note_v1';
 const ORDER_SOURCE_TAG = 'zuba_mobile_app';
 
@@ -66,58 +65,8 @@ const CheckoutScreen: React.FC = () => {
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<ShippingMethod | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'apple_pay' | 'google_pay'>('stripe');
-  const [savedCards, setSavedCards] = useState<Array<{
-    id: string;
-    brand: string;
-    last4: string;
-    name: string;
-    expMonth: string;
-    expYear: string;
-  }>>([]);
-  const [selectedPaymentId, setSelectedPaymentId] = useState<string>('new-card');
-  const [showCardForm, setShowCardForm] = useState(false);
-  const [cardForm, setCardForm] = useState({
-    number: '',
-    name: '',
-    expMonth: '',
-    expYear: '',
-    cvc: '',
-  });
-
-  useEffect(() => {
-    const loadSavedPaymentMethods = async () => {
-      try {
-        const rawCards = await AsyncStorage.getItem(SAVED_CARDS_STORAGE_KEY);
-        if (rawCards) {
-          const parsed = JSON.parse(rawCards);
-          if (Array.isArray(parsed)) {
-            setSavedCards(parsed);
-          }
-        }
-        const selected = await AsyncStorage.getItem(SELECTED_PAYMENT_STORAGE_KEY);
-        if (selected) {
-          setSelectedPaymentId(selected);
-          if (selected === 'apple_pay' || selected === 'google_pay') {
-            setPaymentMethod(selected);
-          } else if (selected !== 'new-card') {
-            setPaymentMethod('stripe');
-          }
-        }
-      } catch {
-        // ignore persisted payment restore errors
-      }
-    };
-    loadSavedPaymentMethods();
-  }, []);
-
-  useEffect(() => {
-    AsyncStorage.setItem(SAVED_CARDS_STORAGE_KEY, JSON.stringify(savedCards)).catch(() => {});
-  }, [savedCards]);
-
-  useEffect(() => {
-    AsyncStorage.setItem(SELECTED_PAYMENT_STORAGE_KEY, selectedPaymentId).catch(() => {});
-  }, [selectedPaymentId]);
+  const paymentMethod = 'stripe' as const;
+  const { payForOrder } = useInAppStripePayment();
   const [deliveryNote, setDeliveryNote] = useState('');
   const [savedDeliveryNote, setSavedDeliveryNote] = useState('');
 
@@ -266,6 +215,41 @@ const CheckoutScreen: React.FC = () => {
     setTotals(newTotals);
   }, [cartTotal, selectedShipping, couponDiscount, giftCardDiscount]);
 
+  useEffect(() => {
+    if (!appliedGiftCard?.code) return;
+    const shippingCost = selectedShipping?.price || 0;
+    const payableBeforeGift = Math.max(0, cartTotal + shippingCost - couponDiscount);
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await checkoutService.applyGiftCard(appliedGiftCard.code, payableBeforeGift);
+        if (cancelled) return;
+        if (response.success && response.data) {
+          const discount = response.data.discount || 0;
+          setGiftCardDiscount(discount);
+          setAppliedGiftCard((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  discount,
+                  balance: response.data?.giftCard?.currentBalance ?? prev.balance,
+                }
+              : null
+          );
+        } else {
+          setGiftCardDiscount(0);
+          setAppliedGiftCard(null);
+          setGiftCardCode('');
+        }
+      } catch {
+        // keep previous gift discount on transient errors
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [couponDiscount, cartTotal, selectedShipping?.price, appliedGiftCard?.code]);
+
   const hasNavigatedToAddAddressRef = useRef(false);
   useEffect(() => {
     if (loading || currentStep !== 'address') return;
@@ -389,7 +373,9 @@ const CheckoutScreen: React.FC = () => {
     
     try {
       setGiftCardLoading(true);
-      const response = await checkoutService.applyGiftCard(giftCardCode.trim(), cartTotal);
+      const shippingCost = selectedShipping?.price || 0;
+      const payableBeforeGift = Math.max(0, cartTotal + shippingCost - couponDiscount);
+      const response = await checkoutService.applyGiftCard(giftCardCode.trim(), payableBeforeGift);
       
       if (response.success && response.data) {
         const discount = response.data.discount || 0;
@@ -451,11 +437,6 @@ const CheckoutScreen: React.FC = () => {
       }
       setCurrentStep('payment');
     } else if (currentStep === 'payment') {
-      const hasSavedCard = savedCards.some((c) => c.id === selectedPaymentId);
-      if (!hasSavedCard) {
-        setShowCardForm(true);
-        return;
-      }
       setCurrentStep('review');
     }
   };
@@ -635,6 +616,8 @@ const CheckoutScreen: React.FC = () => {
         const orderRaw = orderResponse.data as RawOrder;
         const orderId = getOrderId(orderRaw) || String(orderResponse.data._id || orderResponse.data.orderId || '');
 
+        const { effectiveName, effectiveEmail } = getEffectiveContact();
+
         const completeCheckoutSuccess = (paymentPending = false) => {
           analyticsService.purchase(
             orderId,
@@ -659,6 +642,8 @@ const CheckoutScreen: React.FC = () => {
                   paymentPending,
                   paymentAmount: totals.total,
                   paymentMethod,
+                  customerEmail: effectiveEmail,
+                  customerName: effectiveName,
                 },
               },
             ],
@@ -668,8 +653,14 @@ const CheckoutScreen: React.FC = () => {
         const requiresStripe =
           isAuthenticated && needsOnlineStripePayment(orderRaw, paymentMethod);
 
-        if (requiresStripe) {
-          completeCheckoutSuccess(true);
+        if (requiresStripe && totals.total > 0) {
+          const payResult = await payForOrder({
+            orderId,
+            amount: totals.total,
+            customerEmail: effectiveEmail,
+            customerName: effectiveName,
+          });
+          completeCheckoutSuccess(payResult.status !== 'paid');
         } else {
           completeCheckoutSuccess(false);
         }
@@ -877,124 +868,18 @@ const CheckoutScreen: React.FC = () => {
     </View>
   );
 
-  const formatCardNumber = (input: string) => {
-    const digits = input.replace(/\D/g, '').slice(0, 16);
-    return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
-  };
-
-  const inferCardBrand = (num: string) => {
-    const digits = num.replace(/\s/g, '');
-    if (/^4/.test(digits)) return 'VISA';
-    if (/^5[1-5]/.test(digits)) return 'MC';
-    if (/^3[47]/.test(digits)) return 'AMEX';
-    return 'CARD';
-  };
-
-  const resetCardForm = () => {
-    setCardForm({ number: '', name: '', expMonth: '', expYear: '', cvc: '' });
-  };
-
-  const isCardFormValid = () => {
-    const digits = cardForm.number.replace(/\D/g, '');
-    const month = Number(cardForm.expMonth);
-    const year = Number(cardForm.expYear);
-    const validNumber = digits.length >= 13;
-    const validName = !!cardForm.name.trim();
-    const validExp = !!month && month >= 1 && month <= 12 && !!year && cardForm.expYear.length === 2;
-    const validCvc = cardForm.cvc.replace(/\D/g, '').length >= 3;
-    return validNumber && validName && validExp && validCvc;
-  };
-
-  const handleSaveCard = () => {
-    const digits = cardForm.number.replace(/\D/g, '');
-    if (digits.length < 13) {
-      showError('Please enter a valid card number.');
-      return;
-    }
-    if (!cardForm.name.trim()) {
-      showError('Please enter cardholder name.');
-      return;
-    }
-    const month = Number(cardForm.expMonth);
-    const year = Number(cardForm.expYear);
-    if (!month || month < 1 || month > 12 || !year || cardForm.expYear.length !== 2) {
-      showError('Enter expiry as MM / YY.');
-      return;
-    }
-    if (cardForm.cvc.replace(/\D/g, '').length < 3) {
-      showError('Please enter a valid CVC.');
-      return;
-    }
-
-    const newCard = {
-      id: `card_${Date.now()}`,
-      brand: inferCardBrand(cardForm.number),
-      last4: digits.slice(-4),
-      name: cardForm.name.trim(),
-      expMonth: cardForm.expMonth,
-      expYear: cardForm.expYear,
-    };
-    setSavedCards((prev) => [newCard, ...prev]);
-    setSelectedPaymentId(newCard.id);
-    setShowCardForm(false);
-    resetCardForm();
-    showSuccess('Your test card has been saved for this checkout.');
-  };
-
   const renderPaymentStep = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Payment Method</Text>
-      <Text style={styles.stepSubtitle}>Choose your preferred method</Text>
+      <Text style={styles.stepTitle}>Payment</Text>
+      <Text style={styles.stepSubtitle}>Pay securely with credit or debit card</Text>
 
-      {savedCards.map((card) => {
-        const selected = selectedPaymentId === card.id;
-        return (
-          <TouchableOpacity
-            key={card.id}
-            style={[styles.paymentCard, selected && styles.paymentCardSelected]}
-            onPress={() => {
-              setSelectedPaymentId(card.id);
-              setPaymentMethod('stripe');
-              setShowCardForm(false);
-            }}
-          >
-            <View style={styles.paymentRadio}>
-              <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
-                {selected && <View style={styles.radioInner} />}
-              </View>
-            </View>
-            <View style={styles.paymentContent}>
-              <Ionicons name="card" size={24} color={Colors.secondary} />
-              <View style={styles.paymentInfo}>
-                <Text style={styles.paymentName}>{card.brand} •••• {card.last4}</Text>
-                <Text style={styles.paymentDescription}>
-                  {card.name}  •  Expires {card.expMonth}/{card.expYear}
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        );
-      })}
-
-      <TouchableOpacity
-        style={[styles.paymentCard, selectedPaymentId === 'new-card' && styles.paymentCardSelected]}
-        onPress={() => {
-          setSelectedPaymentId('new-card');
-          setPaymentMethod('stripe');
-          setShowCardForm(true);
-        }}
-      >
-        <View style={styles.paymentRadio}>
-          <View style={[styles.radioOuter, selectedPaymentId === 'new-card' && styles.radioOuterSelected]}>
-            {selectedPaymentId === 'new-card' && <View style={styles.radioInner} />}
-          </View>
-        </View>
+      <View style={[styles.paymentCard, styles.paymentCardSelected]}>
         <View style={styles.paymentContent}>
-          <Ionicons name="add-circle-outline" size={24} color={Colors.secondary} />
+          <Ionicons name="card" size={24} color={Colors.secondary} />
           <View style={styles.paymentInfo}>
-            <Text style={styles.paymentName}>Add Credit/Debit Card</Text>
+            <Text style={styles.paymentName}>Credit / Debit Card</Text>
             <Text style={styles.paymentDescription}>
-              Add test card now. More payment methods can be added later.
+              You will enter your card on the next step — payment stays inside the app.
             </Text>
           </View>
           <View style={styles.paymentLogos}>
@@ -1002,124 +887,6 @@ const CheckoutScreen: React.FC = () => {
             <Text style={styles.cardBrand}>MC</Text>
           </View>
         </View>
-      </TouchableOpacity>
-
-      {showCardForm && (
-        <View style={styles.inlineCardForm}>
-          <View style={styles.cardModalHeader}>
-            <Text style={styles.cardModalTitle}>Add Card</Text>
-          </View>
-
-          {/* Card preview */}
-          <View style={styles.cardPreview}>
-            <View style={styles.cardBrandBadge}>
-              <Text style={styles.cardBrandBadgeText}>{inferCardBrand(cardForm.number)}</Text>
-            </View>
-            <Text style={styles.cardPreviewNum}>
-              {cardForm.number || '•••• •••• •••• ••••'}
-            </Text>
-          </View>
-
-          {/* Labeled inputs */}
-          <View style={styles.labeledField}>
-            <Text style={styles.label}>Card Number</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="1234 5678 9012 3456"
-              keyboardType="number-pad"
-              value={cardForm.number}
-              onChangeText={(v) => setCardForm((prev) => ({ ...prev, number: formatCardNumber(v) }))}
-              placeholderTextColor={Colors.primary + '66'}
-            />
-          </View>
-          <View style={styles.labeledField}>
-            <Text style={styles.label}>Cardholder Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Full name on card"
-              value={cardForm.name}
-              onChangeText={(v) => setCardForm((prev) => ({ ...prev, name: v }))}
-              placeholderTextColor={Colors.primary + '66'}
-              autoCapitalize="words"
-            />
-          </View>
-          <View style={[styles.cardRow, styles.modalInputSpacing]}>
-            <View style={styles.labeledFieldRow}>
-              <Text style={styles.label}>MM</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="MM"
-                keyboardType="number-pad"
-                value={cardForm.expMonth}
-                onChangeText={(v) => setCardForm((prev) => ({ ...prev, expMonth: v.replace(/\D/g, '').slice(0, 2) }))}
-                placeholderTextColor={Colors.primary + '66'}
-              />
-            </View>
-            <View style={styles.labeledFieldRow}>
-              <Text style={styles.label}>YY</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="YY"
-                keyboardType="number-pad"
-                value={cardForm.expYear}
-                onChangeText={(v) => setCardForm((prev) => ({ ...prev, expYear: v.replace(/\D/g, '').slice(0, 2) }))}
-                placeholderTextColor={Colors.primary + '66'}
-              />
-            </View>
-            <View style={styles.labeledFieldRow}>
-              <Text style={styles.label}>CVC</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="CVC"
-                keyboardType="number-pad"
-                value={cardForm.cvc}
-                onChangeText={(v) => setCardForm((prev) => ({ ...prev, cvc: v.replace(/\D/g, '').slice(0, 4) }))}
-                placeholderTextColor={Colors.primary + '66'}
-              />
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.modalSaveButton, !isCardFormValid() && styles.actionButtonDisabled]}
-            onPress={handleSaveCard}
-            disabled={!isCardFormValid()}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.modalSaveButtonText}>Save Card</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Branded Wallet Buttons (second after card) */}
-      <View style={styles.walletSection}>
-        <Text style={styles.walletSectionTitle}>Pay With</Text>
-        {Platform.OS === 'ios' && (
-          <TouchableOpacity
-            style={styles.applePayButton}
-            activeOpacity={0.85}
-            onPress={() => {
-              setPaymentMethod('apple_pay');
-              setShowCardForm(false);
-            }}
-          >
-            <Ionicons name="logo-apple" size={18} color="#FFFFFF" />
-            <Text style={styles.applePayText}>Apple Pay</Text>
-          </TouchableOpacity>
-        )}
-
-        {Platform.OS === 'android' && (
-          <TouchableOpacity
-            style={styles.googlePayButton}
-            activeOpacity={0.85}
-            onPress={() => {
-              setPaymentMethod('google_pay');
-              setShowCardForm(false);
-            }}
-          >
-            <Ionicons name="logo-google" size={18} color="#4285F4" />
-            <Text style={styles.googlePayText}>G Pay</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Coupon Code Section */}

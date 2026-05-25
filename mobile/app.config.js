@@ -70,6 +70,8 @@ module.exports = () => {
 
           ...baseInfoPlist,
 
+          CFBundleDisplayName: 'Zuba House',
+
           CFBundleURLTypes: cfBundleURLTypes,
 
           ITSAppUsesNonExemptEncryption: false,
@@ -104,7 +106,12 @@ module.exports = () => {
 
       },
 
-      plugins: [...(appJson.expo.plugins || [])],
+      plugins: [
+        '@stripe/stripe-react-native',
+        ...(appJson.expo.plugins || []).filter(
+          (p) => p !== '@stripe/stripe-react-native'
+        ),
+      ],
 
       extra: {
 

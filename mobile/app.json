@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Zuba",
+    "name": "Zuba House",
     "owner": "olivierndev",
     "slug": "zuba-mobile",
     "version": "11.0.0",
@@ -12,6 +12,13 @@
       "**/*"
     ],
     "plugins": [
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.ninja.wpapp.appzubahousecom",
+          "enableGooglePay": false
+        }
+      ],
       "expo-secure-store",
       "expo-dev-client",
       [

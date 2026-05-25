@@ -3,7 +3,7 @@
  * Success screen after checkout / payment
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,13 +18,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../constants/colors';
+import { orderService } from '../../services/order.service';
+import { needsOnlineStripePayment, type RawOrder } from '../../utils/order.mappers';
 
 interface OrderConfirmationParams {
   orderId: string;
   total: number;
   paymentPending?: boolean;
   paymentAmount?: number;
-  paymentMethod?: 'stripe' | 'apple_pay' | 'google_pay';
+  paymentMethod?: 'stripe';
+  customerEmail?: string;
+  customerName?: string;
 }
 
 const OrderConfirmationScreen: React.FC = () => {
@@ -37,9 +41,35 @@ const OrderConfirmationScreen: React.FC = () => {
     paymentPending = false,
     paymentAmount = total,
     paymentMethod = 'stripe',
+    customerEmail,
+    customerName,
   } = route.params as OrderConfirmationParams;
 
+  const [isPaymentPending, setIsPaymentPending] = useState(paymentPending);
+  const [checkingPayment, setCheckingPayment] = useState(Boolean(orderId && paymentPending));
+
   const orderRef = orderId ? `#${orderId.slice(-8).toUpperCase()}` : '#—';
+
+  useEffect(() => {
+    if (!orderId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await orderService.getOrderById(orderId);
+        if (cancelled || !res.data) return;
+        const raw = res.data as unknown as RawOrder;
+        const stillNeedsPayment = needsOnlineStripePayment(raw, paymentMethod);
+        setIsPaymentPending(stillNeedsPayment);
+      } catch {
+        setIsPaymentPending(paymentPending);
+      } finally {
+        if (!cancelled) setCheckingPayment(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId, paymentMethod, paymentPending]);
 
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -100,14 +130,23 @@ const OrderConfirmationScreen: React.FC = () => {
     navigation.navigate('Payment', {
       orderId,
       amount: paymentAmount,
-      paymentMethod,
+      customerEmail,
+      customerName,
       onSuccess: () => {
+        setIsPaymentPending(false);
         navigation.reset({
           index: 0,
           routes: [
             {
               name: 'OrderConfirmation',
-              params: { orderId, total, paymentPending: false },
+              params: {
+                orderId,
+                total,
+                paymentPending: false,
+                paymentAmount,
+                customerEmail,
+                customerName,
+              },
             },
           ],
         });
@@ -139,7 +178,7 @@ const OrderConfirmationScreen: React.FC = () => {
 
           <Text style={styles.title}>Order placed!</Text>
           <Text style={styles.subtitle}>
-            {paymentPending
+            {isPaymentPending
               ? 'We saved your order. Pay when you’re ready to confirm it.'
               : 'Thank you for shopping with Zuba House.'}
           </Text>
@@ -162,7 +201,7 @@ const OrderConfirmationScreen: React.FC = () => {
             <View style={styles.summaryDivider} />
             <View style={styles.summaryRow}>
               <Text style={styles.rowLabel}>
-                {paymentPending ? 'Amount due' : 'Total paid'}
+                {isPaymentPending ? 'Amount due' : 'Total paid'}
               </Text>
               <Text style={styles.totalAmount}>${total.toFixed(2)}</Text>
             </View>
@@ -172,22 +211,26 @@ const OrderConfirmationScreen: React.FC = () => {
               <View
                 style={[
                   styles.statusPill,
-                  paymentPending ? styles.statusPending : styles.statusPaid,
+                  isPaymentPending ? styles.statusPending : styles.statusPaid,
                 ]}
               >
                 <View
                   style={[
                     styles.statusDot,
-                    paymentPending ? styles.dotPending : styles.dotPaid,
+                    isPaymentPending ? styles.dotPending : styles.dotPaid,
                   ]}
                 />
                 <Text
                   style={[
                     styles.statusText,
-                    paymentPending ? styles.statusTextPending : styles.statusTextPaid,
+                    isPaymentPending ? styles.statusTextPending : styles.statusTextPaid,
                   ]}
                 >
-                  {paymentPending ? 'Payment pending' : 'Paid'}
+                  {checkingPayment
+                    ? 'Checking…'
+                    : isPaymentPending
+                    ? 'Payment pending'
+                    : 'Paid'}
                 </Text>
               </View>
             </View>
@@ -225,7 +268,7 @@ const OrderConfirmationScreen: React.FC = () => {
           { paddingBottom: Math.max(insets.bottom, 16), opacity: fadeAnim },
         ]}
       >
-        {paymentPending ? (
+        {isPaymentPending && !checkingPayment ? (
           <TouchableOpacity
             style={styles.ctaPay}
             onPress={handlePayNow}
@@ -237,18 +280,18 @@ const OrderConfirmationScreen: React.FC = () => {
         ) : null}
 
         <TouchableOpacity
-          style={paymentPending ? styles.ctaSecondary : styles.ctaPrimary}
+          style={isPaymentPending ? styles.ctaSecondary : styles.ctaPrimary}
           onPress={handleContinueShopping}
           activeOpacity={0.88}
         >
           <Ionicons
             name="bag-handle-outline"
             size={20}
-            color={paymentPending ? Colors.primary : Colors.white}
+            color={isPaymentPending ? Colors.primary : Colors.white}
           />
           <Text
             style={
-              paymentPending ? styles.ctaSecondaryText : styles.ctaPrimaryText
+              isPaymentPending ? styles.ctaSecondaryText : styles.ctaPrimaryText
             }
           >
             Continue shopping
