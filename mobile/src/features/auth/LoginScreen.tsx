@@ -5,8 +5,7 @@ import { Button, TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../../constants/colors';
 import { useLogin } from './hooks/useLogin';
-import { useGoogleSignIn } from './hooks/useGoogleSignIn';
-import GoogleSignInButton from './components/GoogleSignInButton';
+import GoogleSignInSection, { isGoogleSignInConfigured } from './components/GoogleSignInSection';
 
 const LoginScreen: React.FC = () => {
   const { t } = useTranslation();
@@ -17,17 +16,12 @@ const LoginScreen: React.FC = () => {
       navigation.goBack();
     }
   };
-  const {
-    signInWithGoogle,
-    error: googleError,
-    submitting: googleSubmitting,
-    disabled: googleDisabled,
-  } = useGoogleSignIn(onAuthSuccess);
+  const googleConfigured = isGoogleSignInConfigured();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const primaryError = error || googleError;
-  const isBusy = submitting || googleSubmitting;
+  const primaryError = error;
+  const isBusy = submitting;
 
   const onSubmit = async () => {
     const ok = await submit({ email, password });
@@ -68,12 +62,12 @@ const LoginScreen: React.FC = () => {
             >
               {t('common.continue')}
             </Button>
-            <Text style={styles.orDivider}>{t('auth.orContinueWith')}</Text>
-            <GoogleSignInButton
-              onPress={() => void signInWithGoogle()}
-              loading={googleSubmitting}
-              disabled={googleDisabled || isBusy}
-            />
+            {googleConfigured ? (
+              <>
+                <Text style={styles.orDivider}>{t('auth.orContinueWith')}</Text>
+                <GoogleSignInSection onSuccess={onAuthSuccess} disabled={isBusy} />
+              </>
+            ) : null}
             <Button mode="text" onPress={() => navigation.navigate('Register')} style={styles.link} labelStyle={styles.linkLabel}>
               {t('auth.createAccount')}
             </Button>

@@ -25,7 +25,7 @@ interface AuthWithGoogleResponse {
   };
 }
 
-function resolveGoogleClientIds(): {
+export function resolveGoogleClientIds(): {
   webClientId?: string;
   iosClientId?: string;
   androidClientId?: string;
