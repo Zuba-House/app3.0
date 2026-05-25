@@ -89,9 +89,9 @@ app.use(cors({
     if (origin.includes('.onrender.com')) {
       return callback(null, true);
     }
-    // Log rejected origin for debugging
+    // Log rejected origin for debugging (null,false avoids 500 on preflight)
     console.log('CORS blocked origin:', origin);
-    return callback(new Error('Not allowed by CORS'), false);
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
