@@ -48,6 +48,7 @@ const PaymentScreen: React.FC = () => {
   const [paying, setPaying] = useState(false);
   const [orderAlreadyComplete, setOrderAlreadyComplete] = useState(false);
   const [cardDetailsComplete, setCardDetailsComplete] = useState(false);
+  const [saveCard, setSaveCard] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const finishPaymentSuccess = useCallback(() => {
@@ -86,6 +87,9 @@ const PaymentScreen: React.FC = () => {
       const result = await payForOrder({
         orderId,
         amount,
+        customerEmail: route.params?.customerEmail,
+        customerName: route.params?.customerName,
+        saveCard,
       });
       if (result.status === 'paid') {
         setPaymentError(null);
@@ -108,6 +112,9 @@ const PaymentScreen: React.FC = () => {
     isStripeNativeAvailable,
     orderId,
     payForOrder,
+    route.params?.customerEmail,
+    route.params?.customerName,
+    saveCard,
   ]);
 
   useEffect(() => {
@@ -193,6 +200,9 @@ const PaymentScreen: React.FC = () => {
                   setCardDetailsComplete(complete);
                   if (complete && paymentError) setPaymentError(null);
                 }}
+                showSaveCardOption
+                saveCard={saveCard}
+                onSaveCardChange={setSaveCard}
               />
               {paymentError ? <Text style={styles.inlinePaymentError}>{paymentError}</Text> : null}
             </>

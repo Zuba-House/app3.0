@@ -1,17 +1,27 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { CardField } from '@stripe/stripe-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../constants/colors';
 import { isStripeNativeModuleAvailable } from '../../lib/stripeNative';
 import { isStripePublishableKeyConfigured } from '../../constants/config';
 
 type Props = {
   onCardChange: (complete: boolean) => void;
-  /** Keep mounted off-screen so Stripe retains card data on later steps (Review → Pay). */
-  preserveMount?: boolean;
+  /** Hide labels when the parent renders its own section header. */
+  hideHeader?: boolean;
+  saveCard?: boolean;
+  onSaveCardChange?: (value: boolean) => void;
+  showSaveCardOption?: boolean;
 };
 
-export function CheckoutStripeCardField({ onCardChange, preserveMount = false }: Props) {
+export function CheckoutStripeCardField({
+  onCardChange,
+  hideHeader = false,
+  saveCard = false,
+  onSaveCardChange,
+  showSaveCardOption = false,
+}: Props) {
   if (!isStripeNativeModuleAvailable() || !isStripePublishableKeyConfigured()) {
     return (
       <View style={styles.placeholder}>
@@ -23,30 +33,32 @@ export function CheckoutStripeCardField({ onCardChange, preserveMount = false }:
   }
 
   return (
-    <View style={[styles.wrap, preserveMount && styles.preserveMount]}>
-      {!preserveMount ? (
+    <View style={styles.wrap}>
+      {!hideHeader ? (
         <>
-          <Text style={styles.label}>Card details</Text>
-          <Text style={styles.hint}>Enter your card number, expiry, CVC, and postal code.</Text>
+          <Text style={styles.label}>Card number</Text>
+          <Text style={styles.hint}>
+            Visa, Mastercard, Amex, and international cards where Stripe is supported.
+          </Text>
         </>
       ) : null}
       <View style={styles.fieldShell}>
         <CardField
           postalCodeEnabled
           placeholders={{
-            number: '1234 5678 9012 3456',
+            number: '1234 1234 1234 1234',
             expiration: 'MM / YY',
             cvc: 'CVC',
-            postalCode: 'Postal code',
+            postalCode: 'Postal / ZIP',
           }}
           cardStyle={{
             backgroundColor: '#FFFFFF',
             textColor: '#0B1220',
-            borderColor: '#94A3B8',
-            borderWidth: 1,
-            borderRadius: 12,
-            fontSize: 20,
-            placeholderColor: '#475569',
+            borderColor: '#E2E8F0',
+            borderWidth: 0,
+            borderRadius: 8,
+            fontSize: 16,
+            placeholderColor: '#94A3B8',
             cursorColor: '#0B1220',
           }}
           style={styles.cardField}
@@ -55,53 +67,79 @@ export function CheckoutStripeCardField({ onCardChange, preserveMount = false }:
           }}
         />
       </View>
+
+      {showSaveCardOption && onSaveCardChange ? (
+        <TouchableOpacity
+          style={styles.saveRow}
+          onPress={() => onSaveCardChange(!saveCard)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.saveCheckbox, saveCard && styles.saveCheckboxChecked]}>
+            {saveCard ? <Ionicons name="checkmark" size={14} color={Colors.white} /> : null}
+          </View>
+          <Text style={styles.saveLabel}>Save card for future purchases</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  preserveMount: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 1,
-    height: 1,
-    opacity: 0,
-    overflow: 'hidden',
-    margin: 0,
-    zIndex: -1,
+    marginTop: 2,
+    marginBottom: 8,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
     color: Colors.primary,
     marginBottom: 4,
   },
   hint: {
-    fontSize: 13,
+    fontSize: 12,
     color: Colors.primary,
-    opacity: 0.7,
-    marginBottom: 10,
-    lineHeight: 18,
+    opacity: 0.65,
+    marginBottom: 8,
+    lineHeight: 16,
   },
   fieldShell: {
     backgroundColor: Colors.white,
-    borderRadius: 14,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#CBD5E1',
-    paddingHorizontal: 4,
-    paddingVertical: 6,
-    minHeight: 56,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    minHeight: 44,
     justifyContent: 'center',
   },
   cardField: {
     width: '100%',
-    height: 50,
+    height: 44,
     marginVertical: 0,
+  },
+  saveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  saveCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#94A3B8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  saveCheckboxChecked: {
+    backgroundColor: Colors.secondary,
+    borderColor: Colors.secondary,
+  },
+  saveLabel: {
+    fontSize: 13,
+    color: Colors.primary,
+    flex: 1,
   },
   placeholder: {
     padding: 12,

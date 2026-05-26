@@ -13,6 +13,8 @@ export interface PayForOrderParams {
   amount: number;
   customerEmail?: string;
   customerName?: string;
+  saveCard?: boolean;
+  paymentMethodId?: string;
 }
 
 export interface PayForOrderResult {
@@ -55,15 +57,46 @@ const StripePaymentContext = createContext<StripePaymentContextValue>({
   isStripeNativeAvailable: false,
 });
 
-function mapStripeError(error: { code?: string; message?: string } | null | undefined): {
+function mapStripeError(error: { code?: string; message?: string; declineCode?: string; localizedMessage?: string } | null | undefined): {
   message: string;
   code?: string;
 } {
+  const rawMessage = String(error?.localizedMessage || error?.message || '').trim();
   const code = String(error?.code || '').toLowerCase();
+  const declineCode = String((error as any)?.declineCode || (error as any)?.decline_code || '').toLowerCase();
   const fallback = 'Payment was not completed. Please check your card details and try again.';
 
+  if (/card details not complete/i.test(rawMessage)) {
+    return {
+      code: 'card_incomplete',
+      message: 'Please enter your full card number, expiry, CVC, and postal code on the Payment step.',
+    };
+  }
+
+  const byDeclineCode: Record<string, string> = {
+    insufficient_funds: 'This card has insufficient funds. Please use another card.',
+    lost_card: 'This card cannot be used. Please contact your bank or use another card.',
+    stolen_card: 'This card cannot be used. Please contact your bank or use another card.',
+    expired_card: 'This card is expired. Please use a different card.',
+    incorrect_cvc: 'The CVC code is incorrect. Please check and try again.',
+    incorrect_number: 'The card number is incorrect. Please check and try again.',
+    invalid_cvc: 'The CVC code is invalid. Please check and try again.',
+    invalid_number: 'The card number is invalid. Please check and try again.',
+    processing_error: 'Payment could not be processed right now. Please try again.',
+    generic_decline: 'Your card was declined. Please use another card or contact your bank.',
+    do_not_honor: 'Your bank declined this payment. Please contact your bank or use another card.',
+    transaction_not_allowed: 'This card does not allow this type of purchase. Try another card.',
+    try_again_later: 'Your bank temporarily declined this payment. Please try again in a few minutes.',
+    card_not_supported: 'This card type is not supported. Please use Visa, Mastercard, or Amex.',
+    currency_not_supported: 'This card does not support payments in this currency.',
+  };
+
+  if (declineCode && byDeclineCode[declineCode]) {
+    return { code: declineCode, message: byDeclineCode[declineCode] };
+  }
+
   if (!code) {
-    return { message: error?.message || fallback };
+    return { message: rawMessage || fallback };
   }
 
   const byCode: Record<string, string> = {
@@ -77,13 +110,14 @@ function mapStripeError(error: { code?: string; message?: string } | null | unde
     processing_error: 'Payment could not be processed right now. Please try again.',
     insufficient_funds: 'This card has insufficient funds. Please use another card.',
     authentication_required:
-      'Your bank requires additional authentication for this card. Please try another card.',
+      'Your bank requires additional verification for this card. Please try another card.',
     network_error: 'Network error while processing payment. Check your connection and try again.',
+    failed: rawMessage || fallback,
   };
 
   return {
     code,
-    message: byCode[code] || error?.message || fallback,
+    message: byCode[code] || rawMessage || fallback,
   };
 }
 
@@ -93,7 +127,7 @@ function StripePaymentBridge({ children }: { children: React.ReactNode }) {
 
   const payForOrder = useCallback(
     async (params: PayForOrderParams): Promise<PayForOrderResult> => {
-      const { orderId, amount } = params;
+      const { orderId, amount, customerEmail, customerName, saveCard, paymentMethodId } = params;
 
       if (!isStripePublishableKeyConfigured()) {
         const errorMessage = stripeKeySetupMessage();
@@ -108,7 +142,12 @@ function StripePaymentBridge({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const intentRes = await checkoutService.createPaymentIntent(amount, orderId);
+        const intentRes = await checkoutService.createPaymentIntent(amount, orderId, {
+          saveCard,
+          customerEmail,
+          customerName,
+          paymentMethodId,
+        });
         const clientSecret = intentRes.data?.clientSecret;
         const paymentIntentId = intentRes.data?.paymentIntentId;
 
@@ -119,11 +158,16 @@ function StripePaymentBridge({ children }: { children: React.ReactNode }) {
           return { status: 'failed', errorMessage, errorCode: 'payment_intent_failed' };
         }
 
+        const confirmParams = paymentMethodId
+          ? {
+              paymentMethodType: 'Card' as const,
+              paymentMethodData: { paymentMethodId },
+            }
+          : { paymentMethodType: 'Card' as const };
+
         const { error: confirmError, paymentIntent: confirmedIntent } = await confirmPayment(
           clientSecret,
-          {
-            paymentMethodType: 'Card',
-          }
+          confirmParams
         );
 
         if (confirmError) {
@@ -132,6 +176,15 @@ function StripePaymentBridge({ children }: { children: React.ReactNode }) {
             return { status: 'cancelled', errorMessage: mapped.message, errorCode: mapped.code };
           }
           const mapped = mapStripeError(confirmError);
+          return { status: 'failed', errorMessage: mapped.message, errorCode: mapped.code };
+        }
+
+        const intentStatus = String(confirmedIntent?.status || '').toLowerCase();
+        if (intentStatus && intentStatus !== 'succeeded' && intentStatus !== 'processing') {
+          const mapped = mapStripeError({
+            code: 'failed',
+            message: `Payment status: ${intentStatus}. Please try again or use another card.`,
+          });
           return { status: 'failed', errorMessage: mapped.message, errorCode: mapped.code };
         }
 

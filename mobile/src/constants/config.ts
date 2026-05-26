@@ -204,6 +204,8 @@ export const API_ENDPOINTS = {
 
   CREATE_PAYMENT_INTENT: '/api/stripe/create-payment-intent',
 
+  GET_SAVED_PAYMENT_METHODS: '/api/stripe/saved-payment-methods',
+
   CREATE_CHECKOUT_SESSION: '/api/stripe/create-checkout-session',
 
   GET_CHECKOUT_STATUS: '/api/stripe/checkout-status',

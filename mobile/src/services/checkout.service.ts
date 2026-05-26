@@ -13,6 +13,14 @@ export interface PaymentIntent {
   paymentIntentId: string;
 }
 
+export interface SavedPaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+}
+
 export interface CreateOrderData {
   userId?: string;
   shippingAddressId: string;
@@ -300,12 +308,33 @@ export const checkoutService = {
   /**
    * Create Stripe payment intent
    */
-  createPaymentIntent: async (amount: number, orderId?: string): Promise<ApiResponse<PaymentIntent>> => {
+  createPaymentIntent: async (
+    amount: number,
+    orderId?: string,
+    options?: {
+      saveCard?: boolean;
+      customerEmail?: string;
+      customerName?: string;
+      paymentMethodId?: string;
+    }
+  ): Promise<ApiResponse<PaymentIntent>> => {
     const response = await postData<PaymentIntent>(API_ENDPOINTS.CREATE_PAYMENT_INTENT, {
       amount,
       orderId,
+      saveCard: options?.saveCard,
+      customerEmail: options?.customerEmail,
+      customerName: options?.customerName,
+      paymentMethodId: options?.paymentMethodId,
     });
     return response;
+  },
+
+  getSavedPaymentMethods: async (): Promise<
+    ApiResponse<{ paymentMethods: SavedPaymentMethod[] }>
+  > => {
+    return fetchDataFromApi<{ paymentMethods: SavedPaymentMethod[] }>(
+      API_ENDPOINTS.GET_SAVED_PAYMENT_METHODS
+    );
   },
 
   /**

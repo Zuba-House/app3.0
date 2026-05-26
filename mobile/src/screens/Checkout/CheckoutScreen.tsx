@@ -24,6 +24,7 @@ import {
   checkoutService,
   isValidShippingAddress,
   resolveShippingAddressForRates,
+  SavedPaymentMethod,
 } from '../../services/checkout.service';
 import { cartService } from '../../services/cart.service';
 import { productService } from '../../services/product.service';
@@ -75,6 +76,10 @@ const CheckoutScreen: React.FC = () => {
   const paymentMethod = 'stripe' as const;
   const { payForOrder, isStripeConfigured } = useInAppStripePayment();
   const [cardDetailsComplete, setCardDetailsComplete] = useState(false);
+  const [cardFieldSessionActive, setCardFieldSessionActive] = useState(false);
+  const [saveCard, setSaveCard] = useState(false);
+  const [savedPaymentMethods, setSavedPaymentMethods] = useState<SavedPaymentMethod[]>([]);
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [deliveryNote, setDeliveryNote] = useState('');
   const [savedDeliveryNote, setSavedDeliveryNote] = useState('');
@@ -93,6 +98,21 @@ const CheckoutScreen: React.FC = () => {
     };
     loadSavedDeliveryNote();
   }, []);
+
+  useEffect(() => {
+    if (currentStep === 'payment' || currentStep === 'review') {
+      setCardFieldSessionActive(true);
+    }
+  }, [currentStep]);
+
+  useEffect(() => {
+    if (currentStep !== 'payment' || !isStripeConfigured || !isAuthenticated) return;
+    checkoutService.getSavedPaymentMethods().then((res) => {
+      if (res.success && res.data?.paymentMethods) {
+        setSavedPaymentMethods(res.data.paymentMethods);
+      }
+    });
+  }, [currentStep, isStripeConfigured, isAuthenticated]);
 
   useEffect(() => {
     const trimmed = deliveryNote.trim();
@@ -540,8 +560,9 @@ const CheckoutScreen: React.FC = () => {
       setPaymentError(null);
       setCurrentStep('payment');
     } else if (currentStep === 'payment') {
-      if (isAuthenticated && totals.total > 0 && isStripeConfigured && !cardDetailsComplete) {
-        showWarning('Please enter your full card details before continuing.');
+      const cardReady = Boolean(selectedPaymentMethodId) || cardDetailsComplete;
+      if (isAuthenticated && totals.total > 0 && isStripeConfigured && !cardReady) {
+        showWarning('Please enter your full card details or select a saved card.');
         return;
       }
       setPaymentError(null);
@@ -691,7 +712,7 @@ const CheckoutScreen: React.FC = () => {
         return;
       }
 
-      if (isAuthenticated && totals.total > 0 && isStripeConfigured && !cardDetailsComplete) {
+      if (isAuthenticated && totals.total > 0 && isStripeConfigured && !selectedPaymentMethodId && !cardDetailsComplete) {
         showWarning('Please enter your card details on the Payment step before paying.');
         setCurrentStep('payment');
         setProcessing(false);
@@ -778,6 +799,8 @@ const CheckoutScreen: React.FC = () => {
           amount: totals.total,
           customerEmail: effectiveEmail,
           customerName: effectiveName,
+          saveCard: saveCard && !selectedPaymentMethodId,
+          paymentMethodId: selectedPaymentMethodId || undefined,
         });
 
         if (payResult.status !== 'paid') {
@@ -1034,22 +1057,97 @@ const CheckoutScreen: React.FC = () => {
     </View>
   );
 
-  const renderPaymentStep = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Payment</Text>
-      <Text style={styles.stepSubtitle}>Pay securely with credit or debit card</Text>
+  const formatCardBrand = (brand: string) =>
+    brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : 'Card';
 
-      {isStripeConfigured ? (
-        <View style={styles.cardEntrySection}>
+  const renderSavedCardPicker = () => {
+    if (savedPaymentMethods.length === 0) return null;
+
+    return (
+      <View style={styles.savedCardsSection}>
+        <Text style={styles.savedCardsTitle}>Saved cards</Text>
+        {savedPaymentMethods.map((pm) => {
+          const selected = selectedPaymentMethodId === pm.id;
+          return (
+            <TouchableOpacity
+              key={pm.id}
+              style={[styles.savedCardRow, selected && styles.savedCardRowSelected]}
+              onPress={() => {
+                setSelectedPaymentMethodId(pm.id);
+                setCardDetailsComplete(true);
+                setPaymentError(null);
+              }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="card-outline" size={20} color={selected ? Colors.secondary : Colors.primary} />
+              <Text style={styles.savedCardText}>
+                {formatCardBrand(pm.brand)} •••• {pm.last4}
+              </Text>
+              <Text style={styles.savedCardExpiry}>
+                {String(pm.expMonth).padStart(2, '0')}/{String(pm.expYear).slice(-2)}
+              </Text>
+              {selected ? <Ionicons name="checkmark-circle" size={20} color={Colors.secondary} /> : null}
+            </TouchableOpacity>
+          );
+        })}
+        {selectedPaymentMethodId ? (
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedPaymentMethodId(null);
+              setCardDetailsComplete(false);
+            }}
+            style={styles.useNewCardLink}
+          >
+            <Text style={styles.useNewCardText}>Use a different card</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderPersistentCardSection = () => {
+    if (!cardFieldSessionActive || !isStripeConfigured) return null;
+
+    const hiddenOnReview = currentStep === 'review';
+
+    return (
+      <View
+        style={[styles.persistentCardSection, hiddenOnReview && styles.persistentCardHidden]}
+        pointerEvents={hiddenOnReview ? 'none' : 'auto'}
+      >
+        {currentStep === 'payment' ? (
+          <>
+            <Text style={styles.stepTitle}>Payment</Text>
+            <Text style={styles.stepSubtitle}>Pay securely with credit or debit card</Text>
+          </>
+        ) : null}
+        {currentStep === 'payment' ? renderSavedCardPicker() : null}
+        {!selectedPaymentMethodId ? (
           <CheckoutStripeCardField
             onCardChange={(complete) => {
               setCardDetailsComplete(complete);
               if (complete && paymentError) setPaymentError(null);
             }}
+            showSaveCardOption={currentStep === 'payment'}
+            saveCard={saveCard}
+            onSaveCardChange={setSaveCard}
           />
-          {paymentError ? <Text style={styles.inlinePaymentError}>{paymentError}</Text> : null}
-        </View>
-      ) : null}
+        ) : null}
+        {currentStep === 'payment' && paymentError ? (
+          <Text style={styles.inlinePaymentError}>{paymentError}</Text>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderPaymentStep = () => (
+    <View style={styles.stepContent}>
+      {isStripeConfigured ? null : (
+        <>
+          <Text style={styles.stepTitle}>Payment</Text>
+          <Text style={styles.stepSubtitle}>Pay securely with credit or debit card</Text>
+        </>
+      )}
 
       <View style={[styles.paymentCard, styles.paymentCardSelected]}>
         <View style={styles.paymentContent}>
@@ -1060,6 +1158,7 @@ const CheckoutScreen: React.FC = () => {
           <View style={styles.paymentLogos}>
             <Text style={styles.cardBrand}>VISA</Text>
             <Text style={styles.cardBrand}>MC</Text>
+            <Text style={styles.cardBrand}>AMEX</Text>
           </View>
         </View>
       </View>
@@ -1328,8 +1427,9 @@ const CheckoutScreen: React.FC = () => {
   }
 
   const requiresCardForCheckout = isAuthenticated && totals.total > 0 && isStripeConfigured;
+  const cardReadyForCheckout = Boolean(selectedPaymentMethodId) || cardDetailsComplete;
   const footerDisabled =
-    processing || (currentStep === 'review' && requiresCardForCheckout && !cardDetailsComplete);
+    processing || (currentStep === 'review' && requiresCardForCheckout && !cardReadyForCheckout);
 
   return (
     <KeyboardAvoidingView
@@ -1356,18 +1456,8 @@ const CheckoutScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {renderPersistentCardSection()}
         {renderStepContent()}
-        {currentStep === 'review' && isStripeConfigured ? (
-          <View style={styles.stripeCardHostHidden} pointerEvents="none">
-            <CheckoutStripeCardField
-              onCardChange={(complete) => {
-                setCardDetailsComplete(complete);
-                if (complete && paymentError) setPaymentError(null);
-              }}
-              preserveMount
-            />
-          </View>
-        ) : null}
       </ScrollView>
 
       {/* Footer Action Button */}
@@ -1495,7 +1585,63 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   cardEntrySection: {
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  persistentCardSection: {
+    marginBottom: 8,
+  },
+  persistentCardHidden: {
+    position: 'absolute',
+    left: -10000,
+    top: 0,
+    width: 320,
+    height: 52,
+    opacity: 0,
+    overflow: 'hidden',
+  },
+  savedCardsSection: {
+    marginBottom: 12,
+  },
+  savedCardsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+    marginBottom: 8,
+  },
+  savedCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: Colors.white,
+    marginBottom: 8,
+  },
+  savedCardRowSelected: {
+    borderColor: Colors.secondary,
+    backgroundColor: '#FFF8F0',
+  },
+  savedCardText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  savedCardExpiry: {
+    fontSize: 12,
+    color: Colors.primary,
+    opacity: 0.65,
+  },
+  useNewCardLink: {
+    paddingVertical: 4,
+  },
+  useNewCardText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.secondary,
   },
   stripeCardHost: {
     marginTop: 4,
