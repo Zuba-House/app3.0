@@ -773,43 +773,6 @@ const CheckoutScreen: React.FC = () => {
           });
         };
 
-        const navigateToPaymentScreen = (message?: string) => {
-          if (message) showWarning(message);
-          clearCartAfterOrder();
-          navigation.reset({
-            index: 0,
-            routes: [
-              {
-                name: 'Payment',
-                params: {
-                  orderId,
-                  amount: totals.total,
-                  customerEmail: effectiveEmail,
-                  customerName: effectiveName,
-                  onSuccess: () => {
-                    navigation.reset({
-                      index: 0,
-                      routes: [
-                        {
-                          name: 'OrderConfirmation',
-                          params: {
-                            orderId,
-                            total: totals.total,
-                            paymentPending: false,
-                            paymentAmount: totals.total,
-                            customerEmail: effectiveEmail,
-                            customerName: effectiveName,
-                          },
-                        },
-                      ],
-                    });
-                  },
-                },
-              },
-            ],
-          });
-        };
-
         const requiresStripe =
           isAuthenticated && needsOnlineStripePayment(orderRaw, paymentMethod);
 
@@ -819,15 +782,17 @@ const CheckoutScreen: React.FC = () => {
             amount: totals.total,
             customerEmail: effectiveEmail,
             customerName: effectiveName,
-            useCardForm: true,
           });
 
           if (payResult.status === 'paid') {
             navigateToPaidConfirmation();
-          } else if (payResult.status === 'cancelled') {
-            navigateToPaymentScreen('Payment cancelled. Add your card to confirm your order.');
           } else {
-            navigateToPaymentScreen('Payment was not completed. Add your card to finish checkout.');
+            showWarning(
+              payResult.status === 'cancelled'
+                ? 'Payment cancelled. Your card is still saved — tap Place Order to try again.'
+                : 'Payment was not completed. Check your card and tap Place Order to try again.'
+            );
+            setCurrentStep('review');
           }
         } else {
           navigateToPaidConfirmation();
@@ -1078,7 +1043,9 @@ const CheckoutScreen: React.FC = () => {
 
       {isStripeConfigured ? (
         <View style={styles.reviewSection}>
-          <CheckoutStripeCardField onCardChange={setCardDetailsComplete} />
+          <Text style={styles.paymentDescription}>
+            Enter your card below — processed securely inside Zuba House.
+          </Text>
         </View>
       ) : null}
 
@@ -1366,6 +1333,20 @@ const CheckoutScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         {renderStepContent()}
+        {(currentStep === 'payment' || currentStep === 'review') && isStripeConfigured ? (
+          <View
+            style={[
+              styles.stripeCardHost,
+              currentStep === 'review' && styles.stripeCardHostHidden,
+            ]}
+            pointerEvents={currentStep === 'payment' ? 'auto' : 'none'}
+          >
+            <CheckoutStripeCardField
+              onCardChange={setCardDetailsComplete}
+              preserveMount={currentStep === 'review'}
+            />
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* Footer Action Button */}
@@ -1490,6 +1471,19 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 100,
+  },
+  stripeCardHost: {
+    marginTop: 4,
+  },
+  stripeCardHostHidden: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: 1,
+    height: 1,
+    opacity: 0,
+    overflow: 'hidden',
+    zIndex: -1,
   },
   stepContent: {
     flex: 1,

@@ -1,7 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo } from 'react';
 import { checkoutService } from '../services/checkout.service';
 import {
-  STRIPE_PUBLISHABLE_KEY,
   isStripePublishableKeyConfigured,
 } from '../constants/config';
 import { isStripeNativeModuleAvailable } from '../lib/stripeNative';
@@ -14,8 +13,6 @@ export interface PayForOrderParams {
   amount: number;
   customerEmail?: string;
   customerName?: string;
-  /** When true (default), charges the card entered in CheckoutStripeCardField. */
-  useCardForm?: boolean;
 }
 
 export interface PayForOrderResult {
@@ -58,11 +55,11 @@ const StripePaymentContext = createContext<StripePaymentContextValue>({
 
 function StripePaymentBridge({ children }: { children: React.ReactNode }) {
   const { useStripe } = require('@stripe/stripe-react-native') as typeof import('@stripe/stripe-react-native');
-  const { confirmPayment, initPaymentSheet, presentPaymentSheet } = useStripe();
+  const { confirmPayment } = useStripe();
 
   const payForOrder = useCallback(
     async (params: PayForOrderParams): Promise<PayForOrderResult> => {
-      const { orderId, amount, customerEmail, customerName, useCardForm = true } = params;
+      const { orderId, amount } = params;
 
       if (!isStripePublishableKeyConfigured()) {
         showError(stripeKeySetupMessage());
@@ -87,67 +84,25 @@ function StripePaymentBridge({ children }: { children: React.ReactNode }) {
           return { status: 'failed' };
         }
 
-        if (useCardForm) {
-          const { error: confirmError, paymentIntent: confirmedIntent } = await confirmPayment(
-            clientSecret,
-            {
-              paymentMethodType: 'Card',
-            }
-          );
-
-          if (confirmError) {
-            if (confirmError.code === 'Canceled') {
-              return { status: 'cancelled' };
-            }
-            showError(confirmError.message || 'Payment was not completed.');
-            return { status: 'failed' };
+        const { error: confirmError, paymentIntent: confirmedIntent } = await confirmPayment(
+          clientSecret,
+          {
+            paymentMethodType: 'Card',
           }
+        );
 
-          const resolvedIntentId = confirmedIntent?.id || paymentIntentId;
-          if (resolvedIntentId) {
-            const confirmRes = await checkoutService.confirmOrderPayment(orderId, {
-              paymentIntentId: resolvedIntentId,
-              paymentMethod: 'stripe',
-              source: 'zuba_mobile_app',
-            });
-            if (!confirmRes.success) {
-              showWarning(
-                'Payment received. Your order will update to Paid shortly — check Orders if it still shows pending.'
-              );
-            }
-          }
-
-          return { status: 'paid', paymentIntentId: resolvedIntentId };
-        }
-
-        const { error: initError } = await initPaymentSheet({
-          merchantDisplayName: 'Zuba House',
-          paymentIntentClientSecret: clientSecret,
-          defaultBillingDetails: {
-            email: customerEmail,
-            name: customerName,
-          },
-          allowsDelayedPaymentMethods: false,
-        });
-
-        if (initError) {
-          showError(initError.message || 'Could not open the payment form.');
-          return { status: 'failed' };
-        }
-
-        const { error: presentError } = await presentPaymentSheet();
-
-        if (presentError) {
-          if (presentError.code === 'Canceled') {
+        if (confirmError) {
+          if (confirmError.code === 'Canceled') {
             return { status: 'cancelled' };
           }
-          showError(presentError.message || 'Payment was not completed.');
+          showError(confirmError.message || 'Payment was not completed.');
           return { status: 'failed' };
         }
 
-        if (paymentIntentId) {
+        const resolvedIntentId = confirmedIntent?.id || paymentIntentId;
+        if (resolvedIntentId) {
           const confirmRes = await checkoutService.confirmOrderPayment(orderId, {
-            paymentIntentId,
+            paymentIntentId: resolvedIntentId,
             paymentMethod: 'stripe',
             source: 'zuba_mobile_app',
           });
@@ -158,14 +113,14 @@ function StripePaymentBridge({ children }: { children: React.ReactNode }) {
           }
         }
 
-        return { status: 'paid', paymentIntentId };
+        return { status: 'paid', paymentIntentId: resolvedIntentId };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Payment failed. Please try again.';
         showError(message);
         return { status: 'failed' };
       }
     },
-    [confirmPayment, initPaymentSheet, presentPaymentSheet]
+    [confirmPayment]
   );
 
   const value = useMemo(

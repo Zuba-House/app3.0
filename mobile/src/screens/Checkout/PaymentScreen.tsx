@@ -1,8 +1,8 @@
 /**
- * Payment Screen — in-app Stripe Payment Sheet (no external browser)
+ * Payment Screen — in-app Zuba House card form (no Stripe Payment Sheet modal)
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   TouchableOpacity,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { ActivityIndicator } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -20,8 +21,9 @@ import { needsOnlineStripePayment, type RawOrder } from '../../utils/order.mappe
 import { cartService } from '../../services/cart.service';
 import { useAppDispatch } from '../../store/hooks';
 import { clearCart } from '../../store/slices/cartSlice';
-import { showError } from '../../utils/toast';
+import { showError, showWarning } from '../../utils/toast';
 import { useInAppStripePayment } from '../../hooks/useInAppStripePayment';
+import { CheckoutStripeCardField } from '../../components/checkout/CheckoutStripeCardField';
 
 interface PaymentScreenParams {
   orderId: string;
@@ -38,8 +40,6 @@ const PaymentScreen: React.FC = () => {
   const {
     orderId,
     amount,
-    customerEmail,
-    customerName,
     onSuccess,
   } = route.params as PaymentScreenParams;
 
@@ -47,7 +47,7 @@ const PaymentScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [orderAlreadyComplete, setOrderAlreadyComplete] = useState(false);
-  const hasAutoPresented = useRef(false);
+  const [cardDetailsComplete, setCardDetailsComplete] = useState(false);
 
   const finishPaymentSuccess = useCallback(() => {
     cartService.clearCart().catch(() => undefined);
@@ -76,27 +76,25 @@ const PaymentScreen: React.FC = () => {
       );
       return;
     }
+    if (!cardDetailsComplete) {
+      showWarning('Please enter your full card details before paying.');
+      return;
+    }
     setPaying(true);
     try {
       const result = await payForOrder({
         orderId,
         amount,
-        customerEmail,
-        customerName,
-        useCardForm: false,
       });
       if (result.status === 'paid') {
         finishPaymentSuccess();
-      } else if (result.status === 'failed') {
-        // Toast already shown in hook
       }
     } finally {
       setPaying(false);
     }
   }, [
     amount,
-    customerEmail,
-    customerName,
+    cardDetailsComplete,
     finishPaymentSuccess,
     isStripeConfigured,
     isStripeNativeAvailable,
@@ -127,13 +125,6 @@ const PaymentScreen: React.FC = () => {
     };
   }, [finishPaymentSuccess, orderId]);
 
-  useEffect(() => {
-    if (loading || orderAlreadyComplete || paying || hasAutoPresented.current) return;
-    if (!isStripeConfigured || !isStripeNativeAvailable) return;
-    hasAutoPresented.current = true;
-    runPayment();
-  }, [loading, orderAlreadyComplete, paying, isStripeConfigured, isStripeNativeAvailable, runPayment]);
-
   const handleCancel = () => {
     Alert.alert(
       'Leave payment?',
@@ -160,7 +151,7 @@ const PaymentScreen: React.FC = () => {
         <View style={styles.headerPlaceholder} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
         <View style={styles.paymentCard}>
           <View style={styles.cardIcon}>
             <Ionicons name="card" size={48} color={Colors.secondary} />
@@ -172,7 +163,7 @@ const PaymentScreen: React.FC = () => {
           <Text style={styles.subtitle}>
             {orderAlreadyComplete
               ? 'Your order is already paid. Opening confirmation…'
-              : 'Enter your card in the secure form below — you stay in the Zuba House app.'}
+              : 'Complete your Zuba House order — card entry stays inside the app.'}
           </Text>
 
           <View style={styles.summaryBox}>
@@ -186,6 +177,10 @@ const PaymentScreen: React.FC = () => {
               <Text style={styles.totalAmount}>${amount.toFixed(2)}</Text>
             </View>
           </View>
+
+          {!orderAlreadyComplete && isStripeConfigured ? (
+            <CheckoutStripeCardField onCardChange={setCardDetailsComplete} />
+          ) : null}
 
           {!orderAlreadyComplete && (
             <TouchableOpacity
@@ -208,7 +203,7 @@ const PaymentScreen: React.FC = () => {
         <View style={styles.securityNote}>
           <Ionicons name="shield-checkmark" size={20} color={Colors.secondary} />
           <View style={styles.securityTextContainer}>
-            <Text style={styles.securityTitle}>Secure Payment</Text>
+            <Text style={styles.securityTitle}>Zuba House secure checkout</Text>
             <Text style={styles.securityText}>
               Payments are processed by Stripe. Card details are never stored on our servers.
             </Text>
@@ -229,7 +224,7 @@ const PaymentScreen: React.FC = () => {
             </View>
           </View>
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 };
@@ -263,13 +258,16 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentInner: {
     padding: 20,
+    paddingBottom: 40,
   },
   paymentCard: {
     backgroundColor: Colors.white,
     borderRadius: 20,
     padding: 24,
-    alignItems: 'center',
+    alignItems: 'stretch',
     shadowColor: Colors.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -284,12 +282,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
+    alignSelf: 'center',
   },
   title: {
     fontSize: 22,
     fontWeight: '700',
     color: Colors.primary,
     marginBottom: 8,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.tertiary,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 8,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -342,6 +342,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     borderRadius: 12,
     width: '100%',
+    marginTop: 16,
   },
   payButtonDisabled: {
     opacity: 0.6,
