@@ -45,6 +45,12 @@ const DealOfTheDay: React.FC<DealOfTheDayProps> = ({
   });
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [dealEnded, setDealEnded] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
+  const displayImage = getProductPrimaryImageUrl(product);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [product._id, displayImage]);
 
   useEffect(() => {
     const tick = () => {
@@ -70,8 +76,6 @@ const DealOfTheDay: React.FC<DealOfTheDayProps> = ({
   const handleShopNow = () => {
     navigateToProductDetail(navigation, product._id);
   };
-
-  const displayImage = getProductPrimaryImageUrl(product);
 
   const displayPrice = getDisplayPrice(product);
   const originalPrice = displayPrice * 1.4;
@@ -115,8 +119,18 @@ const DealOfTheDay: React.FC<DealOfTheDayProps> = ({
 
       <View style={styles.content}>
         <TouchableOpacity style={styles.imageContainer} onPress={handleShopNow} activeOpacity={0.9}>
-          {displayImage ? (
-            <Image source={{ uri: displayImage }} style={styles.productImage} contentFit="cover" />
+          {displayImage && !imageFailed ? (
+            <Image
+              source={{ uri: displayImage }}
+              style={styles.productImage}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              recyclingKey={`deal-${product._id}-${displayImage}`}
+              placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+              priority="high"
+              transition={200}
+              onError={() => setImageFailed(true)}
+            />
           ) : (
             <View style={[styles.productImage, styles.placeholderImage]}>
               <Ionicons name="cube-outline" size={48} color={Colors.primary} />

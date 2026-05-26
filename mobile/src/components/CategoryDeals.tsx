@@ -3,7 +3,7 @@
  * Shows deals organized by category
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   View,
@@ -36,6 +36,49 @@ interface CategoryDealsProps {
   loading?: boolean;
 }
 
+const IMAGE_BLURHASH = 'L6PZfSi_.AyE_3t7t7R**0o#DgR4';
+
+const CategoryCard: React.FC<{
+  item: CategoryDeal;
+  onPress: (category: CategoryDeal) => void;
+}> = ({ item, onPress }) => {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(item.image) && !imageFailed;
+
+  return (
+    <TouchableOpacity
+      style={styles.categoryCard}
+      onPress={() => onPress(item)}
+      activeOpacity={0.8}
+    >
+      {showImage ? (
+        <Image
+          source={{ uri: item.image }}
+          style={styles.categoryImage}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={`cat-${item.id}-${item.image}`}
+          placeholder={{ blurhash: IMAGE_BLURHASH }}
+          transition={200}
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <View style={[styles.categoryImage, styles.categoryImagePlaceholder]}>
+          <Ionicons name="grid-outline" size={36} color={Colors.white} />
+        </View>
+      )}
+      <View style={styles.overlay} />
+      <View style={styles.categoryContent}>
+        <Text style={styles.categoryName}>{item.name}</Text>
+        <View style={styles.discountBadge}>
+          <Text style={styles.discountText}>{item.discount}</Text>
+        </View>
+        <Text style={styles.itemCount}>{item.itemCount}+ items</Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
 const CategoryDeals: React.FC<CategoryDealsProps> = ({
   categories = [],
   loading = false,
@@ -53,34 +96,7 @@ const CategoryDeals: React.FC<CategoryDealsProps> = ({
   };
 
   const renderCategory = ({ item }: { item: CategoryDeal }) => (
-    <TouchableOpacity
-      style={styles.categoryCard}
-      onPress={() => handlePress(item)}
-      activeOpacity={0.8}
-    >
-      {item.image ? (
-        <Image
-          source={{ uri: item.image }}
-          style={styles.categoryImage}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          recyclingKey={`cat-${item.id}-${item.image}`}
-          transition={0}
-        />
-      ) : (
-        <View style={[styles.categoryImage, styles.categoryImagePlaceholder]}>
-          <Ionicons name="grid-outline" size={36} color={Colors.white} />
-        </View>
-      )}
-      <View style={styles.overlay} />
-      <View style={styles.categoryContent}>
-        <Text style={styles.categoryName}>{item.name}</Text>
-        <View style={styles.discountBadge}>
-          <Text style={styles.discountText}>{item.discount}</Text>
-        </View>
-        <Text style={styles.itemCount}>{item.itemCount}+ items</Text>
-      </View>
-    </TouchableOpacity>
+    <CategoryCard item={item} onPress={handlePress} />
   );
 
   const showSkeleton = loading && categories.length === 0;

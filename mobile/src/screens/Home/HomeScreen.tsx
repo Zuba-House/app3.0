@@ -172,7 +172,10 @@ const HomeScreen: React.FC = () => {
       id: cat._id,
       categoryId: cat._id,
       name: cat.name,
-      image: resolveImageUrl(cat.image) || '',
+      image:
+        resolveImageUrl(cat.image) ||
+        resolveImageUrl(Array.isArray(cat.images) ? cat.images[0] : null) ||
+        '',
       discount: 'Shop now',
       itemCount: Math.max(12, (index + 1) * 40),
     }));
@@ -332,6 +335,7 @@ const HomeScreen: React.FC = () => {
         setProducts(dataCacheRef.current.allProducts);
         setCategories(dataCacheRef.current.categories);
         setFeaturedProducts(dataCacheRef.current.featuredProducts);
+        setCategoriesLoading(false);
         setLoading(false);
         return;
       }
@@ -343,7 +347,9 @@ const HomeScreen: React.FC = () => {
       await loadProducts(null, undefined, 1, false);
       setLoading(false);
       void Promise.allSettled([loadCategories(), loadFeaturedProducts()]);
-      void preloadMoreHomeProducts();
+      InteractionManager.runAfterInteractions(() => {
+        void preloadMoreHomeProducts();
+      });
 
       dataCacheRef.current.lastLoad = Date.now();
     } catch {
@@ -455,9 +461,7 @@ const HomeScreen: React.FC = () => {
 
   const preloadMoreHomeProducts = async () => {
     try {
-      for (let page = 2; page <= 4; page += 1) {
-        await loadProducts(null, undefined, page, true);
-      }
+      await loadProducts(null, undefined, 2, true);
     } catch {
       // Non-blocking background pagination
     }
@@ -486,6 +490,10 @@ const HomeScreen: React.FC = () => {
             };
             if (cat.slug && typeof cat.slug === 'string') safe.slug = cat.slug;
             if (cat.image && typeof cat.image === 'string') safe.image = cat.image;
+            if (Array.isArray(cat.images) && cat.images.length > 0) {
+              safe.images = cat.images.filter((img: unknown) => typeof img === 'string');
+              if (!safe.image && safe.images[0]) safe.image = safe.images[0];
+            }
             if (cat.icon && typeof cat.icon === 'string') safe.icon = cat.icon;
             // Explicitly do NOT copy level3, thirdsubCat, or any nested properties
             return safe;

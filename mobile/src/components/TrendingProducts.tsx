@@ -3,7 +3,7 @@
  * Shows what's trending now
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -24,11 +24,86 @@ import { FLATLIST_PERF } from '../utils/flatListPerf';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
+const IMAGE_BLURHASH = 'L6PZfSi_.AyE_3t7t7R**0o#DgR4';
 
 interface TrendingProductsProps {
   products: Product[];
   title?: string;
 }
+
+const TrendingProductCard: React.FC<{
+  item: Product;
+  index: number;
+  onPress: (productId: string) => void;
+}> = ({ item, index, onPress }) => {
+  const [imageFailed, setImageFailed] = useState(false);
+  const displayImage = getProductPrimaryImageUrl(item);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [item._id, displayImage]);
+
+  const viewCount = (item as any).views || 0;
+  const wishlistCount = (item as any).wishlistCount || 0;
+  const totalSales = (item as any).totalSales || 0;
+  const trendingScore = wishlistCount * 2 + totalSales * 3 + viewCount;
+  const trendingUp = trendingScore > 10 || totalSales > 5;
+
+  return (
+    <TouchableOpacity
+      style={styles.productCard}
+      onPress={() => onPress(item._id)}
+      activeOpacity={0.8}
+    >
+      <View style={styles.trendingBadge}>
+        <Ionicons
+          name={trendingUp ? 'trending-up' : 'flame'}
+          size={12}
+          color={Colors.white}
+        />
+        <Text style={styles.trendingText}>{trendingUp ? 'Hot' : 'Popular'}</Text>
+      </View>
+
+      <View style={styles.imageContainer}>
+        {displayImage && !imageFailed ? (
+          <Image
+            source={{ uri: displayImage }}
+            style={styles.productImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={`trending-${item._id}-${displayImage}`}
+            placeholder={{ blurhash: IMAGE_BLURHASH }}
+            priority={index < 4 ? 'high' : 'normal'}
+            transition={200}
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <View style={[styles.productImage, styles.placeholderImage]}>
+            <Ionicons name="cube-outline" size={32} color={Colors.primary} />
+          </View>
+        )}
+      </View>
+
+      <View style={styles.productInfo}>
+        <Text style={styles.productName} numberOfLines={2}>
+          {item.name}
+        </Text>
+        <Text
+          style={[
+            styles.productPrice,
+            formatProductPrice(item) === 'Price unavailable' && styles.priceUnavailable,
+          ]}
+        >
+          {formatProductPrice(item)}
+        </Text>
+        <View style={styles.viewsContainer}>
+          <Ionicons name="eye-outline" size={12} color={Colors.primary} />
+          <Text style={styles.viewsText}>{viewCount.toLocaleString()} views</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 const TrendingProducts: React.FC<TrendingProductsProps> = ({
   products,
@@ -43,79 +118,8 @@ const TrendingProducts: React.FC<TrendingProductsProps> = ({
     navigateToProductDetail(navigation, productId);
   };
 
-  const renderProduct = ({ item, index }: { item: Product; index: number }) => {
-    const displayImage = getProductPrimaryImageUrl(item);
-
-    // Real trending data from product
-    const viewCount = (item as any).views || 0;
-    const wishlistCount = (item as any).wishlistCount || 0;
-    const totalSales = (item as any).totalSales || 0;
-    const trendingScore = (wishlistCount * 2) + (totalSales * 3) + viewCount;
-    
-    // Determine if trending up based on actual data
-    const trendingUp = trendingScore > 10 || totalSales > 5;
-
-    return (
-      <TouchableOpacity
-        style={styles.productCard}
-        onPress={() => handlePress(item._id)}
-        activeOpacity={0.8}
-      >
-        {/* Trending Badge */}
-        <View style={styles.trendingBadge}>
-          <Ionicons
-            name={trendingUp ? 'trending-up' : 'flame'}
-            size={12}
-            color={Colors.white}
-          />
-          <Text style={styles.trendingText}>
-            {trendingUp ? 'Hot' : 'Popular'}
-          </Text>
-        </View>
-
-        {/* Product Image */}
-        <View style={styles.imageContainer}>
-          {displayImage ? (
-            <Image
-              source={{ uri: displayImage }}
-              style={styles.productImage}
-              contentFit="cover"
-              transition={200}
-            />
-          ) : (
-            <View style={[styles.productImage, styles.placeholderImage]}>
-              <Ionicons name="cube-outline" size={32} color={Colors.primary} />
-            </View>
-          )}
-        </View>
-
-        {/* Product Info */}
-        <View style={styles.productInfo}>
-          <Text style={styles.productName} numberOfLines={2}>
-            {item.name}
-          </Text>
-          <Text
-            style={[
-              styles.productPrice,
-              formatProductPrice(item) === 'Price unavailable' && styles.priceUnavailable,
-            ]}
-          >
-            {formatProductPrice(item)}
-          </Text>
-          
-          {/* Views */}
-          <View style={styles.viewsContainer}>
-            <Ionicons name="eye-outline" size={12} color={Colors.primary} />
-            <Text style={styles.viewsText}>{viewCount.toLocaleString()} views</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.titleContainer}>
           <Ionicons name="trending-up" size={22} color="#FF5722" />
@@ -136,11 +140,12 @@ const TrendingProducts: React.FC<TrendingProductsProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Products Grid */}
       <FlatList
         {...FLATLIST_PERF}
         data={visible.slice(0, 10)}
-        renderItem={renderProduct}
+        renderItem={({ item, index }) => (
+          <TrendingProductCard item={item} index={index} onPress={handlePress} />
+        )}
         keyExtractor={(item) => `trending-${item._id}`}
         numColumns={2}
         scrollEnabled={false}

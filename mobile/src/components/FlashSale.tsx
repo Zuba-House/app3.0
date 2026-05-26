@@ -3,7 +3,7 @@
  * Countdown timer with urgency indicators
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCurrency } from '../context/CurrencyContext';
 import {
@@ -92,10 +92,13 @@ const FlashSaleTimer: React.FC<{ endTime: Date }> = ({ endTime }) => {
   );
 };
 
+const IMAGE_BLURHASH = 'L6PZfSi_.AyE_3t7t7R**0o#DgR4';
+
 const FlashSaleCard: React.FC<{ product: Product; index: number }> = ({ product, index }) => {
   const { t } = useTranslation();
   const { formatPrice } = useCurrency();
   const navigation = useNavigation<any>();
+  const [imageFailed, setImageFailed] = useState(false);
 
   // Real discount only: supports salePrice/oldPrice/discount payload shapes.
   const saleInfo = getSaleInfo(product as any);
@@ -109,6 +112,10 @@ const FlashSaleCard: React.FC<{ product: Product; index: number }> = ({ product,
   };
 
   const displayImage = getProductPrimaryImageUrl(product);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [product._id, displayImage]);
 
   return (
     <TouchableOpacity 
@@ -125,12 +132,17 @@ const FlashSaleCard: React.FC<{ product: Product; index: number }> = ({ product,
 
       {/* Product Image */}
       <View style={styles.imageContainer}>
-        {displayImage ? (
+        {displayImage && !imageFailed ? (
           <Image
             source={{ uri: displayImage }}
             style={styles.productImage}
             contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={`flash-${product._id}-${displayImage}`}
+            placeholder={{ blurhash: IMAGE_BLURHASH }}
+            priority={index < 4 ? 'high' : 'normal'}
             transition={200}
+            onError={() => setImageFailed(true)}
           />
         ) : (
           <View style={[styles.productImage, styles.placeholderImage]}>
@@ -168,49 +180,51 @@ const FlashSaleCard: React.FC<{ product: Product; index: number }> = ({ product,
   );
 };
 
+const shuffle = <T,>(arr: T[]) => {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
 const FlashSale: React.FC<FlashSaleProps> = ({ 
   products, 
   endTime = new Date(Date.now() + 4 * 60 * 60 * 1000), // Default 4 hours from now
   title = "Flash Sale"
 }) => {
   const navigation = useNavigation<any>();
-  const priced = filterPricedProducts(products ?? []);
-  if (!priced || priced.length === 0) return null;
-  const [cycleEnd, setCycleEnd] = useState<Date>(endTime);
-  const [cycleTick, setCycleTick] = useState(0);
+  const [cycleEnd] = useState<Date>(endTime);
+  const [cycleTick] = useState(0);
   const [dealEnded, setDealEnded] = useState(false);
 
-  // Only show truly discounted products in flash sale, sorted by highest discount first.
-  const saleProducts = priced
-    .filter((p) => getSaleInfo(p as any).isOnSale)
-    .sort((a, b) => {
-      const aDisc = getSaleInfo(a as any).discountPercent;
-      const bDisc = getSaleInfo(b as any).discountPercent;
-      return bDisc - aDisc;
-    });
+  const priced = useMemo(() => filterPricedProducts(products ?? []), [products]);
 
-  // If on-sale items are not enough, fill with mixed products for a richer section.
-  const restProducts = priced.filter((p) => !saleProducts.find((s) => s._id === p._id));
-  const mixedPool = [...saleProducts, ...restProducts];
-  if (mixedPool.length === 0) return null;
+  const dataToRender = useMemo(() => {
+    if (!priced.length) return [];
 
-  const shuffle = <T,>(arr: T[]) => {
-    const copy = [...arr];
-    for (let i = copy.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [copy[i], copy[j]] = [copy[j], copy[i]];
-    }
-    return copy;
-  };
+    const saleProducts = priced
+      .filter((p) => getSaleInfo(p as any).isOnSale)
+      .sort((a, b) => {
+        const aDisc = getSaleInfo(a as any).discountPercent;
+        const bDisc = getSaleInfo(b as any).discountPercent;
+        return bDisc - aDisc;
+      });
 
-  const displayProducts = shuffle(mixedPool).slice(0, 16);
-  const dataToRender = displayProducts.sort((a, b) => {
-    const aInfo = getSaleInfo(a as any);
-    const bInfo = getSaleInfo(b as any);
-    // Keep discounted items first while still mixed.
-    if (aInfo.isOnSale !== bInfo.isOnSale) return aInfo.isOnSale ? -1 : 1;
-    return bInfo.discountPercent - aInfo.discountPercent;
-  });
+    const restProducts = priced.filter((p) => !saleProducts.find((s) => s._id === p._id));
+    const mixedPool = [...saleProducts, ...restProducts];
+    if (!mixedPool.length) return [];
+
+    return shuffle(mixedPool)
+      .slice(0, 16)
+      .sort((a, b) => {
+        const aInfo = getSaleInfo(a as any);
+        const bInfo = getSaleInfo(b as any);
+        if (aInfo.isOnSale !== bInfo.isOnSale) return aInfo.isOnSale ? -1 : 1;
+        return bInfo.discountPercent - aInfo.discountPercent;
+      });
+  }, [priced]);
 
   useEffect(() => {
     const tick = setInterval(() => {
@@ -228,6 +242,8 @@ const FlashSale: React.FC<FlashSaleProps> = ({
       </View>
     );
   }
+
+  if (dataToRender.length === 0) return null;
 
   return (
     <View style={styles.container} key={`flash-cycle-${cycleTick}`}>

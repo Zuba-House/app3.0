@@ -278,7 +278,7 @@ export const PAGINATION = {
 
   MAX_PAGE_SIZE: 200,
 
-  HOME_PAGE_SIZE: 60,
+  HOME_PAGE_SIZE: 40,
 
   LIST_PAGE_SIZE: 50,
 
