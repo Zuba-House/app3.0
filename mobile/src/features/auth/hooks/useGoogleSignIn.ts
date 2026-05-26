@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
+import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { API_ENDPOINTS, API_URL } from '../../../constants/config';
 import { authManager } from '../../../core/auth/authManager';
@@ -93,6 +95,23 @@ function maskClientId(id?: string): string | undefined {
   return `${id.slice(0, 8)}...${id.slice(-6)}`;
 }
 
+/**
+ * Standalone iOS/Android redirect used by expo-auth-session Google provider.
+ * Must match Authorized redirect URIs on the Google OAuth client (see app.config.js CFBundleURLTypes).
+ */
+export function resolveGoogleOAuthRedirectUri(iosClientId?: string): string {
+  if (iosClientId?.endsWith('.apps.googleusercontent.com')) {
+    const clientIdPart = iosClientId.slice(0, -'.apps.googleusercontent.com'.length);
+    return makeRedirectUri({
+      native: `com.googleusercontent.apps.${clientIdPart}:/oauthredirect`,
+    });
+  }
+  const bundleId = Application.applicationId || 'ninja.wpapp.appzubahousecom';
+  return makeRedirectUri({
+    native: `${bundleId}:/oauthredirect`,
+  });
+}
+
 export function useGoogleSignIn(onSuccess?: () => void) {
   const clientIds = resolveGoogleClientIds();
   const hasClientId = Boolean(clientIds.webClientId || clientIds.iosClientId || clientIds.androidClientId);
@@ -103,19 +122,26 @@ export function useGoogleSignIn(onSuccess?: () => void) {
       web: maskClientId(clientIds.webClientId),
       ios: maskClientId(clientIds.iosClientId),
       android: maskClientId(clientIds.androidClientId),
+      redirectUri,
       configured: hasClientId,
       expoGo: Constants.appOwnership === 'expo',
     });
-  }, [clientIds.androidClientId, clientIds.iosClientId, clientIds.webClientId, hasClientId]);
+  }, [clientIds.androidClientId, clientIds.iosClientId, clientIds.webClientId, hasClientId, redirectUri]);
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const handledResponseRef = useRef<unknown>(null);
 
+  const redirectUri = useMemo(
+    () => resolveGoogleOAuthRedirectUri(clientIds.iosClientId),
+    [clientIds.iosClientId]
+  );
+
   const [request, response, promptAsync] = Google.useAuthRequest({
     iosClientId: clientIds.iosClientId,
     androidClientId: clientIds.androidClientId,
     webClientId: clientIds.webClientId,
+    redirectUri,
     scopes: ['openid', 'profile', 'email'],
   });
 

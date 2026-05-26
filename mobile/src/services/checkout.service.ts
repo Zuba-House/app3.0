@@ -76,7 +76,17 @@ export interface GiftCardValidation {
   error?: string;
 }
 
-/** True when address has enough fields for /api/shipping/rates (matches web cart). */
+/** Matches web cart: city + country are enough to request API fallback/zone rates. */
+export function hasMinimalShippingDestination(shippingAddress?: Record<string, any> | null): boolean {
+  if (!shippingAddress || typeof shippingAddress !== 'object') return false;
+  const city = String(shippingAddress.city || shippingAddress.address?.city || '').trim();
+  const countryCode = String(
+    shippingAddress.countryCode || shippingAddress.address?.countryCode || ''
+  ).trim();
+  return Boolean(city && city !== '—' && countryCode);
+}
+
+/** Full address required at order placement (not for showing estimated rates). */
 export function isValidShippingAddress(shippingAddress?: Record<string, any> | null): boolean {
   if (!shippingAddress || typeof shippingAddress !== 'object') return false;
   const city = String(shippingAddress.city || shippingAddress.address?.city || '').trim();
@@ -92,7 +102,37 @@ export function isValidShippingAddress(shippingAddress?: Record<string, any> | n
   const addressLine1 = String(
     shippingAddress.addressLine1 || shippingAddress.address?.addressLine1 || ''
   ).trim();
-  return Boolean(city && addressLine1 && (postal || countryCode));
+  return Boolean(city && city !== '—' && addressLine1 && addressLine1 !== 'Address pending' && (postal || countryCode));
+}
+
+export type ShippingLocationHint = {
+  countryCode?: string | null;
+  countryName?: string | null;
+  city?: string | null;
+  region?: string | null;
+};
+
+/** Build destination for /api/shipping/rates — same minimal fields as zuba-web2.0 cart. */
+export function resolveShippingAddressForRates(
+  shippingAddress?: Record<string, any> | null,
+  locationHint?: ShippingLocationHint | null
+): Record<string, any> | null {
+  const addr = shippingAddress && typeof shippingAddress === 'object' ? shippingAddress : {};
+  const countryCode =
+    String(addr.countryCode || addr.address?.countryCode || locationHint?.countryCode || 'CA').trim() ||
+    'CA';
+  const city =
+    String(addr.city || addr.address?.city || locationHint?.city || '').trim() ||
+    (countryCode === 'CA' ? 'Toronto' : countryCode === 'US' ? 'New York' : 'City');
+  const merged = {
+    ...addr,
+    city,
+    countryCode,
+    country: addr.country || addr.address?.country || locationHint?.countryName || countryCode,
+    addressLine1: addr.addressLine1 || addr.address?.addressLine1 || '',
+    postalCode: addr.postalCode || addr.postal_code || addr.address?.postalCode || '',
+  };
+  return hasMinimalShippingDestination(merged) ? merged : null;
 }
 
 /** Normalize address for shipping rate API. */
@@ -161,19 +201,23 @@ export const checkoutService = {
    */
   getShippingRates: async (
     cartItems: any[] = [],
-    shippingAddress?: Record<string, any> | null
-  ): Promise<ApiResponse<ShippingMethod[]>> => {
+    shippingAddress?: Record<string, any> | null,
+    locationHint?: ShippingLocationHint | null
+  ): Promise<ApiResponse<ShippingMethod[]> & { estimated?: boolean }> => {
     if (!cartItems?.length) {
       throw new Error('Your cart is empty.');
     }
 
-    if (!isValidShippingAddress(shippingAddress)) {
-      throw new Error('Please enter a complete shipping address to see shipping options.');
+    const destination = resolveShippingAddressForRates(shippingAddress, locationHint);
+    if (!destination) {
+      throw new Error('Enter your city and country to see shipping options.');
     }
+
+    const estimated = !isValidShippingAddress(destination);
 
     const payload = {
       cartItems: buildCartItemsForShipping(cartItems),
-      shippingAddress: addressToShippingPayload(shippingAddress!),
+      shippingAddress: addressToShippingPayload(destination),
     };
 
     const response = await postData<{ standard?: any; express?: any }>(
@@ -193,7 +237,7 @@ export const checkoutService = {
       throw new Error('No shipping options available for this address.');
     }
 
-    return { ...response, data: methods };
+    return { ...response, data: methods, estimated };
   },
 
   /**

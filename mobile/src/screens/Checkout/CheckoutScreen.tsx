@@ -22,6 +22,7 @@ import { addressService } from '../../services/address.service';
 import {
   checkoutService,
   isValidShippingAddress,
+  resolveShippingAddressForRates,
 } from '../../services/checkout.service';
 import { cartService } from '../../services/cart.service';
 import { productService } from '../../services/product.service';
@@ -62,6 +63,7 @@ const CheckoutScreen: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('address');
   const [loading, setLoading] = useState(true);
   const [shippingRatesLoading, setShippingRatesLoading] = useState(false);
+  const [shippingRatesEstimated, setShippingRatesEstimated] = useState(false);
   const [processing, setProcessing] = useState(false);
 
   // Data state
@@ -230,17 +232,24 @@ const CheckoutScreen: React.FC = () => {
         return;
       }
 
-      if (!isValidShippingAddress(address)) {
+      const destination = resolveShippingAddressForRates(address, shippingLocation);
+      if (!destination) {
         setShippingMethods([]);
         setSelectedShipping(null);
+        setShippingRatesEstimated(false);
         return;
       }
 
       setShippingRatesLoading(true);
       try {
-        const shippingRes = await checkoutService.getShippingRates(cartItems, address);
+        const shippingRes = await checkoutService.getShippingRates(
+          cartItems,
+          address,
+          shippingLocation
+        );
         if (shippingRes.success && shippingRes.data) {
           const methods = Array.isArray(shippingRes.data) ? shippingRes.data : [];
+          setShippingRatesEstimated(Boolean(shippingRes.estimated));
           setShippingMethods(methods);
           setSelectedShipping((prev) => {
             if (prev && methods.some((m) => m._id === prev._id)) {
@@ -253,6 +262,7 @@ const CheckoutScreen: React.FC = () => {
         console.error('[Checkout] Shipping rate fetch failed:', err);
         setShippingMethods([]);
         setSelectedShipping(null);
+        setShippingRatesEstimated(false);
         showError(
           err instanceof Error
             ? err.message
@@ -262,7 +272,7 @@ const CheckoutScreen: React.FC = () => {
         setShippingRatesLoading(false);
       }
     },
-    [cartItems]
+    [cartItems, shippingLocation]
   );
 
   const handleAddressChange = useCallback(
@@ -286,10 +296,25 @@ const CheckoutScreen: React.FC = () => {
   }, [cartTotal, selectedShipping, couponDiscount, giftCardDiscount, appliedCoupon?.freeShipping]);
 
   useEffect(() => {
-    if (!cartItems.length || !selectedAddress) return;
-    if (!isValidShippingAddress(selectedAddress)) return;
+    if (!cartItems.length) return;
     void loadShippingRates(selectedAddress);
-  }, [cartQuantitySignature, selectedAddress?._id, selectedAddress?.postalCode, selectedAddress?.city, selectedAddress?.countryCode, loadShippingRates, cartItems.length]);
+  }, [
+    cartQuantitySignature,
+    selectedAddress?._id,
+    selectedAddress?.postalCode,
+    selectedAddress?.city,
+    selectedAddress?.countryCode,
+    shippingLocation.countryCode,
+    shippingLocation.city,
+    loadShippingRates,
+    cartItems.length,
+  ]);
+
+  useEffect(() => {
+    if (currentStep !== 'shipping' || !cartItems.length) return;
+    if (shippingMethods.length > 0 || shippingRatesLoading) return;
+    void loadShippingRates(selectedAddress);
+  }, [currentStep, cartItems.length, shippingMethods.length, shippingRatesLoading, loadShippingRates, selectedAddress]);
 
   useEffect(() => {
     if (!appliedGiftCard?.code) return;
@@ -365,10 +390,16 @@ const CheckoutScreen: React.FC = () => {
           _id: 'guest-stub',
           name: 'Customer',
           phone: '',
-          addressLine1: 'Address pending',
-          city: shippingLocation.city || '—',
-          state: '',
-          postalCode: '00000',
+          addressLine1: '',
+          city:
+            shippingLocation.city ||
+            (shippingLocation.countryCode === 'CA'
+              ? 'Toronto'
+              : shippingLocation.countryCode === 'US'
+                ? 'New York'
+                : 'City'),
+          state: shippingLocation.region || '',
+          postalCode: '',
           country: shippingLocation.countryName || shippingLocation.countryCode,
           countryCode: shippingLocation.countryCode,
         } as Address;
@@ -960,6 +991,12 @@ const CheckoutScreen: React.FC = () => {
         Zuba House Regular & Express
       </Text>
 
+      {shippingRatesEstimated && shippingMethods.length > 0 ? (
+        <Text style={styles.shippingEstimateNote}>
+          Estimated rates for your region. Final shipping updates when your full address is entered.
+        </Text>
+      ) : null}
+
       {shippingRatesLoading ? (
         <View style={styles.shippingLoadingRow}>
           <ActivityIndicator size="small" color={Colors.secondary} />
@@ -969,7 +1006,7 @@ const CheckoutScreen: React.FC = () => {
 
       {!shippingRatesLoading && shippingMethods.length === 0 ? (
         <Text style={styles.shippingEmptyText}>
-          Enter a complete shipping address to see delivery options.
+          Enter your city and country on the address step to see delivery options.
         </Text>
       ) : null}
 
@@ -1645,6 +1682,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7C89',
     marginBottom: 12,
+  },
+  shippingEstimateNote: {
+    fontSize: 13,
+    color: '#6B7C89',
+    marginBottom: 12,
+    lineHeight: 18,
   },
   shippingCard: {
     flexDirection: 'row',
