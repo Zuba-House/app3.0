@@ -58,8 +58,19 @@ const OrderConfirmationScreen: React.FC = () => {
         const res = await orderService.getOrderById(orderId);
         if (cancelled || !res.data) return;
         const raw = res.data as unknown as RawOrder;
-        const stillNeedsPayment = needsOnlineStripePayment(raw, paymentMethod);
-        setIsPaymentPending(stillNeedsPayment);
+
+        const status = String(raw.payment_status ?? raw.paymentState ?? '').toLowerCase();
+        const paymentId = String(raw.paymentId ?? (raw as { payment_id?: string }).payment_id ?? '');
+        const isPaidOnServer = ['paid', 'completed', 'success', 'succeeded'].includes(status);
+        const hasStripeCharge = paymentId.startsWith('pi_') || paymentId.startsWith('cs_');
+
+        // Checkout already charged the card — never show pay-again on confirmation.
+        if (!paymentPending || isPaidOnServer || hasStripeCharge) {
+          setIsPaymentPending(false);
+          return;
+        }
+
+        setIsPaymentPending(needsOnlineStripePayment(raw, paymentMethod));
       } catch {
         setIsPaymentPending(paymentPending);
       } finally {
