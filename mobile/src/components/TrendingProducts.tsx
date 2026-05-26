@@ -19,6 +19,7 @@ import { Product } from '../types/product.types';
 import Colors from '../constants/colors';
 import { filterPricedProducts, formatProductPrice } from '../utils/productDisplay';
 import { navigateToProductDetail, navigateToProductList } from '../navigation/navigationHelpers';
+import { getProductPrimaryImageUrl } from '../utils/productImages';
 import { FLATLIST_PERF } from '../utils/flatListPerf';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -43,10 +44,7 @@ const TrendingProducts: React.FC<TrendingProductsProps> = ({
   };
 
   const renderProduct = ({ item, index }: { item: Product; index: number }) => {
-    const imageUrl = item.images?.[0] || (item as any).featuredImage || '';
-    const displayImage = typeof imageUrl === 'object' && (imageUrl as any)?.url
-      ? (imageUrl as any).url
-      : imageUrl;
+    const displayImage = getProductPrimaryImageUrl(item);
 
     // Real trending data from product
     const viewCount = (item as any).views || 0;

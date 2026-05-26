@@ -32,6 +32,7 @@ import SearchBar from '../../components/SearchBar';
 import { API_URL } from '../../constants/config';
 import { showError } from '../../utils/toast';
 import { filterPricedProducts } from '../../utils/productDisplay';
+import { resolveImageUrl } from '../../utils/productImages';
 import {
   navigateToProductList,
   navigateToCategories,
@@ -62,6 +63,7 @@ const HomeScreen: React.FC = () => {
   const sectionsReady = useDeferredReady(120);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -170,12 +172,7 @@ const HomeScreen: React.FC = () => {
       id: cat._id,
       categoryId: cat._id,
       name: cat.name,
-      image:
-        cat.image?.startsWith('http')
-          ? cat.image
-          : cat.image
-            ? `${API_URL}${cat.image.startsWith('/') ? '' : '/'}${cat.image}`
-            : `https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=400&sig=${index}`,
+      image: resolveImageUrl(cat.image) || '',
       discount: 'Shop now',
       itemCount: Math.max(12, (index + 1) * 40),
     }));
@@ -343,9 +340,10 @@ const HomeScreen: React.FC = () => {
         setLoading(true);
       }
       // Products first so the feed paints quickly; categories/featured load after.
-      await loadProducts(null, undefined);
+      await loadProducts(null, undefined, 1, false);
       setLoading(false);
       void Promise.allSettled([loadCategories(), loadFeaturedProducts()]);
+      void preloadMoreHomeProducts();
 
       dataCacheRef.current.lastLoad = Date.now();
     } catch {
@@ -455,7 +453,18 @@ const HomeScreen: React.FC = () => {
     }
   }, [selectedCategory, searchQuery]);
 
+  const preloadMoreHomeProducts = async () => {
+    try {
+      for (let page = 2; page <= 4; page += 1) {
+        await loadProducts(null, undefined, page, true);
+      }
+    } catch {
+      // Non-blocking background pagination
+    }
+  };
+
   const loadCategories = async () => {
+    setCategoriesLoading(true);
     try {
       const response = await categoryService.getCategories();
       if (response.success && response.data) {
@@ -491,6 +500,8 @@ const HomeScreen: React.FC = () => {
     } catch {
       setCategories([]);
       // Don't show error for categories - it's not critical
+    } finally {
+      setCategoriesLoading(false);
     }
   };
 
@@ -995,7 +1006,7 @@ const HomeScreen: React.FC = () => {
           />
         )}
 
-        <CategoryDeals categories={categoryDealsData.length > 0 ? categoryDealsData : undefined} />
+        <CategoryDeals categories={categoryDealsData} loading={categoriesLoading} />
 
         <RecentlyViewed />
 

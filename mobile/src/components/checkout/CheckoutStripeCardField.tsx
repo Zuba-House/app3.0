@@ -24,32 +24,45 @@ export function CheckoutStripeCardField({ onCardChange, preserveMount = false }:
 
   return (
     <View style={[styles.wrap, preserveMount && styles.preserveMount]}>
-      {!preserveMount ? <Text style={styles.label}>Card details</Text> : null}
-      <CardField
-        postalCodeEnabled
-        placeholders={{ number: '1234 5678 9012 3456' }}
-        cardStyle={{
-          backgroundColor: '#FFFFFF',
-          textColor: '#0F172A',
-          borderColor: '#CBD5E1',
-          borderWidth: 1,
-          borderRadius: 12,
-          fontSize: 18,
-          placeholderColor: '#64748B',
-        }}
-        style={styles.cardField}
-        onCardChange={(details) => {
-          onCardChange(Boolean(details.complete));
-        }}
-      />
+      {!preserveMount ? (
+        <>
+          <Text style={styles.label}>Card details</Text>
+          <Text style={styles.hint}>Enter your card number, expiry, CVC, and postal code.</Text>
+        </>
+      ) : null}
+      <View style={styles.fieldShell}>
+        <CardField
+          postalCodeEnabled
+          placeholders={{
+            number: '1234 5678 9012 3456',
+            expiration: 'MM / YY',
+            cvc: 'CVC',
+            postalCode: 'Postal code',
+          }}
+          cardStyle={{
+            backgroundColor: '#FFFFFF',
+            textColor: '#0B1220',
+            borderColor: '#94A3B8',
+            borderWidth: 1,
+            borderRadius: 12,
+            fontSize: 20,
+            placeholderColor: '#475569',
+            cursorColor: '#0B1220',
+          }}
+          style={styles.cardField}
+          onCardChange={(details) => {
+            onCardChange(Boolean(details.complete));
+          }}
+        />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: 4,
+    marginBottom: 12,
   },
   preserveMount: {
     position: 'absolute',
@@ -63,15 +76,32 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: Colors.primary,
-    marginBottom: 8,
+    marginBottom: 4,
+  },
+  hint: {
+    fontSize: 13,
+    color: Colors.primary,
+    opacity: 0.7,
+    marginBottom: 10,
+    lineHeight: 18,
+  },
+  fieldShell: {
+    backgroundColor: Colors.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    minHeight: 56,
+    justifyContent: 'center',
   },
   cardField: {
     width: '100%',
-    height: 58,
-    marginVertical: 4,
+    height: 50,
+    marginVertical: 0,
   },
   placeholder: {
     padding: 12,

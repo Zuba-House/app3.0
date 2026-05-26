@@ -21,6 +21,7 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../constants/colors';
 import { navigateToProductDetail } from '../navigation/navigationHelpers';
+import { resolveImageUrl, collectProductImageUrls } from '../utils/productImages';
 import { FLATLIST_PERF_HORIZONTAL } from '../utils/flatListPerf';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -56,7 +57,12 @@ const RecentlyViewed: React.FC<RecentlyViewedProps> = ({ maxItems = 10 }) => {
         // Sort by most recent and limit
         const sorted = products
           .sort((a, b) => b.viewedAt - a.viewedAt)
-          .slice(0, maxItems);
+          .slice(0, maxItems)
+          .map((item) => ({
+            ...item,
+            image: resolveImageUrl(item.image) || '',
+          }))
+          .filter((item) => Boolean(item.image));
         setRecentProducts(sorted);
       }
     } catch {
@@ -148,15 +154,7 @@ export const addToRecentlyViewed = async (product: {
     const stored = await AsyncStorage.getItem('recentlyViewed');
     let products: RecentProduct[] = stored ? JSON.parse(stored) : [];
 
-    // Get image URL
-    let imageUrl = '';
-    if (product.images?.[0]) {
-      const img = product.images[0];
-      imageUrl = typeof img === 'object' && (img as any)?.url ? (img as any).url : String(img);
-    } else if (product.featuredImage) {
-      const img = product.featuredImage;
-      imageUrl = typeof img === 'object' && (img as any)?.url ? (img as any).url : String(img);
-    }
+    const imageUrl = collectProductImageUrls(product)[0] || '';
 
     // Remove if already exists
     products = products.filter((p) => p._id !== product._id);

@@ -21,6 +21,7 @@ import { Product } from '../types/product.types';
 import Colors from '../constants/colors';
 import { filterPricedProducts, getSoldPercent, isAlmostGone } from '../utils/productDisplay';
 import { getSaleInfo } from '../utils/productSaleInfo';
+import { getProductPrimaryImageUrl } from '../utils/productImages';
 import { navigateToProductDetail, navigateToProductList } from '../navigation/navigationHelpers';
 import { FLATLIST_PERF_HORIZONTAL } from '../utils/flatListPerf';
 
@@ -107,8 +108,7 @@ const FlashSaleCard: React.FC<{ product: Product; index: number }> = ({ product,
     navigateToProductDetail(navigation, product._id);
   };
 
-  const imageUrl = product.images?.[0] || (product as any).featuredImage || '';
-  const displayImage = typeof imageUrl === 'object' && imageUrl?.url ? imageUrl.url : imageUrl;
+  const displayImage = getProductPrimaryImageUrl(product);
 
   return (
     <TouchableOpacity 

@@ -19,6 +19,7 @@ import { Product } from '../types/product.types';
 import Colors from '../constants/colors';
 import { getDisplayPrice, hasValidPrice } from '../utils/productDisplay';
 import { navigateToProductDetail } from '../navigation/navigationHelpers';
+import { getProductPrimaryImageUrl } from '../utils/productImages';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -70,9 +71,7 @@ const DealOfTheDay: React.FC<DealOfTheDayProps> = ({
     navigateToProductDetail(navigation, product._id);
   };
 
-  const imageUrl = product.images?.[0] || (product as any).featuredImage || '';
-  const displayImage =
-    typeof imageUrl === 'object' && (imageUrl as any)?.url ? (imageUrl as any).url : imageUrl;
+  const displayImage = getProductPrimaryImageUrl(product);
 
   const displayPrice = getDisplayPrice(product);
   const originalPrice = displayPrice * 1.4;

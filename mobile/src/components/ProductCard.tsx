@@ -3,16 +3,16 @@
  * Reusable product card for displaying products
  */
 
-import React, { memo } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import { useCurrency } from '../context/CurrencyContext';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Button } from 'react-native-paper';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Product } from '../types/product.types';
-import { API_URL } from '../constants/config';
 import Colors from '../constants/colors';
 import { getProductStock, isProductOutOfStock } from '../utils/productStock';
+import { getProductPrimaryImageUrl } from '../utils/productImages';
 
 interface ProductCardProps {
   product: Product;
@@ -28,6 +28,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   style,
 }) => {
   const { formatPrice } = useCurrency();
+  const [imageFailed, setImageFailed] = useState(false);
   // Resolve display price robustly:
   // some variable products have parent price=0 and valid variation prices.
   const parentSale = Number(product.salePrice ?? 0);
@@ -51,104 +52,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
     ? Math.round(((originalPrice - displayPrice) / originalPrice) * 100)
     : 0;
 
-  // Get image URL - handle different formats from backend (including Cloudinary)
-  const getImageUrl = (): string | null => {
-    // Helper to fix relative URLs - handles undefined, null, and non-string values
-    const fixUrl = (url: any): string | null => {
-      // Check if url exists and is a string
-      if (!url || typeof url !== 'string') {
-        return null;
-      }
-      
-      // Remove whitespace
-      url = url.trim();
-      
-      // If empty after trim, return null
-      if (!url) {
-        return null;
-      }
+  const imageUrl = getProductPrimaryImageUrl(product);
 
-      // Some legacy payloads send Mongo ObjectId instead of image URL/path.
-      // Avoid building invalid URLs like /<objectId> that always 404.
-      if (/^[a-fA-F0-9]{24}$/.test(url)) {
-        return null;
-      }
-      
-      // Cloudinary URLs are already absolute, return as is
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        return url;
-      }
-      
-      // Handle relative URLs
-      if (url.startsWith('/')) {
-        return `${API_URL}${url}`;
-      }
-      
-      return `${API_URL}/${url}`;
-    };
-
-    // Try images array first - handle both string[] and object[] formats
-    if (product.images && Array.isArray(product.images) && product.images.length > 0) {
-      const firstImage = product.images[0];
-      
-      // Handle object format: { url: string, alt?: string, ... }
-      if (firstImage && typeof firstImage === 'object' && firstImage.url) {
-        const imageUrl = fixUrl(firstImage.url);
-        if (imageUrl) return imageUrl;
-      }
-      
-      // Handle string format: string[]
-      if (typeof firstImage === 'string') {
-        const imageUrl = fixUrl(firstImage);
-        if (imageUrl) return imageUrl;
-      }
-    }
-    
-    // Try featuredImage field (Cloudinary URL)
-    const featuredImage = (product as any).featuredImage;
-    if (featuredImage) {
-      const imageUrl = fixUrl(featuredImage);
-      if (imageUrl) return imageUrl;
-    }
-    
-    // Try image (singular) field
-    const image = (product as any).image;
-    if (image) {
-      // Handle object or string
-      const imageUrl = fixUrl(typeof image === 'object' ? image.url : image);
-      if (imageUrl) return imageUrl;
-    }
-    
-    // Try imageUrl field
-    const imageUrl = (product as any).imageUrl;
-    if (imageUrl) {
-      const fixedUrl = fixUrl(typeof imageUrl === 'object' ? imageUrl.url : imageUrl);
-      if (fixedUrl) return fixedUrl;
-    }
-    
-    // Try thumbnail field
-    const thumbnail = (product as any).thumbnail;
-    if (thumbnail) {
-      const fixedUrl = fixUrl(typeof thumbnail === 'object' ? thumbnail.url : thumbnail);
-      if (fixedUrl) return fixedUrl;
-    }
-    
-    return null;
-  };
-
-  const imageUrl = getImageUrl();
-  
-  // Log for debugging
-  if (!imageUrl) {
-    // Logging disabled for production - uncomment for debugging
-    // console.log('⚠️ No image found for product:', product.name, {
-    //   hasImages: !!product.images,
-    //   imagesLength: product.images?.length,
-    //   hasImage: !!(product as any).image,
-    //   hasImageUrl: !!(product as any).imageUrl,
-    //   productKeys: Object.keys(product),
-    // });
-  }
+  useEffect(() => {
+    setImageFailed(false);
+  }, [product._id, imageUrl]);
 
   // Stock: same rules as web ProductItem — missing quantity ≠ out of stock
   const outOfStock = isProductOutOfStock(product);
@@ -182,17 +90,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
       activeOpacity={0.7}
     >
       <View style={styles.imageContainer}>
-        {imageUrl ? (
+        {imageUrl && !imageFailed ? (
           <Image
             source={{ uri: imageUrl }}
             style={styles.image}
             contentFit="cover"
             cachePolicy="memory-disk"
+            recyclingKey={`product-${product._id}-${imageUrl}`}
             placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
             transition={200}
-            onError={() => {
-              // Keep UI quiet for broken remote image URLs; fallback placeholder already handles it.
-            }}
+            onError={() => setImageFailed(true)}
           />
         ) : (
           <View style={[styles.image, styles.placeholderImage]}>

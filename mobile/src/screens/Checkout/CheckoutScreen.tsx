@@ -13,6 +13,7 @@ import {
   Dimensions,
   Platform,
   TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator } from 'react-native-paper';
@@ -1038,6 +1039,18 @@ const CheckoutScreen: React.FC = () => {
       <Text style={styles.stepTitle}>Payment</Text>
       <Text style={styles.stepSubtitle}>Pay securely with credit or debit card</Text>
 
+      {isStripeConfigured ? (
+        <View style={styles.cardEntrySection}>
+          <CheckoutStripeCardField
+            onCardChange={(complete) => {
+              setCardDetailsComplete(complete);
+              if (complete && paymentError) setPaymentError(null);
+            }}
+          />
+          {paymentError ? <Text style={styles.inlinePaymentError}>{paymentError}</Text> : null}
+        </View>
+      ) : null}
+
       <View style={[styles.paymentCard, styles.paymentCardSelected]}>
         <View style={styles.paymentContent}>
           <Ionicons name="card" size={24} color={Colors.secondary} />
@@ -1319,6 +1332,11 @@ const CheckoutScreen: React.FC = () => {
     processing || (currentStep === 'review' && requiresCardForCheckout && !cardDetailsComplete);
 
   return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+    >
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
@@ -1339,22 +1357,15 @@ const CheckoutScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         {renderStepContent()}
-        {(currentStep === 'payment' || currentStep === 'review') && isStripeConfigured ? (
-          <View
-            style={[
-              styles.stripeCardHost,
-              currentStep === 'review' && styles.stripeCardHostHidden,
-            ]}
-            pointerEvents={currentStep === 'payment' ? 'auto' : 'none'}
-          >
+        {currentStep === 'review' && isStripeConfigured ? (
+          <View style={styles.stripeCardHostHidden} pointerEvents="none">
             <CheckoutStripeCardField
               onCardChange={(complete) => {
                 setCardDetailsComplete(complete);
                 if (complete && paymentError) setPaymentError(null);
               }}
-              preserveMount={currentStep === 'review'}
+              preserveMount
             />
-            {paymentError ? <Text style={styles.inlinePaymentError}>{paymentError}</Text> : null}
           </View>
         ) : null}
       </ScrollView>
@@ -1388,6 +1399,7 @@ const CheckoutScreen: React.FC = () => {
         })()}
       </View>
     </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -1481,6 +1493,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 100,
+  },
+  cardEntrySection: {
+    marginBottom: 16,
   },
   stripeCardHost: {
     marginTop: 4,

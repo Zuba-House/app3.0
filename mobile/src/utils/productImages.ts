@@ -58,6 +58,12 @@ export function collectProductImageUrls(product: any, variation?: any): string[]
   return urls;
 }
 
+/** First displayable image URL for a product card or list row. */
+export function getProductPrimaryImageUrl(product: any, variation?: any): string | null {
+  const urls = collectProductImageUrls(product, variation);
+  return urls[0] ?? null;
+}
+
 /** Unwrap single-product API payloads: { product }, nested data, or plain product. */
 export function unwrapProductPayload(payload: unknown): any | null {
   if (!payload || typeof payload !== 'object') return null;

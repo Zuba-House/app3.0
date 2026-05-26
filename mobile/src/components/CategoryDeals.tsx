@@ -33,41 +33,12 @@ interface CategoryDeal {
 
 interface CategoryDealsProps {
   categories?: CategoryDeal[];
+  loading?: boolean;
 }
 
-const DEFAULT_CATEGORIES: CategoryDeal[] = [
-  {
-    id: '1',
-    name: 'Women',
-    image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400',
-    discount: 'Up to 60%',
-    itemCount: 500,
-  },
-  {
-    id: '2',
-    name: 'Men',
-    image: 'https://images.unsplash.com/photo-1516257984-b1b4d707412e?w=400',
-    discount: 'Up to 50%',
-    itemCount: 350,
-  },
-  {
-    id: '3',
-    name: 'Kids',
-    image: 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=400',
-    discount: 'Up to 70%',
-    itemCount: 280,
-  },
-  {
-    id: '4',
-    name: 'Accessories',
-    image: 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=400',
-    discount: 'Up to 55%',
-    itemCount: 420,
-  },
-];
-
 const CategoryDeals: React.FC<CategoryDealsProps> = ({
-  categories = DEFAULT_CATEGORIES,
+  categories = [],
+  loading = false,
 }) => {
   const { t } = useTranslation();
   const navigation = useNavigation<any>();
@@ -87,13 +58,20 @@ const CategoryDeals: React.FC<CategoryDealsProps> = ({
       onPress={() => handlePress(item)}
       activeOpacity={0.8}
     >
-      <Image
-        source={{ uri: item.image }}
-        style={styles.categoryImage}
-        contentFit="cover"
-        cachePolicy="memory-disk"
-        transition={200}
-      />
+      {item.image ? (
+        <Image
+          source={{ uri: item.image }}
+          style={styles.categoryImage}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={`cat-${item.id}-${item.image}`}
+          transition={0}
+        />
+      ) : (
+        <View style={[styles.categoryImage, styles.categoryImagePlaceholder]}>
+          <Ionicons name="grid-outline" size={36} color={Colors.white} />
+        </View>
+      )}
       <View style={styles.overlay} />
       <View style={styles.categoryContent}>
         <Text style={styles.categoryName}>{item.name}</Text>
@@ -104,6 +82,8 @@ const CategoryDeals: React.FC<CategoryDealsProps> = ({
       </View>
     </TouchableOpacity>
   );
+
+  const showSkeleton = loading && categories.length === 0;
 
   return (
     <View style={styles.container}>
@@ -118,16 +98,24 @@ const CategoryDeals: React.FC<CategoryDealsProps> = ({
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        {...FLATLIST_PERF_HORIZONTAL}
-        data={categories}
-        renderItem={renderCategory}
-        keyExtractor={(item) => `cat-deal-${item.id}`}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-        onEndReachedThreshold={0.1}
-      />
+      {showSkeleton ? (
+        <View style={styles.skeletonRow}>
+          {[1, 2, 3].map((key) => (
+            <View key={key} style={styles.skeletonCard} />
+          ))}
+        </View>
+      ) : categories.length > 0 ? (
+        <FlatList
+          {...FLATLIST_PERF_HORIZONTAL}
+          data={categories}
+          renderItem={renderCategory}
+          keyExtractor={(item) => `cat-deal-${item.id}`}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          onEndReachedThreshold={0.1}
+        />
+      ) : null}
     </View>
   );
 };
@@ -176,6 +164,22 @@ const styles = StyleSheet.create({
   categoryImage: {
     width: '100%',
     height: '100%',
+  },
+  categoryImagePlaceholder: {
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  skeletonCard: {
+    width: SCREEN_WIDTH * 0.42,
+    height: SCREEN_WIDTH * 0.5,
+    borderRadius: 16,
+    backgroundColor: '#E8E4DE',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
