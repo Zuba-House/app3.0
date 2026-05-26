@@ -26,6 +26,7 @@ export interface CreateOrderData {
   shippingRate?: any;
   shippingAddress?: any;
   delivery_address?: string;
+  paymentId?: string;
   payment_status?: string;
   isGuestOrder?: boolean;
   guestCustomer?: {

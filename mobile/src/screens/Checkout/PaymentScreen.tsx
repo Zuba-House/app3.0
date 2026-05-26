@@ -21,7 +21,7 @@ import { needsOnlineStripePayment, type RawOrder } from '../../utils/order.mappe
 import { cartService } from '../../services/cart.service';
 import { useAppDispatch } from '../../store/hooks';
 import { clearCart } from '../../store/slices/cartSlice';
-import { showError, showWarning } from '../../utils/toast';
+import { showError } from '../../utils/toast';
 import { useInAppStripePayment } from '../../hooks/useInAppStripePayment';
 import { CheckoutStripeCardField } from '../../components/checkout/CheckoutStripeCardField';
 
@@ -48,6 +48,7 @@ const PaymentScreen: React.FC = () => {
   const [paying, setPaying] = useState(false);
   const [orderAlreadyComplete, setOrderAlreadyComplete] = useState(false);
   const [cardDetailsComplete, setCardDetailsComplete] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const finishPaymentSuccess = useCallback(() => {
     cartService.clearCart().catch(() => undefined);
@@ -77,7 +78,7 @@ const PaymentScreen: React.FC = () => {
       return;
     }
     if (!cardDetailsComplete) {
-      showWarning('Please enter your full card details before paying.');
+      setPaymentError('Please enter your full card details before paying.');
       return;
     }
     setPaying(true);
@@ -87,7 +88,14 @@ const PaymentScreen: React.FC = () => {
         amount,
       });
       if (result.status === 'paid') {
+        setPaymentError(null);
         finishPaymentSuccess();
+      } else if (result.status !== 'cancelled') {
+        setPaymentError(
+          result.errorMessage || 'Payment was not completed. Please check your card details and try again.'
+        );
+      } else {
+        setPaymentError(result.errorMessage || 'Payment was cancelled before completion.');
       }
     } finally {
       setPaying(false);
@@ -179,14 +187,22 @@ const PaymentScreen: React.FC = () => {
           </View>
 
           {!orderAlreadyComplete && isStripeConfigured ? (
-            <CheckoutStripeCardField onCardChange={setCardDetailsComplete} />
+            <>
+              <CheckoutStripeCardField
+                onCardChange={(complete) => {
+                  setCardDetailsComplete(complete);
+                  if (complete && paymentError) setPaymentError(null);
+                }}
+              />
+              {paymentError ? <Text style={styles.inlinePaymentError}>{paymentError}</Text> : null}
+            </>
           ) : null}
 
           {!orderAlreadyComplete && (
             <TouchableOpacity
-              style={[styles.payButton, busy && styles.payButtonDisabled]}
+              style={[styles.payButton, (busy || !cardDetailsComplete) && styles.payButtonDisabled]}
               onPress={runPayment}
-              disabled={busy}
+              disabled={busy || !cardDetailsComplete}
             >
               {busy ? (
                 <ActivityIndicator size="small" color={Colors.white} />
@@ -346,6 +362,18 @@ const styles = StyleSheet.create({
   },
   payButtonDisabled: {
     opacity: 0.6,
+  },
+  inlinePaymentError: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#B91C1C',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
   payButtonText: {
     fontSize: 16,

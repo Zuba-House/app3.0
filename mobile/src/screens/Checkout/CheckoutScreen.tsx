@@ -39,7 +39,7 @@ import { authManager } from '../../core/auth/authManager';
 import { buildCheckoutPayload } from '../../features/checkout/utils/buildCheckoutPayload';
 import { createCheckoutOrder } from '../../features/checkout/api/createOrder';
 import { checkoutStore } from '../../features/checkout/store/checkoutStore';
-import { getOrderId, needsOnlineStripePayment, type RawOrder } from '../../utils/order.mappers';
+import { getOrderId, type RawOrder } from '../../utils/order.mappers';
 import { useInAppStripePayment } from '../../hooks/useInAppStripePayment';
 import { CheckoutStripeCardField } from '../../components/checkout/CheckoutStripeCardField';
 
@@ -74,6 +74,7 @@ const CheckoutScreen: React.FC = () => {
   const paymentMethod = 'stripe' as const;
   const { payForOrder, isStripeConfigured } = useInAppStripePayment();
   const [cardDetailsComplete, setCardDetailsComplete] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [deliveryNote, setDeliveryNote] = useState('');
   const [savedDeliveryNote, setSavedDeliveryNote] = useState('');
 
@@ -535,12 +536,14 @@ const CheckoutScreen: React.FC = () => {
         showWarning('Please select a shipping method');
         return;
       }
+      setPaymentError(null);
       setCurrentStep('payment');
     } else if (currentStep === 'payment') {
       if (isAuthenticated && totals.total > 0 && isStripeConfigured && !cardDetailsComplete) {
         showWarning('Please enter your full card details before continuing.');
         return;
       }
+      setPaymentError(null);
       setCurrentStep('review');
     }
   };
@@ -729,77 +732,87 @@ const CheckoutScreen: React.FC = () => {
         });
       }
 
-      const orderResponse: ApiResponse<any> = await createCheckoutOrder(payloadResult.data.payload);
+      const { effectiveName, effectiveEmail } = getEffectiveContact();
+      const clearCartAfterOrder = () => {
+        cartService.clearCart().catch(() => undefined);
+        dispatch(clearCart());
+      };
 
-      if (orderResponse.success && orderResponse.data) {
-        const orderRaw = orderResponse.data as RawOrder;
-        const orderId = getOrderId(orderRaw) || String(orderResponse.data._id || orderResponse.data.orderId || '');
-
-        const { effectiveName, effectiveEmail } = getEffectiveContact();
-
-        const clearCartAfterOrder = () => {
-          cartService.clearCart().catch(() => undefined);
-          dispatch(clearCart());
-        };
-
-        const navigateToPaidConfirmation = () => {
-          analyticsService.purchase(
-            orderId,
-            totals.total,
-            cartItems.map((item) => ({
-              id: typeof item.product === 'object' ? item.product?._id : '',
-              name: typeof item.product === 'object' ? item.product?.name || 'Unknown' : 'Unknown',
-              price: item.price,
-              quantity: item.quantity,
-            }))
-          );
-          clearCartAfterOrder();
-          navigation.reset({
-            index: 0,
-            routes: [
-              {
-                name: 'OrderConfirmation',
-                params: {
-                  orderId,
-                  total: totals.total,
-                  paymentPending: false,
-                  paymentAmount: totals.total,
-                  paymentMethod,
-                  customerEmail: effectiveEmail,
-                  customerName: effectiveName,
-                },
+      const navigateToPaidConfirmation = (orderId: string) => {
+        analyticsService.purchase(
+          orderId,
+          totals.total,
+          cartItems.map((item) => ({
+            id: typeof item.product === 'object' ? item.product?._id : '',
+            name: typeof item.product === 'object' ? item.product?.name || 'Unknown' : 'Unknown',
+            price: item.price,
+            quantity: item.quantity,
+          }))
+        );
+        clearCartAfterOrder();
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: 'OrderConfirmation',
+              params: {
+                orderId,
+                total: totals.total,
+                paymentPending: false,
+                paymentAmount: totals.total,
+                paymentMethod,
+                customerEmail: effectiveEmail,
+                customerName: effectiveName,
               },
-            ],
-          });
-        };
+            },
+          ],
+        });
+      };
 
-        const requiresStripe =
-          isAuthenticated && needsOnlineStripePayment(orderRaw, paymentMethod);
+      const requiresStripe = isAuthenticated && totals.total > 0 && isStripeConfigured;
+      let paymentIntentId: string | undefined;
 
-        if (requiresStripe && totals.total > 0) {
-          const payResult = await payForOrder({
-            orderId,
-            amount: totals.total,
-            customerEmail: effectiveEmail,
-            customerName: effectiveName,
-          });
+      if (requiresStripe) {
+        const payResult = await payForOrder({
+          amount: totals.total,
+          customerEmail: effectiveEmail,
+          customerName: effectiveName,
+        });
 
-          if (payResult.status === 'paid') {
-            navigateToPaidConfirmation();
-          } else {
-            showWarning(
-              payResult.status === 'cancelled'
-                ? 'Payment cancelled. Your card is still saved — tap Place Order to try again.'
-                : 'Payment was not completed. Check your card and tap Place Order to try again.'
-            );
-            setCurrentStep('review');
-          }
-        } else {
-          navigateToPaidConfirmation();
+        if (payResult.status !== 'paid') {
+          setPaymentError(
+            payResult.errorMessage ||
+              (payResult.status === 'cancelled'
+                ? 'Payment was cancelled before completion.'
+                : 'Payment was not completed. Please check your card details and try again.')
+          );
+          setCurrentStep('payment');
+          return;
         }
-      } else {
-        showError(toUserFriendlyOrderError((orderResponse as any).message || ''));
+        paymentIntentId = payResult.paymentIntentId;
       }
+
+      const orderPayload = {
+        ...payloadResult.data.payload,
+        payment_status: requiresStripe ? 'COMPLETED' : payloadResult.data.payload.payment_status,
+        paymentId: paymentIntentId,
+      };
+
+      const orderResponse: ApiResponse<any> = await createCheckoutOrder(orderPayload);
+      if (!orderResponse.success || !orderResponse.data) {
+        if (paymentIntentId) {
+          setPaymentError(
+            `Payment succeeded but order creation failed. Contact support with payment ID ${paymentIntentId}.`
+          );
+        }
+        showError(toUserFriendlyOrderError((orderResponse as any).message || ''));
+        return;
+      }
+
+      const orderRaw = orderResponse.data as RawOrder;
+      const orderId = getOrderId(orderRaw) || String(orderResponse.data._id || orderResponse.data.orderId || '');
+      setPaymentError(null);
+      navigateToPaidConfirmation(orderId);
     } catch (error: any) {
       showError(toUserFriendlyOrderError(error.message || ''));
     } finally {
@@ -1030,9 +1043,6 @@ const CheckoutScreen: React.FC = () => {
           <Ionicons name="card" size={24} color={Colors.secondary} />
           <View style={styles.paymentInfo}>
             <Text style={styles.paymentName}>Credit / Debit Card</Text>
-            <Text style={styles.paymentDescription}>
-              Enter your card below. Payment is processed securely inside the app.
-            </Text>
           </View>
           <View style={styles.paymentLogos}>
             <Text style={styles.cardBrand}>VISA</Text>
@@ -1040,14 +1050,6 @@ const CheckoutScreen: React.FC = () => {
           </View>
         </View>
       </View>
-
-      {isStripeConfigured ? (
-        <View style={styles.reviewSection}>
-          <Text style={styles.paymentDescription}>
-            Enter your card below — processed securely inside Zuba House.
-          </Text>
-        </View>
-      ) : null}
 
       {/* Coupon Code Section */}
       <View style={styles.discountSection}>
@@ -1312,6 +1314,10 @@ const CheckoutScreen: React.FC = () => {
     );
   }
 
+  const requiresCardForCheckout = isAuthenticated && totals.total > 0 && isStripeConfigured;
+  const footerDisabled =
+    processing || (currentStep === 'review' && requiresCardForCheckout && !cardDetailsComplete);
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -1342,9 +1348,13 @@ const CheckoutScreen: React.FC = () => {
             pointerEvents={currentStep === 'payment' ? 'auto' : 'none'}
           >
             <CheckoutStripeCardField
-              onCardChange={setCardDetailsComplete}
+              onCardChange={(complete) => {
+                setCardDetailsComplete(complete);
+                if (complete && paymentError) setPaymentError(null);
+              }}
               preserveMount={currentStep === 'review'}
             />
+            {paymentError ? <Text style={styles.inlinePaymentError}>{paymentError}</Text> : null}
           </View>
         ) : null}
       </ScrollView>
@@ -1356,10 +1366,10 @@ const CheckoutScreen: React.FC = () => {
         <TouchableOpacity
             style={[
               styles.actionButton,
-              processing && styles.actionButtonDisabled,
+              footerDisabled && styles.actionButtonDisabled,
             ]}
             onPress={currentStep === 'review' ? handlePlaceOrder : handleNextStep}
-            disabled={processing}
+            disabled={footerDisabled}
         >
           {processing ? (
             <ActivityIndicator size="small" color={Colors.white} />
@@ -1474,6 +1484,18 @@ const styles = StyleSheet.create({
   },
   stripeCardHost: {
     marginTop: 4,
+  },
+  inlinePaymentError: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#B91C1C',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
   stripeCardHostHidden: {
     position: 'absolute',

@@ -9,7 +9,7 @@ import { showError, showWarning } from '../utils/toast';
 export type InAppPaymentStatus = 'paid' | 'cancelled' | 'failed';
 
 export interface PayForOrderParams {
-  orderId: string;
+  orderId?: string;
   amount: number;
   customerEmail?: string;
   customerName?: string;
@@ -18,6 +18,8 @@ export interface PayForOrderParams {
 export interface PayForOrderResult {
   status: InAppPaymentStatus;
   paymentIntentId?: string;
+  errorMessage?: string;
+  errorCode?: string;
 }
 
 type StripePaymentContextValue = {
@@ -53,6 +55,38 @@ const StripePaymentContext = createContext<StripePaymentContextValue>({
   isStripeNativeAvailable: false,
 });
 
+function mapStripeError(error: { code?: string; message?: string } | null | undefined): {
+  message: string;
+  code?: string;
+} {
+  const code = String(error?.code || '').toLowerCase();
+  const fallback = 'Payment was not completed. Please check your card details and try again.';
+
+  if (!code) {
+    return { message: error?.message || fallback };
+  }
+
+  const byCode: Record<string, string> = {
+    canceled: 'Payment was cancelled before completion.',
+    card_declined: 'Your card was declined. Please use another card or contact your bank.',
+    expired_card: 'This card is expired. Please use a different card.',
+    incorrect_cvc: 'The CVC code is incorrect. Please check and try again.',
+    invalid_cvc: 'The CVC code is invalid. Please check and try again.',
+    incorrect_number: 'The card number is incorrect. Please check and try again.',
+    invalid_number: 'The card number is invalid. Please check and try again.',
+    processing_error: 'Payment could not be processed right now. Please try again.',
+    insufficient_funds: 'This card has insufficient funds. Please use another card.',
+    authentication_required:
+      'Your bank requires additional authentication for this card. Please try another card.',
+    network_error: 'Network error while processing payment. Check your connection and try again.',
+  };
+
+  return {
+    code,
+    message: byCode[code] || error?.message || fallback,
+  };
+}
+
 function StripePaymentBridge({ children }: { children: React.ReactNode }) {
   const { useStripe } = require('@stripe/stripe-react-native') as typeof import('@stripe/stripe-react-native');
   const { confirmPayment } = useStripe();
@@ -62,13 +96,15 @@ function StripePaymentBridge({ children }: { children: React.ReactNode }) {
       const { orderId, amount } = params;
 
       if (!isStripePublishableKeyConfigured()) {
-        showError(stripeKeySetupMessage());
-        return { status: 'failed' };
+        const errorMessage = stripeKeySetupMessage();
+        showError(errorMessage);
+        return { status: 'failed', errorMessage, errorCode: 'stripe_not_configured' };
       }
 
       if (!Number.isFinite(amount) || amount <= 0) {
-        showError('Invalid payment amount.');
-        return { status: 'failed' };
+        const errorMessage = 'Invalid payment amount.';
+        showError(errorMessage);
+        return { status: 'failed', errorMessage, errorCode: 'invalid_amount' };
       }
 
       try {
@@ -77,11 +113,10 @@ function StripePaymentBridge({ children }: { children: React.ReactNode }) {
         const paymentIntentId = intentRes.data?.paymentIntentId;
 
         if (!intentRes.success || !clientSecret) {
-          showError(
+          const errorMessage =
             (intentRes as { message?: string }).message ||
-              'Could not start secure payment. Please try again.'
-          );
-          return { status: 'failed' };
+            'Could not start secure payment. Please try again.';
+          return { status: 'failed', errorMessage, errorCode: 'payment_intent_failed' };
         }
 
         const { error: confirmError, paymentIntent: confirmedIntent } = await confirmPayment(
@@ -93,14 +128,15 @@ function StripePaymentBridge({ children }: { children: React.ReactNode }) {
 
         if (confirmError) {
           if (confirmError.code === 'Canceled') {
-            return { status: 'cancelled' };
+            const mapped = mapStripeError(confirmError);
+            return { status: 'cancelled', errorMessage: mapped.message, errorCode: mapped.code };
           }
-          showError(confirmError.message || 'Payment was not completed.');
-          return { status: 'failed' };
+          const mapped = mapStripeError(confirmError);
+          return { status: 'failed', errorMessage: mapped.message, errorCode: mapped.code };
         }
 
         const resolvedIntentId = confirmedIntent?.id || paymentIntentId;
-        if (resolvedIntentId) {
+        if (orderId && resolvedIntentId) {
           const confirmRes = await checkoutService.confirmOrderPayment(orderId, {
             paymentIntentId: resolvedIntentId,
             paymentMethod: 'stripe',
@@ -115,9 +151,13 @@ function StripePaymentBridge({ children }: { children: React.ReactNode }) {
 
         return { status: 'paid', paymentIntentId: resolvedIntentId };
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Payment failed. Please try again.';
-        showError(message);
-        return { status: 'failed' };
+        const rawMessage = err instanceof Error ? err.message : 'Payment failed. Please try again.';
+        const networkLike = /network|timeout|internet|fetch|connection/i.test(rawMessage);
+        if (networkLike) {
+          const mapped = mapStripeError({ code: 'network_error', message: rawMessage });
+          return { status: 'failed', errorMessage: mapped.message, errorCode: mapped.code };
+        }
+        return { status: 'failed', errorMessage: rawMessage, errorCode: 'payment_failed' };
       }
     },
     [confirmPayment]
