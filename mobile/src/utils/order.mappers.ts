@@ -172,8 +172,14 @@ export function getOrderLineItems(order: RawOrder): OrderLineItem[] {
       (Array.isArray(product.images) ? product.images[0] : null) ??
       product.imageUrl;
     const name =
-      String(row.name ?? row.productName ?? product.name ?? product.title ?? 'Product').trim() ||
-      'Product';
+      String(
+        row.name ??
+          row.productName ??
+          row.productTitle ??
+          product.name ??
+          product.title ??
+          'Product'
+      ).trim() || 'Product';
 
     return {
       id: String(row._id ?? row.id ?? product._id ?? index),
@@ -216,6 +222,12 @@ export function getPaymentStatusLabel(order: RawOrder): 'Paid' | 'Pending' | 'Fa
   const raw = String(
     order.payment_status ?? order.paymentState ?? payment?.status ?? ''
   ).toLowerCase();
+  const paymentId = String(order.paymentId ?? (order as { payment_id?: string }).payment_id ?? '');
+  if (paymentId.startsWith('pi_') || paymentId.startsWith('cs_')) {
+    if (!['failed', 'declined', 'cancelled', 'canceled'].includes(raw)) {
+      return 'Paid';
+    }
+  }
   if (['paid', 'completed', 'success', 'succeeded'].includes(raw)) return 'Paid';
   if (['failed', 'declined', 'cancelled', 'canceled'].includes(raw)) return 'Failed';
   return 'Pending';

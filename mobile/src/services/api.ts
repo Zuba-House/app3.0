@@ -33,7 +33,14 @@ function normalizeResponse<T>(raw: any): ApiResponse<T> {
     ) {
       data = data.product;
     } else if (Array.isArray(data.products)) {
-      data = data.products;
+      const looksLikeOrder =
+        data._id != null ||
+        data.totalAmt != null ||
+        data.payment_status != null ||
+        data.userId != null;
+      if (!looksLikeOrder) {
+        data = data.products;
+      }
     } else if (Array.isArray(data.orders)) {
       data = data.orders;
     } else if (Array.isArray(data.users)) {

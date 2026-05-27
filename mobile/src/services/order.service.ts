@@ -32,7 +32,15 @@ export const orderService = {
   getOrderById: async (orderId: string): Promise<ApiResponse<Order>> => {
     try {
       const response = await fetchDataFromApi<unknown>(`${API_ENDPOINTS.GET_ORDER}/${orderId}`);
-      const payload = response.data as unknown;
+      let payload = response.data as unknown;
+      if (Array.isArray(payload)) {
+        const listResponse = await orderService.getOrders();
+        const list = parseOrdersListPayload(listResponse.data);
+        const match = list.find((o) => String(o._id) === orderId);
+        if (match) {
+          return { ...response, data: match as unknown as Order };
+        }
+      }
       const order =
         payload && typeof payload === 'object' && payload !== null && 'order' in payload
           ? (payload as { order: Order }).order
