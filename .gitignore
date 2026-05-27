@@ -17,6 +17,10 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.cursor/
+
+# Local release artifacts
+Release Build 1/
 
 # Build & caches (monorepo)
 # Note: do not ignore root `dist/` — some packages (e.g. frontend) track assets under dist/.
