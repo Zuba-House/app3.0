@@ -1,64 +1,129 @@
-{
-  "cli": {
-    "version": ">= 18.11.0",
-    "appVersionSource": "remote"
-  },
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "ios": {
-        "simulator": false
-      },
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://zuba-api.onrender.com",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51SVpBOL4mpYpbq9c9goY5LX2IYbKHm9afZJupqPOhUybgz9buWhBSvZxYtIAtSK5x71a2z6bplwiC04ePiU3Ovql0020AiCYME",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "473177050132-1qblfnv4gap1gkpfq6mg4iu11lucp48u.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "473177050132-9rdnpnh57lnd3oi29tgujdnihgqfajo7.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "473177050132-2s3gl7imtijd3h36bj9tjtjqktc25eja.apps.googleusercontent.com"
-      }
-    },
-    "development-store": {
-      "developmentClient": true,
-      "distribution": "store",
-      "ios": {
-        "simulator": false
-      },
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://zuba-api.onrender.com",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51SVpBOL4mpYpbq9c9goY5LX2IYbKHm9afZJupqPOhUybgz9buWhBSvZxYtIAtSK5x71a2z6bplwiC04ePiU3Ovql0020AiCYME",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "473177050132-1qblfnv4gap1gkpfq6mg4iu11lucp48u.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "473177050132-9rdnpnh57lnd3oi29tgujdnihgqfajo7.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "473177050132-2s3gl7imtijd3h36bj9tjtjqktc25eja.apps.googleusercontent.com"
-      }
-    },
-    "preview": {
-      "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://zuba-api.onrender.com",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51SVpBOL4mpYpbq9c9goY5LX2IYbKHm9afZJupqPOhUybgz9buWhBSvZxYtIAtSK5x71a2z6bplwiC04ePiU3Ovql0020AiCYME",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "473177050132-1qblfnv4gap1gkpfq6mg4iu11lucp48u.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "473177050132-9rdnpnh57lnd3oi29tgujdnihgqfajo7.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "473177050132-2s3gl7imtijd3h36bj9tjtjqktc25eja.apps.googleusercontent.com"
-      }
-    },
-    "production": {
-      "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://zuba-api.onrender.com",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51SVpBOL4mpYpbq9c9goY5LX2IYbKHm9afZJupqPOhUybgz9buWhBSvZxYtIAtSK5x71a2z6bplwiC04ePiU3Ovql0020AiCYME",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "473177050132-1qblfnv4gap1gkpfq6mg4iu11lucp48u.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "473177050132-9rdnpnh57lnd3oi29tgujdnihgqfajo7.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "473177050132-2s3gl7imtijd3h36bj9tjtjqktc25eja.apps.googleusercontent.com"
-      }
-    }
-  },
-  "submit": {
-    "production": {
-      "ios": {
-        "ascAppId": "6743128257"
-      }
-    }
-  }
-}
-
+{
+
+  "cli": {
+
+    "version": ">= 18.11.0",
+
+    "appVersionSource": "remote"
+
+  },
+
+  "build": {
+
+    "development": {
+
+      "developmentClient": true,
+
+      "distribution": "internal",
+
+      "ios": {
+
+        "simulator": false
+
+      },
+
+      "env": {
+
+        "EXPO_PUBLIC_API_URL": "https://zuba-api.onrender.com",
+
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51SVpBOL4mpYpbq9c9goY5LX2IYbKHm9afZJupqPOhUybgz9buWhBSvZxYtIAtSK5x71a2z6bplwiC04ePiU3Ovql0020AiCYME",
+
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "473177050132-1qblfnv4gap1gkpfq6mg4iu11lucp48u.apps.googleusercontent.com",
+
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "473177050132-9rdnpnh57lnd3oi29tgujdnihgqfajo7.apps.googleusercontent.com",
+
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "473177050132-2s3gl7imtijd3h36bj9tjtjqktc25eja.apps.googleusercontent.com"
+
+      }
+
+    },
+
+    "development-store": {
+
+      "developmentClient": true,
+
+      "distribution": "store",
+
+      "ios": {
+
+        "simulator": false
+
+      },
+
+      "env": {
+
+        "EXPO_PUBLIC_API_URL": "https://zuba-api.onrender.com",
+
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51SVpBOL4mpYpbq9c9goY5LX2IYbKHm9afZJupqPOhUybgz9buWhBSvZxYtIAtSK5x71a2z6bplwiC04ePiU3Ovql0020AiCYME",
+
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "473177050132-1qblfnv4gap1gkpfq6mg4iu11lucp48u.apps.googleusercontent.com",
+
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "473177050132-9rdnpnh57lnd3oi29tgujdnihgqfajo7.apps.googleusercontent.com",
+
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "473177050132-2s3gl7imtijd3h36bj9tjtjqktc25eja.apps.googleusercontent.com"
+
+      }
+
+    },
+
+    "preview": {
+
+      "distribution": "internal",
+
+      "env": {
+
+        "EXPO_PUBLIC_API_URL": "https://zuba-api.onrender.com",
+
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51SVpBOL4mpYpbq9c9goY5LX2IYbKHm9afZJupqPOhUybgz9buWhBSvZxYtIAtSK5x71a2z6bplwiC04ePiU3Ovql0020AiCYME",
+
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "473177050132-1qblfnv4gap1gkpfq6mg4iu11lucp48u.apps.googleusercontent.com",
+
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "473177050132-9rdnpnh57lnd3oi29tgujdnihgqfajo7.apps.googleusercontent.com",
+
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "473177050132-2s3gl7imtijd3h36bj9tjtjqktc25eja.apps.googleusercontent.com"
+
+      }
+
+    },
+
+    "production": {
+
+      "autoIncrement": true,
+
+      "credentialsSource": "local",
+
+      "env": {
+
+        "EXPO_PUBLIC_API_URL": "https://zuba-api.onrender.com",
+
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51SVpBOL4mpYpbq9c9goY5LX2IYbKHm9afZJupqPOhUybgz9buWhBSvZxYtIAtSK5x71a2z6bplwiC04ePiU3Ovql0020AiCYME",
+
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "473177050132-1qblfnv4gap1gkpfq6mg4iu11lucp48u.apps.googleusercontent.com",
+
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "473177050132-9rdnpnh57lnd3oi29tgujdnihgqfajo7.apps.googleusercontent.com",
+
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "473177050132-2s3gl7imtijd3h36bj9tjtjqktc25eja.apps.googleusercontent.com"
+
+      }
+
+    }
+
+  },
+
+  "submit": {
+
+    "production": {
+
+      "ios": {
+
+        "ascAppId": "6743128257"
+
+      }
+
+    }
+
+  }
+
+}
+
+
