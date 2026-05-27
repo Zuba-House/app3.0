@@ -32,6 +32,7 @@
     "ios": {
       "supportsTablet": true,
       "useFrameworks": "static",
+      "icon": "./assets/icon.png",
       "bundleIdentifier": "ninja.wpapp.appzubahousecom",
       "googleServicesFile": "./GoogleService-Info.plist",
       "splash": {
