@@ -7,6 +7,7 @@ import {
   Image,
   StyleSheet,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
@@ -29,10 +30,12 @@ const EditProfileScreen: React.FC = () => {
   const [saving, setSaving] = useState(false);
 
   const pickPhoto = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      showError('Photo library permission is required');
-      return;
+    if (Platform.OS === 'ios') {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        showError('Photo library permission is required');
+        return;
+      }
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,

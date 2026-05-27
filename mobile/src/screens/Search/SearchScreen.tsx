@@ -305,10 +305,12 @@ export default function SearchScreen() {
       {
         text: 'Choose from library',
         onPress: async () => {
-          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (status !== 'granted') {
-            showError('Photo library permission is required');
-            return;
+          if (Platform.OS === 'ios') {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              showError('Photo library permission is required');
+              return;
+            }
           }
           const result = await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.6 });
           if (result.canceled || !result.assets?.[0]?.base64) return;

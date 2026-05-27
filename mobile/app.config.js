@@ -34,11 +34,24 @@ module.exports = () => {
 
   const googleScheme = getIosGoogleUrlScheme();
 
-  const plugins = (appJson.expo.plugins || []).filter((plugin) => {
-    if (!isStoreRelease) return true;
-    const name = Array.isArray(plugin) ? plugin[0] : plugin;
-    return name !== 'expo-dev-client';
-  });
+  const plugins = [
+    ...(appJson.expo.plugins || []).filter((plugin) => {
+      if (!isStoreRelease) return true;
+      const name = Array.isArray(plugin) ? plugin[0] : plugin;
+      return name !== 'expo-dev-client';
+    }),
+    './plugins/withBlockMediaPermissions.js',
+    [
+      'expo-image-picker',
+      {
+        photosPermission:
+          'Used to select profile photo and search products by image',
+        cameraPermission:
+          'Used to upload profile photo and search products by image',
+        microphonePermission: false,
+      },
+    ],
+  ];
 
 
 
@@ -96,13 +109,18 @@ module.exports = () => {
 
         ...appJson.expo.android,
 
+        blockedPermissions: [
+          'android.permission.READ_MEDIA_IMAGES',
+          'android.permission.READ_MEDIA_VIDEO',
+          'android.permission.READ_MEDIA_AUDIO',
+          'android.permission.READ_EXTERNAL_STORAGE',
+        ],
+
         permissions: [
 
           'android.permission.INTERNET',
 
           'android.permission.CAMERA',
-
-          'android.permission.READ_MEDIA_IMAGES',
 
           'android.permission.ACCESS_COARSE_LOCATION',
 
