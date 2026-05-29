@@ -40,6 +40,15 @@ module.exports = () => {
       const name = Array.isArray(plugin) ? plugin[0] : plugin;
       return name !== 'expo-dev-client';
     }),
+    [
+      'expo-build-properties',
+      {
+        android: {
+          compileSdkVersion: 35,
+          targetSdkVersion: 35,
+        },
+      },
+    ],
     './plugins/withBlockMediaPermissions.js',
     [
       'expo-image-picker',
@@ -108,6 +117,8 @@ module.exports = () => {
       android: {
 
         ...appJson.expo.android,
+
+        versionCode: isStoreRelease ? 1000202407 : appJson.expo.android?.versionCode,
 
         blockedPermissions: [
           'android.permission.READ_MEDIA_IMAGES',

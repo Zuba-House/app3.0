@@ -48,7 +48,7 @@
     },
     "android": {
       "package": "appzubahousecom.wpapp",
-      "versionCode": 3,
+      "versionCode": 1000202407,
       "enableProguardInReleaseBuilds": true,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {

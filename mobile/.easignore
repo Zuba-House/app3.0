@@ -2,6 +2,11 @@
 node_modules/.cache/
 .expo/
 dist/
+**/.gradle/
+**/build/
+android/.gradle/
+android/build/
+android/app/build/
 *.md
 !README.md
 INSTALL_DEV_BUILD.md
