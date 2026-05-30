@@ -118,7 +118,7 @@ module.exports = () => {
 
         ...appJson.expo.android,
 
-        versionCode: isStoreRelease ? 1000202407 : appJson.expo.android?.versionCode,
+        versionCode: isStoreRelease ? 1000202410 : appJson.expo.android?.versionCode,
 
         blockedPermissions: [
           'android.permission.READ_MEDIA_IMAGES',
